@@ -23,6 +23,8 @@ function posthogReady(): boolean {
 export function trackClient(event: EventName, props?: Record<string, unknown>) {
   assertKnown(event);
   const clean = scrubProps(props);
+  // e2e builds only: keep a copy so tests can check page views and that no message text is captured.
+  if (process.env.NEXT_PUBLIC_E2E_EVENTS === "1") ((window as unknown as { __vaultEvents?: unknown[] }).__vaultEvents ??= []).push({ event, props: clean });
   const def = EVENTS[event];
   if (def.business) {
     void fetch("/api/track", {

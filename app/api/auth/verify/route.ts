@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   const sb = await supabaseServer();
   const { data, error } = await sb.auth.verifyOtp({ email, token: code, type: "email" });
   if (error || !data.user) {
-    await track("vault_code_failed", { reason: error?.code ?? "invalid" }, { email });
+    await track("vault_code_failed", { reason: error?.code ?? "invalid", attempt: Number(req.headers.get("x-attempt") ?? 0) || null }, { email });
     return json({ error: "invalid_code" }, 400);
   }
   await markSignedIn(email);

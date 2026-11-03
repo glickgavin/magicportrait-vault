@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Download, Sparkles } from "lucide-react";
 import { markOpenedFromEmail, publicCard } from "@/lib/cards/public";
 import { TrackPageView } from "@/components/TrackPageView";
+import { SuperProps } from "@/components/SuperProps";
 import { t } from "@/lib/i18n";
 import { db } from "@/lib/db/client";
 
@@ -29,6 +30,7 @@ export default async function PublicCardPage({ params, searchParams }: { params:
   const theme = card.theme_id ? ((await db().from("themes").select("name").eq("id", card.theme_id).single()).data as { name: string } | null) : null;
   return (
     <div className="mx-auto max-w-[480px]" data-testid="public-card">
+      <SuperProps props={{ entry_point: "recipient_page" }} />
       <TrackPageView event="page_view_card_received" props={{ card_id: card.public_id, entry_point: "recipient_page" }} />
       <p className="text-center text-[16px] text-ink-2">{t("publicCard.from", { from: card.from_name, theme: theme?.name ?? t("publicCard.card") })}</p>
       <img src={`/c/${slug}/image`} alt={t("publicCard.alt", { from: card.from_name })} width={1500} height={2100} className="ph-no-capture mx-auto mt-4 w-full max-w-[420px] rounded-[8px] shadow-[0_12px_40px_rgba(0,0,0,0.18)]" />

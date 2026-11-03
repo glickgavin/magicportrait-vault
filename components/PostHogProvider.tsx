@@ -33,7 +33,13 @@ export function PostHogProvider({ children, identity }: { children: React.ReactN
         return event;
       },
       loaded: (ph) => {
-        ph.register({ app: "vault" });
+        const q = new URLSearchParams(window.location.search);
+        const utm: Record<string, string> = {};
+        for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]) {
+          const v = q.get(k);
+          if (v) utm[k] = v.slice(0, 120);
+        }
+        ph.register({ app: "vault", ...utm });
       },
     });
   }, []);

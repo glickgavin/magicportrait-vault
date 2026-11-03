@@ -32,6 +32,7 @@ export function SignInForm({ purpose, next, expired, codeMinutes }: { purpose: P
       return;
     }
     setBusy(true);
+    if (purpose === "redeem") trackClient("redeem_lookup_submitted", { has_order_in_url: next.startsWith("/orders/"), email_domain: email.trim().toLowerCase().split("@")[1] ?? null });
     try {
       const r = await fetch("/api/auth/code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, purpose }) });
       if (r.status === 429) setError(t("errors.rateLimited"));
@@ -57,7 +58,7 @@ export function SignInForm({ purpose, next, expired, codeMinutes }: { purpose: P
     }
     setBusy(true);
     try {
-      const r = await fetch("/api/auth/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, code, next }) });
+      const r = await fetch("/api/auth/verify", { method: "POST", headers: { "content-type": "application/json", "x-attempt": String(attempt + 1) }, body: JSON.stringify({ email, code, next }) });
       const body = (await r.json().catch(() => ({}))) as { next?: string };
       if (r.ok) {
         identifyClient(email.trim().toLowerCase(), { email: email.trim().toLowerCase() });

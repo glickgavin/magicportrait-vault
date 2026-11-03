@@ -18,7 +18,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 9 | Free gift offer | done |
 | 10 | Settings | done |
 | 11 | Insights | done |
-| 12 | Analytics pass | pending |
+| 12 | Analytics pass | done |
 | 13 | Final check and preview | pending |
 
 ## Part 0: Preflight (3 Nov 2026)
@@ -144,6 +144,15 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Delete on request** (customer): deletes their cards, card JPEGs and portrait copies, anonymises their activity (`anonymise_activity`), deletes their outbox rows, queues the Klaviyo deletion job, suppresses the address (`all`, `deletion`), removes sign-in links and the member row, pseudonymises the email on `gift_offers`, and records the request in `data_requests`.
 - Tests: KPI queries against seeded rows (this and the previous period), cards per day, top themes, funnel; timeline order across sources; export; deletion (files gone, rows anonymised, outbox cleared, email suppressed, Klaviyo job queued, request recorded); e2e for the pages, customer search to an opaque URL, timeline filters, logged card views, hiding a link.
 
+## Part 12: Analytics pass
+
+- Audited every event in `docs/analytics.md` against the code. Added the missing ones: `vault_lookup_succeeded` / `vault_lookup_empty` (after each sign-in, with counts and `lookup_ms`), `redeem_lookup_submitted` (RedeemEntry), `redeem_lookup_succeeded` / `redeem_lookup_failed` (order page), and `attempt` on `vault_code_failed`. `gift_popup_shown` / `_cta_tapped` / `_dismissed` belong to the Shopify thank-you extension (outside this repo; listed in `docs/gift-sheet.md`).
+- Identity: `identify(email)` on sign-in and on every signed-in page (`Identify`), with `email`, `is_customer`, `first_order_at`, `portrait_count`, `session_count`, `cards_created` and `vault_first_seen_at` (set once). Super properties: `app: "vault"`, `is_customer`, `entry_point` (from `?entry=`, `recipient_page` on card pages) and `utm_*`.
+- Replay: inputs masked, `.ph-no-capture` on every card preview and card image, `data-ph-mask` on names and messages; URLs scrubbed on `/g/` and `/c/`.
+- `scripts/posthog-setup.ts` creates the "My Magic Portraits" dashboard with the §5 funnels and trends. **Not run**: `POSTHOG_PERSONAL_API_KEY` isn't available in this session.
+- `prebuild` runs the event-name check, so `pnpm build` (and Vercel) fails on any event name that isn't in the list; `pnpm lint` runs it too.
+- Tests: e2e asserts every customer page fires its `page_view_*` (19 screens and states) and every Settings page fires `settings_viewed` with a section; signed-in pages identify the person; a card made with a distinctive message, recipient name and email leaves none of them in browser events, `activity_log` or the Klaviyo outbox (with Klaviyo switched on for the test); replay-masking checks.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -175,6 +184,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Placeholder artwork and the sample portrait are traced into the serverless bundle** (`outputFileTracingIncludes`), because the renderer reads them from disk at runtime.
 - **"Delete on request" on a single card** (All cards) deletes that card and its files only; the full person deletion (SPEC §15) is on the customer page.
 - **Rate-limit settings** accept up to 1,000,000 per hour (the local test seed lifts them; a test now checks every test-seed value validates).
+- **Test-only browser hook:** when `NEXT_PUBLIC_E2E_EVENTS=1` (set only in the local test env) the browser keeps a copy of tracked events in `window.__vaultEvents` for the analytics tests. Vercel builds don't set it.
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked

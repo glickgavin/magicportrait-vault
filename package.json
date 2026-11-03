@@ -20,7 +20,8 @@
     "db:reset": "supabase db reset",
     "db:apply-remote": "NODE_USE_ENV_PROXY=1 node --experimental-strip-types --no-warnings scripts/db-apply-remote.ts",
     "auth:configure": "NODE_USE_ENV_PROXY=1 node --experimental-strip-types --no-warnings scripts/configure-auth.ts",
-    "db:seed:gen": "node --experimental-strip-types --no-warnings scripts/gen-seed.ts"
+    "db:seed:gen": "node --experimental-strip-types --no-warnings scripts/gen-seed.ts",
+    "prebuild": "node scripts/check-events.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.1.0",

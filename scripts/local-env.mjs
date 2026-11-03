@@ -37,6 +37,7 @@ export function appTestEnv(port = 3100) {
     NEXT_TELEMETRY_DISABLED: "1",
     SETTINGS_CACHE_MS: "0",
     E2E_FIXTURE_RESET: "1",
+    NEXT_PUBLIC_E2E_EVENTS: "1",
   };
 }
 

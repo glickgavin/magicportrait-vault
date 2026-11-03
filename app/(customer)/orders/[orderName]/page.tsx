@@ -11,6 +11,7 @@ import { MugPicker } from "@/components/orders/MugPicker";
 import { Downloads } from "@/components/orders/Downloads";
 import { FulfillmentPill } from "@/components/orders/OrderChips";
 import { TrackPageView } from "@/components/TrackPageView";
+import { track } from "@/lib/track";
 import { fmtDate } from "@/lib/format";
 import { t, tn } from "@/lib/i18n";
 
@@ -22,9 +23,13 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNam
   const { orderName } = await params;
   const user = await requireUser(`/orders/${orderName}`);
   const order = await findOwnedOrder(user.email, decodeURIComponent(orderName));
-  if (!order) return <OrderNotFound />;
+  if (!order) {
+    await track("redeem_lookup_failed", { reason: "not_found_or_not_owned", had_order_in_url: true, email_domain: user.email.split("@")[1] }, { email: user.email });
+    return <OrderNotFound />;
+  }
   const [view, cfg, cardsEnabled] = await Promise.all([viewOrder(order), redeemConfig(), getSetting("cards.enabled")]);
   const { parsed } = view;
+  await track("redeem_lookup_succeeded", { order_id: order.legacyId, order_name: order.name, portrait_count: parsed.portraits.length, mug_present: parsed.mug.present, mug_already_chosen: Boolean(parsed.mug.currentTileId), downloads_enabled: view.downloadsEnabled }, { email: user.email });
   const lockedText = view.lock.reason === "cancelled" ? t("orders.lockedCancelled") : view.lock.locked ? t("orders.locked") : null;
   const param = order.name.replace(/^#/, "");
   return (
