@@ -1,0 +1,230 @@
+{
+  "pack": "2026-11 seasonal",
+  "canvas": {
+    "w": 1500,
+    "h": 2100
+  },
+  "themes": [
+    {
+      "slug": "new-year",
+      "name": "New Year",
+      "category": "new-year"
+    },
+    {
+      "slug": "christmas",
+      "name": "Christmas",
+      "category": "holidays"
+    },
+    {
+      "slug": "birthday",
+      "name": "Birthday",
+      "category": "birthdays"
+    }
+  ],
+  "versions": [
+    {
+      "theme": "new-year",
+      "slug": "midnight-gold",
+      "name": "Midnight Gold",
+      "audience": "general",
+      "is_new": true,
+      "sort_order": 1,
+      "background": "new-year/midnight-gold/new-year-midnight-gold-background.jpg",
+      "overlay": "new-year/midnight-gold/new-year-midnight-gold-overlay.png",
+      "layout": "new-year/midnight-gold/layout.json",
+      "preview": "new-year/midnight-gold/new-year-midnight-gold-preview.jpg",
+      "message_ideas": [
+        "Happy New Year, {to}! Here's to a year full of good things.",
+        "Cheers to new beginnings, {to}. Wishing you health, joy and lots of laughter.",
+        "{pet} and I are sending you all our love for the year ahead!"
+      ]
+    },
+    {
+      "theme": "new-year",
+      "slug": "champagne-toast",
+      "name": "Champagne Toast",
+      "audience": "general",
+      "is_new": true,
+      "sort_order": 2,
+      "background": "new-year/champagne-toast/new-year-champagne-toast-background.jpg",
+      "overlay": "new-year/champagne-toast/new-year-champagne-toast-overlay.png",
+      "layout": "new-year/champagne-toast/layout.json",
+      "preview": "new-year/champagne-toast/new-year-champagne-toast-preview.jpg",
+      "message_ideas": [
+        "Here's to you, {to}! May this year sparkle as brightly as you do.",
+        "Raising a glass to you, {to}. Happy New Year and all my love.",
+        "{pet} would raise a glass too, if paws could hold one. Happy New Year, {to}!"
+      ]
+    },
+    {
+      "theme": "new-year",
+      "slug": "pawsome-new-year",
+      "name": "Pawsome New Year",
+      "audience": "pet",
+      "is_new": true,
+      "sort_order": 3,
+      "background": "new-year/pawsome-new-year/new-year-pawsome-new-year-background.jpg",
+      "overlay": "new-year/pawsome-new-year/new-year-pawsome-new-year-overlay.png",
+      "layout": "new-year/pawsome-new-year/layout.json",
+      "preview": "new-year/pawsome-new-year/new-year-pawsome-new-year-preview.jpg",
+      "message_ideas": [
+        "Happy New Year, {to}! {pet} says this year is going to be pawsome.",
+        "Wishing you a pawsome New Year, {to}, from both of us (and our wagging tails).",
+        "New year, same good pet. Love you, {to}!"
+      ]
+    },
+    {
+      "theme": "new-year",
+      "slug": "pet-resolutions",
+      "name": "Pet Resolutions",
+      "audience": "pet",
+      "is_new": true,
+      "sort_order": 4,
+      "background": "new-year/pet-resolutions/new-year-pet-resolutions-background.jpg",
+      "overlay": "new-year/pet-resolutions/new-year-pet-resolutions-overlay.png",
+      "layout": "new-year/pet-resolutions/layout.json",
+      "preview": "new-year/pet-resolutions/new-year-pet-resolutions-preview.jpg",
+      "message_ideas": [
+        "Happy New Year, {to}! {pet}'s resolutions: more treats, more naps, more visits to you.",
+        "New year, same lovable {pet}. Wishing you a wonderful year, {to}!",
+        "Our only resolution is to see you more often. Happy New Year, {to}!"
+      ]
+    },
+    {
+      "theme": "christmas",
+      "slug": "evergreen-gold",
+      "name": "Evergreen & Gold",
+      "audience": "general",
+      "is_new": true,
+      "sort_order": 1,
+      "background": "christmas/evergreen-gold/christmas-evergreen-gold-background.jpg",
+      "overlay": "christmas/evergreen-gold/christmas-evergreen-gold-overlay.png",
+      "layout": "christmas/evergreen-gold/layout.json",
+      "preview": "christmas/evergreen-gold/christmas-evergreen-gold-preview.jpg",
+      "message_ideas": [
+        "Merry Christmas, {to}! Wishing you a season full of warmth and joy.",
+        "Sending you love and comfort and joy this Christmas, {to}.",
+        "Merry Christmas from {pet} and me. We can't wait to see you!"
+      ]
+    },
+    {
+      "theme": "christmas",
+      "slug": "winter-wreath",
+      "name": "Winter Wreath",
+      "audience": "general",
+      "is_new": true,
+      "sort_order": 2,
+      "background": "christmas/winter-wreath/christmas-winter-wreath-background.jpg",
+      "overlay": "christmas/winter-wreath/christmas-winter-wreath-overlay.png",
+      "layout": "christmas/winter-wreath/layout.json",
+      "preview": "christmas/winter-wreath/christmas-winter-wreath-preview.jpg",
+      "message_ideas": [
+        "Merry Christmas, {to}! Peace, love and joy to you this season.",
+        "Wishing you a cozy Christmas and a bright New Year, {to}.",
+        "{pet} and I are sending you the warmest Christmas hugs, {to}."
+      ]
+    },
+    {
+      "theme": "christmas",
+      "slug": "pawsitively-merry",
+      "name": "Pawsitively Merry",
+      "audience": "pet",
+      "is_new": true,
+      "sort_order": 3,
+      "background": "christmas/pawsitively-merry/christmas-pawsitively-merry-background.jpg",
+      "overlay": "christmas/pawsitively-merry/christmas-pawsitively-merry-overlay.png",
+      "layout": "christmas/pawsitively-merry/layout.json",
+      "preview": "christmas/pawsitively-merry/christmas-pawsitively-merry-preview.jpg",
+      "message_ideas": [
+        "Merry Christmas, {to}! {pet} has been pawsitively good this year (mostly).",
+        "Wishing you a pawsitively merry Christmas, {to}, from both of us!",
+        "{pet} wanted to be in the Christmas card. Who could say no? Merry Christmas, {to}!"
+      ]
+    },
+    {
+      "theme": "christmas",
+      "slug": "dear-santa",
+      "name": "Dear Santa",
+      "audience": "pet",
+      "is_new": true,
+      "sort_order": 4,
+      "background": "christmas/dear-santa/christmas-dear-santa-background.jpg",
+      "overlay": "christmas/dear-santa/christmas-dear-santa-overlay.png",
+      "layout": "christmas/dear-santa/layout.json",
+      "preview": "christmas/dear-santa/christmas-dear-santa-preview.jpg",
+      "message_ideas": [
+        "Merry Christmas, {to}! {pet} has been mostly good this year. Santa is reviewing the evidence.",
+        "Exhibit A: one very good {pet}. Merry Christmas, {to}!",
+        "{pet} wrote to Santa and asked for one thing: more time with you. Merry Christmas, {to}!"
+      ]
+    },
+    {
+      "theme": "birthday",
+      "slug": "confetti-pop",
+      "name": "Confetti Pop",
+      "audience": "general",
+      "is_new": true,
+      "sort_order": 1,
+      "background": "birthday/confetti-pop/birthday-confetti-pop-background.jpg",
+      "overlay": "birthday/confetti-pop/birthday-confetti-pop-overlay.png",
+      "layout": "birthday/confetti-pop/layout.json",
+      "preview": "birthday/confetti-pop/birthday-confetti-pop-preview.jpg",
+      "message_ideas": [
+        "Happy Birthday, {to}! Hope your day is as wonderful as you are.",
+        "Wishing you the happiest of birthdays, {to}. Let's celebrate!",
+        "Happy Birthday from {pet} and me, {to}! Have the best day."
+      ]
+    },
+    {
+      "theme": "birthday",
+      "slug": "balloon-bouquet",
+      "name": "Balloon Bouquet",
+      "audience": "general",
+      "is_new": true,
+      "sort_order": 2,
+      "background": "birthday/balloon-bouquet/birthday-balloon-bouquet-background.jpg",
+      "overlay": "birthday/balloon-bouquet/birthday-balloon-bouquet-overlay.png",
+      "layout": "birthday/balloon-bouquet/layout.json",
+      "preview": "birthday/balloon-bouquet/birthday-balloon-bouquet-preview.jpg",
+      "message_ideas": [
+        "Happy Birthday, {to}! Here's to another wonderful trip around the sun.",
+        "Sending you a bouquet of birthday wishes, {to}. Enjoy every moment!",
+        "{pet} and I hope your birthday is as lovely as you are, {to}."
+      ]
+    },
+    {
+      "theme": "birthday",
+      "slug": "pawty-time",
+      "name": "Pawty Time",
+      "audience": "pet",
+      "is_new": true,
+      "sort_order": 3,
+      "background": "birthday/pawty-time/birthday-pawty-time-background.jpg",
+      "overlay": "birthday/pawty-time/birthday-pawty-time-overlay.png",
+      "layout": "birthday/pawty-time/layout.json",
+      "preview": "birthday/pawty-time/birthday-pawty-time-preview.jpg",
+      "message_ideas": [
+        "Happy Birthday, {to}! {pet} says it's pawty time!",
+        "It's your birthday, {to}! {pet} is ready to party (and share the cake).",
+        "Wishing you the happiest birthday, {to}, from your favorite furry party animal."
+      ]
+    },
+    {
+      "theme": "birthday",
+      "slug": "treats-on-me",
+      "name": "Treats On Me",
+      "audience": "pet",
+      "is_new": true,
+      "sort_order": 4,
+      "background": "birthday/treats-on-me/birthday-treats-on-me-background.jpg",
+      "overlay": "birthday/treats-on-me/birthday-treats-on-me-overlay.png",
+      "layout": "birthday/treats-on-me/layout.json",
+      "preview": "birthday/treats-on-me/birthday-treats-on-me-preview.jpg",
+      "message_ideas": [
+        "Happy Birthday, {to}! The treats are on {pet} today.",
+        "{pet} saved the best treat for you, {to}. Happy Birthday!",
+        "Happy Birthday, {to}! Wishing you a day full of treats, naps and belly rubs."
+      ]
+    }
+  ]
+}

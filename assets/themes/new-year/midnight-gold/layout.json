@@ -1,0 +1,52 @@
+{
+  "canvas": {
+    "w": 1500,
+    "h": 2100
+  },
+  "photo": {
+    "x": 285,
+    "y": 572,
+    "w": 930,
+    "h": 968,
+    "shape": "arch",
+    "frame": {
+      "color": "#D9B25C",
+      "width": 16
+    }
+  },
+  "text": {
+    "to": {
+      "x": 150,
+      "y": 1650,
+      "w": 1200,
+      "font": "DM Serif Display",
+      "size": 62,
+      "color": "#F5EEDC",
+      "align": "center",
+      "template": "Dear {to},"
+    },
+    "message": {
+      "x": 150,
+      "y": 1735,
+      "w": 1200,
+      "h": 220,
+      "font": "Plus Jakarta Sans",
+      "size": 40,
+      "lineHeight": 1.35,
+      "color": "#E6E0D0",
+      "align": "center",
+      "valign": "middle",
+      "maxLines": 4
+    },
+    "from": {
+      "x": 150,
+      "y": 1965,
+      "w": 1200,
+      "font": "DM Serif Display",
+      "size": 54,
+      "color": "#E7C46A",
+      "align": "center",
+      "template": "With love, {from}"
+    }
+  }
+}

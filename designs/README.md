@@ -42,3 +42,4 @@ These are the approved mockups. File names still say "Vault" (the internal code 
 | **System** | | |
 | `Blueprint` | Flow, data model, rules | — (reference) |
 | `ThemeSpec` | Artwork spec for designers | — (reference; also show it as help text in the template editor) |
+| `ThemePack` (screenshot only) | The 12 finished theme versions (New Year, Christmas, Birthday; 2 general + 2 pet each) | Files in `assets/themes/`, loaded by Settings › Theme library › Import theme pack |

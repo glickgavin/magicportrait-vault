@@ -186,13 +186,18 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
              "frame": { "color": "#FFFFFF", "width": 30 } },
   "text": {
     "to":      { "x": 150, "y": 1660, "w": 1200, "font": "DM Serif Display", "size": 64, "color": "#3B1F0E", "align": "center", "template": "Dear {to}," },
-    "message": { "x": 150, "y": 1740, "w": 1200, "h": 220, "font": "Plus Jakarta Sans", "size": 44, "lineHeight": 1.35, "color": "#3B1F0E", "align": "center", "maxLines": 4 },
+    "message": { "x": 150, "y": 1740, "w": 1200, "h": 220, "font": "Plus Jakarta Sans", "size": 44, "lineHeight": 1.35, "color": "#3B1F0E", "align": "center", "valign": "middle", "maxLines": 4 },
     "from":    { "x": 150, "y": 1980, "w": 1200, "font": "DM Serif Display", "size": 56, "color": "#3B1F0E", "align": "center", "template": "With love, {from}" }
   }
 }
 ```
 
-`shape` is one of `rect` · `rounded` · `circle` · `arch`. The approved fonts are DM Serif Display and Plus Jakarta Sans; more can be added in Settings later (the font files ship with the app). Text is shrunk down to `minSize` (default 70% of `size`) before wrapping, and never overflows its box.
+`shape` is one of `rect` · `rounded` · `circle` · `arch` (a rectangle with a semicircular top of radius `w/2`). The approved fonts are DM Serif Display and Plus Jakarta Sans; more can be added in Settings later (the font files ship with the app). Text is shrunk down to `minSize` (default 70% of `size`) before wrapping, and never overflows its box.
+
+- `y` is the **top** of each text box. `to` and `from` are single lines (box height ≈ `size × 1.25`) that shrink to fit `w`.
+- `message.valign` is `top` (default) or `middle`; `middle` centres the wrapped lines vertically in the `h` box.
+- `photo.frame` is drawn **inside** the photo box, over the portrait's edge; `width: 0` means no frame (the background art supplies it).
+- Layer order: background, portrait (clipped to `shape`), frame, overlay, text.
 
 ## Seed data
 
@@ -245,6 +250,7 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `links.menu_thumbnails` | [] (six image URLs for the menu's product list; placeholders until set, SPEC Q9) |
 
 - The four categories, and themes Christmas, Happy Holidays, New Year, Birthday, Thank you, With love and Congratulations. Each has one version with a plain placeholder background (a generated solid colour plus a headline) and a default layout. The 10 versions in the designs (`CardPreview` variants) are the target set; real artwork comes from the designers (`ThemeSpec`).
+- **Theme pack** (`assets/themes/`, manifest `themes.json`): 12 finished versions for New Year, Christmas and Birthday (2 general + 2 pet-centric each). Settings › Theme library › Import theme pack loads them into `magic-vault` as drafts; the local test stack loads them as live.
 - **Two seed files:**
   - `supabase/seed.sql` (the live project, `magic-vault`): every version is **draft**, and every `cards.enabled` and `gift.*` switch is off. It is idempotent (`on conflict do nothing`), so re-running it never overwrites what a super user changed.
   - `supabase/seed.test.sql` (the local test stack only, never `magic-vault`): one **live** version per category, `cards.enabled = true`, and fixture people. The e2e tests have something to pick.

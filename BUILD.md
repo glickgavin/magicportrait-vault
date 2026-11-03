@@ -108,7 +108,7 @@ Each part lists what to build and what has to be true before it's committed.
 
 ### Part 2: Database and settings
 - Migrations for everything in `docs/schema.md`: tables, checks, indexes, RLS, `is_super_user`, `settings_history` trigger, the activity_log append-only guard, `rate_limits` with `hit_rate_limit()`, buckets.
-- `supabase/seed.sql` (live project: drafts, switches off; idempotent, `on conflict do nothing`, so it never overwrites a value a super user changed) and `supabase/seed.test.sql` (local test stack only: one live version per category, `cards.enabled` on, fixture people). `supabase/config.toml` points `db reset` at `seed.test.sql`.
+- `supabase/seed.sql` (live project: drafts, switches off; idempotent, `on conflict do nothing`, so it never overwrites a value a super user changed) and `supabase/seed.test.sql` (local test stack only: one live version per category, `cards.enabled` on, fixture people). `supabase/config.toml` points `db reset` at `seed.test.sql`. The local stack also loads the theme pack (`assets/themes/themes.json`) as live versions, uploading its files to the local `theme-assets` bucket.
 - **Local test stack:** the Supabase CLI's `supabase start` (Docker), without the services we don't use (Studio, Realtime, edge runtime, analytics, imgproxy). Unit, integration and e2e tests all use it; `supabase db reset` rebuilds it. If Docker can't run the stack, use the preinstalled PostgreSQL 16 with small stubs for the `auth` and `storage` schemas for the database tests, and record the e2e sign-in tests as Blocked.
 - **Live project:** `scripts/db-apply-remote.ts` applies pending files from `supabase/migrations/` in order, then `supabase/seed.sql`, to `magic-vault` through the Management API (`POST https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query`). It records applied versions in `supabase_migrations.schema_migrations`, the table the Supabase CLI uses. Run it at the end of every part that adds a migration, so Vercel previews (which use the live project) keep working.
 - `lib/settings/registry.ts` with every key from `docs/schema.md` § Seed and `docs/data.md` § Constants, plus typed `getSetting`/`setSetting` (short cache, validation, history).
@@ -160,7 +160,8 @@ Each part lists what to build and what has to be true before it's committed.
 - `/c/[slug]` public page and image route; `share_hidden` handling; `/c/[slug]/try` (logs the tap, then redirects with the UTM tags).
 - `POST /api/track` for business events from the browser (allow-listed names; email from the session only).
 - **Done when**:
-  - the renderer has golden-image tests for each seed version (small pixel tolerance) and a test that long messages shrink and never overflow
+  - the renderer has golden-image tests for each theme-pack version (small pixel tolerance, using a fixture portrait) and a test that long messages shrink and never overflow
+  - the renderer follows the layout rules in `docs/schema.md` (top-anchored text boxes, `valign`, frame inside the photo box, layer order)
   - e2e covers both deliveries: self, and email up to a queued `card_deliveries` row. Sending is tested in Part 7.
   - a `/g/[token]` link lands on `FirstCard` for someone with no cards, and on step 1 for someone with cards
   - on `FirstCard`, typing a name and tapping Create (no other input) makes a card
@@ -223,7 +224,8 @@ Each part lists what to build and what has to be true before it's committed.
   - draggable zones writing `layout`
   - test render
   - publish with thumbnail generation
-  - status and `is_new`.
+  - status and `is_new`
+  - **Import theme pack**: reads `assets/themes/themes.json`, uploads the files to `theme-assets/<theme>/<version>/`, creates missing themes in their category and each version as **draft** with its layout and message ideas; idempotent by (theme slug, version slug).
 - Data-source test buttons, including Klaviyo with outbox counts and "retry failed"; super-user add/remove with its guards; activity log browser.
 - **Done when**:
   - e2e as a super user changes a setting, which shows in history and changes behaviour
@@ -269,7 +271,7 @@ Each part lists what to build and what has to be true before it's committed.
 
 ## After the build (launch, with Gavin)
 
-1. Review the preview on a phone. Run every "Test" in Settings › Data sources and "Send me a test" in Settings › Emails. Add real theme artwork via Settings › Theme library and publish the first versions.
+1. Review the preview on a phone. Run every "Test" in Settings › Data sources and "Send me a test" in Settings › Emails. In Settings › Theme library, run **Import theme pack**, check the 12 drafts, and publish the ones you want live.
 2. Merge the pull request into `main`. That deploys `my.magicportraits.ai` (nothing is switched on yet).
 3. Run `scripts/register-shopify-webhook.ts` against production (orders/paid → My Magic Portraits).
 4. Point the live site's `/redeem` at `https://my.magicportraits.ai/redeem` (keep the query string), and add the MY MAGIC PORTRAITS links to its menu. This is a change in the Lovable project.
