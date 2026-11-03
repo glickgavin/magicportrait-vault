@@ -14,6 +14,9 @@ These are the approved mockups. File names still say "Vault" (the internal code 
 | `Account` | Account menu from the initials | `AccountMenu` component |
 | `VaultPortraits` | All portraits, ordered or not | `/portraits` |
 | `VaultGuest` | Home for a creator with no order | `/` (creator state) |
+| **First time (no cards yet)** | | |
+| `FirstHome` | Home before the first card: one big "Make my card" | `/` (first-time state) |
+| `FirstCard` | First card on one screen: the card is already made, they add a name | `/create` (first-time state) |
 | **Card builder** | | |
 | `M1Theme` | Step 1, themes grouped by occasion | `/create` (`?category=`) |
 | `M2Portrait` | Step 2, portrait | `/create/portrait` |

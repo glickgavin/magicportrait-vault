@@ -99,6 +99,18 @@ Business events that happen in the browser (share, copy link, download, mug tile
 | `page_view_card_ready` | Step 5 | `card_id` |
 | `card_step_back` | Back button | `from_step` |
 
+### First card (one screen, SPEC §8.0)
+| Event | When | Key properties |
+|---|---|---|
+| `page_view_card_first` | `FirstCard` shown | `theme_slug`, `version_slug`, `portrait_was_ordered`, `pet_name_known`, `entry_point` |
+| `card_first_design_changed` | "Change design" | `to_version_slug`, `via` (`cycle` / `picker`) |
+| `card_first_photo_changed` | "Change photo" | `image_id`, `was_ordered` |
+| `card_first_idea_changed` | "Try another" | `idea_index` |
+| `card_first_full_builder_opened` | "See all designs" | |
+| `page_view_vault_home_first` | `FirstHome` (no cards yet) | `mug_pending` |
+
+`card_create_tapped` and `card_created` carry `flow` (`first` / `full`) and `first_card` (true/false), so the first-card funnel is `page_view_card_first` → `card_create_tapped` (`flow=first`) → `card_render_completed`.
+
 ### After creating
 | Event | When | Key properties |
 |---|---|---|
@@ -164,6 +176,11 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 | `admin_theme_updated` / `admin_category_updated` / `admin_version_updated` | Theme library edits | `theme_slug` / `category` / `version_slug` |
 | `card_recipient_email_bounced` | Recipient email bounced | `card_id` |
 | `card_recipient_unsubscribed` | "Don't email me cards" | `card_id` |
+| `free_gift_unlocked` | A qualifying order is paid (sent to Klaviyo, SPEC §14a) | `order_id`, `order_name`, `first_order` |
+| `card_created` | A card row is created and rendered | `card_id`, `theme_slug`, `category`, `delivery`, `scheduled`, `flow`, `first_card` |
+| `gift_reminder_due` | Seasonal reminder due for a customer | `category`, `version_slug` |
+| `mug_photo_needed` | Free mug with no photo after `redeem.mug_reminder_after_days` | `order_id` |
+| `error_klaviyo_send_failed` | An outbox row gave up after 8 attempts | `event`, `status_code` |
 
 ## 5. Dashboards, funnels and replays to set up in PostHog
 
@@ -182,6 +199,7 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 - Theme picker: grouped rows vs grid on open.
 - Gift email: send after order paid vs after the portrait is delivered.
 - Locked gift for non-customers vs one free card.
+- First card: one screen (`cards.first_card_mode = one_screen`) vs the full builder. Primary metric: cards created per person who opened the link.
 
 ## 7. Privacy
 
@@ -190,6 +208,10 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 - No personal data in URLs. Sign-in tokens are stripped by redirect, and admin pages use opaque ids. PostHog's `before_send` also drops the path token and query string on `/g/`, `/email-preferences/` and `/c/` pages.
 - Customer `email` is used only as the PostHog identity, as on the main site.
 - Respect the main site's consent setting; don't start replay before consent where it's required.
+
+## 7a. Klaviyo
+
+The events listed in `klaviyo.events` are also sent server-side to Klaviyo through the outbox, with a fixed property list per event (`SPEC.md` §14a, `docs/data.md` §10). They are the same names as here. The Klaviyo copy never carries message text, recipient details or card images.
 
 ## 8. Our own activity log (app database)
 

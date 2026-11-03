@@ -52,7 +52,8 @@ People are identified by **email**. Shopify and Imagen stay the sources of truth
 | D16 | Analytics has two layers: PostHog (clicks, funnels, replays), plus our own `activity_log` table, which is permanent and powers Settings › Insights. |
 | D17 | Every card is kept forever. Super users can see all of them. A card is only removed on the customer's data-deletion request. |
 | D18 | The whole app is built in one Claude Code run, in ordered parts with a commit after each (`BUILD.md`). |
-| D19 | Email sending: **Resend** (proposed; confirm in §20). |
+| D19 | Email: **Resend** sends everything that must arrive at once or goes to someone who isn't a customer: sign-in codes, cards to recipients, scheduled-card confirmations, resent sign-in links. **Klaviyo** gets our events and profile properties, and sends the lifecycle emails (free gift offer, seasonal reminder, mug photo reminder) as Klaviyo flows. Each lifecycle email can be switched to Resend in Settings (§14a). |
+| D20 | **A first card is one screen.** Someone with no cards yet gets a card already made (in-season design, their newest portrait, a suggested message). They type who it's for and tap Create. The full four-step builder is for later cards, or one tap away (§8.0). |
 
 ## 3. Words we use
 
@@ -114,12 +115,14 @@ People are identified by **email**. Shopify and Imagen stay the sources of truth
                          ├── writes outside its own database (only these):
                          │     • Shopify order: mug choice metafield + "mug:ready" tag
                          │
-                         ├── sends: Resend (sign-in codes, offer emails, card emails)
+                         ├── sends: Resend (sign-in codes, cards to recipients, confirmations)
+                         ├── Klaviyo (private key, server-side): events + profile properties
+                         │       → Klaviyo flows send the offer, reminder and mug-photo emails
                          └── tracks: PostHog project 540098 (same as the main site), via /ingest
 
  Shopify ──orders/paid webhook──► /api/webhooks/shopify/orders-paid ──► free gift offer email
  Resend  ──delivery webhooks────► /api/webhooks/resend ──► card status, bounces, opens
- Vercel Cron ──► scheduled cards, offer emails, reminders
+ Vercel Cron ──► scheduled cards, offer emails, reminders, Klaviyo outbox retries
 ```
 
 How a person's portraits are found: email → `analytics_events_mirror` (`properties->>'imagegen_session_id'`, available from 12 May 2026) → Imagen sessions and images → ordered when the image is in `revenue_events` or appears in one of their Shopify orders. The exact SQL is in `docs/data.md` §2–3.
@@ -139,12 +142,39 @@ How a person's portraits are found: email → `analytics_events_mirror` (`proper
 
 ## 8. Greeting cards
 
+### 8.0 First time: one screen (`FirstCard`, `FirstHome`)
+Most people arrive once, from the offer email, with no cards yet. For them it must be very simple.
+
+- **The card is already made.**
+  - Design: the first in-season live version, else `cards.first_card_default_version`.
+  - Portrait: the newest ordered portrait, else the newest portrait.
+  - Message: the version's first message idea. Ideas may use `{pet}`, filled from the session's pet name; ideas with `{pet}` are skipped when the name isn't known.
+  - From: their first name.
+- **They do one thing:** type who it's for. "I'll share it" is selected; "Email it for me" adds one email field (sends now, no scheduling on the first card).
+- **The button:** "Create my card" (or "Create and send"). It's disabled until a name is typed, and an email too when emailing.
+- **Optional, never required:**
+  - "Change design" (cycles through in-season designs; long-press or a second tap opens the picker sheet)
+  - "Change photo" (portrait picker sheet)
+  - "Try another" (next message idea)
+  - "From … change"
+  - "See all designs", which opens the full builder with everything carried over.
+- **What triggers it:** `cards.first_card_mode = one_screen` (default) and the person has made no cards. Set it to `full_builder` to switch it off, or use a PostHog flag to compare the two.
+- **First-time home** (`FirstHome`, `/` with no cards). Only:
+  - "Hi Sam"
+  - one big "Send a greeting card with your portrait" panel with **Make my card**
+  - My portraits
+  - Orders, downloads & mugs (with "Choose your free mug photo" when needed)
+  - the footer.
+  
+  No tabs, no recent cards, no "more gifts coming". After the first card, home becomes `VaultHome`.
+- After creating, the same Ready screen (`M5Ready`) as everyone else.
+
 ### 8.1 Three ways in, one flow
 | Way in | Screen | Goes to |
 |---|---|---|
-| Free gift email after an order | `Main` | `/g/[token]`, then builder step 1 |
-| Thank-you page pop-up | `GiftSheet` | `/g/[token]`, then step 1. "Later, email me the link" sends the offer email now. |
-| Site menu, home, My cards, order page | `Menu`, `VaultHome`, `MyCards`, `OrderDetail` | `/create` (signs in first if needed) |
+| Free gift email after an order | `Main` (or the Klaviyo version) | `/g/[token]`, then `FirstCard` (no cards yet) or builder step 1 |
+| Thank-you page pop-up | `GiftSheet` | `/g/[token]`, then `FirstCard` or step 1. "Later, email me the link" sends the offer email now. |
+| Site menu, home, My cards, order page | `Menu`, `FirstHome`/`VaultHome`, `MyCards`, `OrderDetail` | `/create`, which shows `FirstCard` when they have no cards yet, else step 1 (signs in first if needed) |
 
 ### 8.2 Builder steps
 Steps are mobile first; the desktop step bar reads Theme · Portrait · Message · Ready (`DesktopVault`).
@@ -254,7 +284,9 @@ Behaviour matches the live `/redeem`; the exact rules are in `docs/data.md` §4 
 
 - **After an order.**
   - The Shopify `orders/paid` webhook creates one `gift_offers` row per qualifying order (HMAC checked, idempotent; `gift.unlock_rule`).
-  - The offer email (`Main`) is sent after `gift.offer_email_delay_minutes`, with a personal `/g/[token]` link.
+  - After `gift.offer_email_delay_minutes`, the offer goes out by the channel in `email.channel_gift_offer`:
+    - `klaviyo` (default): we send Klaviyo the `free_gift_unlocked` event with the personal `/g/[token]` link and a preview image of their portrait. A Klaviyo flow sends the email (`Main` is the design to copy).
+    - `resend`: we send `Main` ourselves.
   - Non-qualifying orders are recorded as skipped, with the reason.
 - **Thank-you pop-up.**
   - `POST /api/gift/offer-link` returns the personal link for the Shopify thank-you page (`GiftSheet`).
@@ -262,9 +294,14 @@ Behaviour matches the live `/redeem`; the exact rules are in `docs/data.md` §4 
   - "Later, email me the link" sends the offer email now.
   - Wiring the pop-up into Shopify (a checkout UI extension) is a launch step outside this repo.
 - **Seasonal reminder** (built, off by default).
-  - `gift.reminder_days_before` days before a category comes into season, it emails customers who have the free gift and haven't made a card in `gift.reminder_skip_if_card_within_days` days (default 60).
+  - `gift.reminder_days_before` days before a category comes into season, it finds customers who have the free gift and haven't made a card in `gift.reminder_skip_if_card_within_days` days (default 60).
+  - It sends each one the `gift_reminder_due` event to Klaviyo (default), or a Resend email (`email.channel_reminder`).
   - It's turned on per category in the theme library.
-- **Email preferences.** The offer and reminder emails link to `/email-preferences/[token]`, where the person can stop offer and reminder emails. This is separate from the recipients' "Don't email me cards".
+- **Mug photo reminder** (new, Klaviyo only, off by default).
+  - `redeem.mug_reminder_after_days` (default 2) after an order with the free mug and no photo chosen, while not locked, we send `mug_photo_needed` to Klaviyo with a one-tap link to that order.
+  - A Klaviyo flow sends "Choose the photo for your free mug".
+  - Choosing a photo sends `redeem_mug_saved`, which the flow uses as its exit condition.
+- **Email preferences.** Offer and reminder emails sent by Klaviyo use Klaviyo's own unsubscribe and consent. Ones sent by Resend link to `/email-preferences/[token]`. Both are separate from the recipients' "Don't email me cards".
 - **Switches** `cards.enabled`, `gift.offer_email_enabled`, `gift.popup_enabled` and `gift.reminder_email_enabled` all start **off**. Turning them on is the launch.
 
 ## 13. Settings (super users only)
@@ -319,7 +356,8 @@ At `/settings`; desktop first, with a dark sidebar. Anyone else gets a 404. Ever
 - A read-only "look up an order" box that shows what the customer would see.
 
 **System**
-- **Emails:** sender, reply-to, a preview of each template, "Send me a test", the bounce and unsubscribe list.
+- **Emails:** sender, reply-to, a preview of each template, "Send me a test", the bounce and unsubscribe list, and the channel per lifecycle email (Klaviyo or Resend, with whether its Klaviyo flow got events in the last 7 days; §14a).
+- **Klaviyo** (under Data sources): connection test, events sent and failed in the outbox, and a "retry failed" button.
 - **Tracking:** PostHog project, proxy status, recent counts, links to dashboards.
 - **Data sources:** a status card per source with "Test" and its last success; "Test all".
 - **Super users:** add by email, remove. You can't remove yourself or the last one.
@@ -329,9 +367,50 @@ At `/settings`; desktop first, with a dark sidebar. Anyone else gets a 404. Ever
 - `cards.*`: the product. `enabled`, `who_can_create`, `per_customer`, `price`, `message_max_chars`, `size_px`, `jpeg_quality`, `email_sender_name`, `footer_text`.
 - `gift.*`: the offer. `offer_email_enabled`, `popup_enabled`, `popup_window_minutes`, `reminder_email_enabled`, `reminder_days_before`, `reminder_skip_if_card_within_days`, `unlock_rule`, `qualifying_product_ids`, `link_valid_days`, `offer_email_delay_minutes`.
 - `redeem.*`: the /redeem rules and constants, plus `downloads_enabled`, `mug_offer_active`, `mug_lock_mode`, `mug_lock_days`.
-- `email.*`: `from_offers`, `from_cards`, `reply_to`.
+- `email.*`: `from_offers`, `from_cards`, `reply_to`, `channel_gift_offer`, `channel_reminder`.
+- `klaviyo.*`: `enabled`, `api_revision`, `events`, `include_signin_link`, `profile_properties`.
+- `cards.first_card_mode`, `cards.first_card_default_version`; `redeem.mug_reminder_after_days`.
 - `vault.*`: data-source plumbing and the first-order offer.
 - Also `themes.*`, `auth.*`, `brand.*`, `email.*`, `links.*`.
+
+## 14a. Klaviyo
+
+The live site already sends a few funnel events to Klaviyo from its server (`track-event`, private key). My Magic Portraits does the same, so card activity sits on the same customer profiles and marketing can build flows on it.
+
+- **How:** server-side only, with the private key `KLAVIYO_PRIVATE_KEY` (the same variable name as the live site).
+  - Events go to the Events API and profile properties to the Profiles API, at revision `klaviyo.api_revision`.
+  - Each event has a `unique_id` (our activity id), so retries never double-count.
+  - Everything goes through an **outbox** (`outbound_events`): written in the same transaction as the action, sent at once, and retried by cron with backoff. Klaviyo being down never breaks the app.
+- **Events sent** (`klaviyo.events`; names match `docs/analytics.md`, snake_case like the live site's):
+
+| Event | When | Main properties |
+|---|---|---|
+| `free_gift_unlocked` | A qualifying order is paid | `order_name`, `card_link` (one-tap, expires), `link_expires_at`, `portrait_image_url`, `suggested_design` |
+| `vault_signed_in` | Signs in to My Magic Portraits | `method` |
+| `card_created` | A card is made | `card_id`, `theme_name`, `category`, `delivery`, `scheduled`, `cards_created_total`, `first_card` |
+| `card_email_sent` | We emailed their card to someone | `card_id`, `theme_name` |
+| `card_recipient_email_opened` | Their recipient opened it | `card_id` |
+| `gift_reminder_due` | Seasonal reminder is due | `category`, `suggested_design`, `card_link` |
+| `mug_photo_needed` | Free mug, no photo yet | `order_name`, `order_link`, `portrait_count` |
+| `redeem_mug_saved` | Mug photo chosen | `order_name` |
+
+- **Profile properties** (set on the customer's profile, named like the live site's custom properties):
+  - `My MP Has Free Gift`
+  - `My MP Cards Created`
+  - `My MP Last Card At`
+  - `My MP Portraits`
+  - `My MP Mug Photo Needed`
+- **Never sent to Klaviyo:**
+  - recipients: they are not our customers and haven't agreed to anything, so no profile is ever created for a recipient
+  - recipient names or emails
+  - message text
+  - card images (they show the message).
+- **Flows to build in Klaviyo** (marketing does this, outside the repo; a launch step):
+  - "Free gift: make your card" (trigger `free_gift_unlocked`, exit on `card_created`)
+  - "Seasonal card reminder" (`gift_reminder_due`)
+  - "Choose your mug photo" (`mug_photo_needed`, exit on `redeem_mug_saved`)
+  - optional "Your card was opened" (`card_recipient_email_opened`).
+- **Settings › Emails** shows, per lifecycle email, the channel (Klaviyo or Resend) and whether the Klaviyo flow has received events in the last 7 days. **Settings › Data sources** has a Klaviyo card with "Test".
 
 ## 14. Analytics and the activity log
 
@@ -417,6 +496,10 @@ This pass reviewed all 28 screens against the decisions above.
   - page-view names for every page.
 - Tests run against a separate dev database (`magic-vault-dev`) with live sample themes. Production is never touched by tests, and sign-in tests need no Docker.
 
+**Added after review (3 Nov)**
+- **First time is one screen** (`FirstCard`, `FirstHome`, §8.0). The card is already made; the person types a name and taps Create.
+- **Klaviyo** (§14a): events and profile properties for flows, the offer, reminder and mug-photo emails as Klaviyo flows, and an outbox with retries.
+
 **In this spec but not drawn (build to the spec)**
 - Changing or cancelling scheduled cards in My cards (§9).
 - The footer on My portraits and the creator home (§17).
@@ -434,6 +517,7 @@ This pass reviewed all 28 screens against the decisions above.
    - Point the live `/redeem` to `my.magicportraits.ai/redeem`.
    - Add the MY MAGIC PORTRAITS links to the main site's menu.
    - Add the thank-you pop-up.
+   - Build the Klaviyo flows (§14a) and set them live in Klaviyo.
 5. **Update the privacy policy** (§16).
 6. **Turn on**, in Settings, `cards.enabled`, then the pop-up, then the offer email. Watch Insights and PostHog for the first day.
 
@@ -441,7 +525,7 @@ This pass reviewed all 28 screens against the decisions above.
 
 | # | Question | Default if not answered |
 |---|---|---|
-| Q1 | Email sender: Resend, or Klaviyo for the marketing emails? | Resend for everything |
+| Q1 | Email: Klaviyo for the offer, reminder and mug emails, with Resend for the rest (D19)? | Yes. Each lifecycle email can be switched to Resend in Settings. |
 | Q2 | Does the r_orders token have `write_orders` (mug save), `read_all_orders` (orders older than 60 days) and `read_customers`? | Checked in Part 0; mug save is blocked until confirmed |
 | Q3 | At which print status should the mug choice lock? `generating` and `file_ready` let 7 changes through. | Lock from `draft_created` (setting `redeem.mug_lock_states`) |
 | Q4 | May we add a `lower(email)` index on the events mirror? Without it, 2.3% of emails stored in mixed case are missed. | Search both spellings, no index |
@@ -451,6 +535,8 @@ This pass reviewed all 28 screens against the decisions above.
 | Q8 | Later: should My Magic Portraits absorb the VIP Portal (store credit), so there's one sign-in? | Not in v1 |
 | Q9 | The six product thumbnails in the site menu: can someone export them from the live site? (They are binary files and couldn't be copied.) | Placeholder tiles, with the image URLs set in `links.menu_thumbnails` |
 | Q10 | Sender addresses: `hello@magicportraits.ai` for offers and `cards@magicportraits.ai` for cards? | As proposed, once the domain is verified in Resend |
+| Q11 | Klaviyo stores the one-tap link (30-day expiry) as an event property so its email can carry it. Is that acceptable, or should Klaviyo emails link to the sign-in page instead? | Include the link (`klaviyo.include_signin_link`) |
+| Q12 | Is the free gift offer a marketing email (needs consent) or a transactional one? This decides whether the Klaviyo flow can go to everyone who orders. | Treat it as marketing: Klaviyo's consent rules apply. The thank-you pop-up and "Create a card" in the menu cover everyone else. |
 
 ## 21. Problems found on the live systems (outside this build, needs an owner)
 

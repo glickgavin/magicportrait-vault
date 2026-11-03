@@ -53,6 +53,10 @@ These need an account owner. The build checks each one in Part 0. Anything missi
    - In Cloudflare, add a CNAME `my` → `cname.vercel-dns.com`, DNS only (grey cloud).
 7. **PostHog.** The project key for project 540098 (the one the main site uses). Optional: a personal API key, so Settings › Tracking can show counts and the setup script can create dashboards.
 8. **Intercom.** The app id the main site uses for "Chat With Us" (`NEXT_PUBLIC_INTERCOM_APP_ID`).
+9. **Klaviyo.**
+   - In Klaviyo › Settings › API keys, create a private key just for this app (name it "My Magic Portraits") with scopes `events:write`, `profiles:write`, `data-privacy:write`, `metrics:read` and `flows:read`.
+   - Put it in Vercel as `KLAVIYO_PRIVATE_KEY`.
+   - The flows themselves are built after the build (see After the build).
 
 ---
 
@@ -83,6 +87,7 @@ Each part lists what to build and what has to be true before it's committed.
   - Our Supabase project: connect
   - Shopify token scopes: `currentAppInstallation { accessScopes { handle } }` (list any of the four in step 5 that are missing)
   - Resend: domain status
+  - Klaviyo: `GET /api/metrics/?page[size]=1` with the private key; try the newest API revision and save the one that works in `klaviyo.api_revision`
   - PostHog: key format.
 - **Done when** `BUILD_LOG.md` lists each source as OK or Blocked, with the reason.
 
@@ -121,12 +126,20 @@ Each part lists what to build and what has to be true before it's committed.
   - the address bar never shows a token after sign-in.
 
 ### Part 5: Home and My portraits
-- `/` for the customer, the creator (`VaultGuest`, with locked cards and the first-order offer) and nobody (empty state).
+- `/` for:
+  - a customer with no cards yet (`FirstHome`: one big "Make my card", portraits, orders)
+  - a customer with cards (`VaultHome`)
+  - a creator (`VaultGuest`, with locked cards and the first-order offer)
+  - nobody found (empty state).
 - `/portraits` with the filters, session groups, ORDERED badges, "Order as wall art"/"Order more" deep links and "Make a card".
-- **Done when** e2e covers all three people at 390 and 1280 px and screenshots match the mockups' layout and copy.
+- **Done when** e2e covers all four states at 390 and 1280 px and screenshots match the mockups' layout and copy.
 
 ### Part 6: Card builder and renderer
-- `/create` steps 1–3 (`M1Theme`, `M2Portrait`, `M3Message`), state kept in the URL plus session storage.
+- **First card, one screen** (`FirstCard`, SPEC §8.0), shown by `/create` when the person has no cards and `cards.first_card_mode = one_screen`.
+  - Smart defaults: in-season version, newest ordered portrait, first usable message idea with `{pet}`, their first name.
+  - Change design / photo / message.
+  - "See all designs" hands everything over to the full builder.
+- `/create` steps 1–3 (`M1Theme`, `M2Portrait`, `M3Message`) for later cards, state kept in the URL plus session storage.
 - `CardPreview` and `lib/render` share one layout module, so the preview matches the JPEG.
 - `POST /api/cards`:
   1. check the limits and settings
@@ -140,7 +153,8 @@ Each part lists what to build and what has to be true before it's committed.
 - **Done when**:
   - the renderer has golden-image tests for each seed version (small pixel tolerance) and a test that long messages shrink and never overflow
   - e2e covers both deliveries: self, and email up to a queued `card_deliveries` row. Sending is tested in Part 7.
-  - a `/g/[token]` link lands on step 1
+  - a `/g/[token]` link lands on `FirstCard` for someone with no cards, and on step 1 for someone with cards
+  - on `FirstCard`, typing a name and tapping Create (no other input) makes a card
   - `cards.enabled=false` and the `cards.who_can_create` and `cards.per_customer` rules work.
 
 ### Part 7: Email and delivery
@@ -153,6 +167,14 @@ Each part lists what to build and what has to be true before it's committed.
   - `signin-link` (when a super user resends someone's link).
 - Sending through Resend, with `cards.email_sender_name`, `email.from_offers`, `email.from_cards` and `email.reply_to`.
 - Cron `/api/cron/send-scheduled` every 5 minutes.
+- **Klaviyo client** (`lib/klaviyo.ts`) and the `outbound_events` outbox, `docs/data.md` §10:
+  - send at once, retry from cron `/api/cron/flush-outbox` every minute
+  - dedupe keys
+  - a fixed property list per event
+  - profile property updates
+  - `klaviyo.enabled = false` marks rows `skipped`.
+  
+  `card_created`, `card_email_sent`, `card_recipient_email_opened` and `vault_signed_in` are wired here.
 - `/api/webhooks/resend` updates `card_deliveries`, card status and `email_suppressions`.
 - The recipients' "Don't email me cards" page, and `/email-preferences/[token]` for offer and reminder emails (the `Main` footer's "Email preferences" link).
 - My cards (`/cards`) with Use again, Resend, Download, Copy link, and **Change** or **Cancel** for scheduled cards. Change reopens the builder on that card, re-renders it and keeps or updates the time.
@@ -177,7 +199,11 @@ Each part lists what to build and what has to be true before it's committed.
   - never a bare order number.
 - "Later, email me the link".
 - Non-qualifying orders are recorded as `skipped`, with the reason.
-- Seasonal reminder: cron `/api/cron/send-reminders`, using `gift.reminder_*` and `theme_categories.reminder_enabled`.
+- Offer channel `email.channel_gift_offer`:
+  - `klaviyo` sends `free_gift_unlocked` with the one-tap link (when `klaviyo.include_signin_link`) and the portrait preview
+  - `resend` sends `gift-offer`.
+- Seasonal reminder: cron `/api/cron/send-reminders`, using `gift.reminder_*`, `theme_categories.reminder_enabled` and `email.channel_reminder` (`gift_reminder_due` to Klaviyo, or the `gift-reminder` email).
+- Mug photo reminder: cron `/api/cron/mug-reminders` sends `mug_photo_needed` to Klaviyo, once per order, `redeem.mug_reminder_after_days` after the order, while no photo is chosen and the mug isn't locked.
 - `scripts/register-shopify-webhook.ts`: written but **not run**.
 - **Done when** tests show that:
   - with the switches off, nothing is sent
@@ -193,7 +219,7 @@ Each part lists what to build and what has to be true before it's committed.
   - test render
   - publish with thumbnail generation
   - status and `is_new`.
-- Data-source test buttons; super-user add/remove with its guards; activity log browser.
+- Data-source test buttons, including Klaviyo with outbox counts and "retry failed"; the per-email channel switch in Settings › Emails; super-user add/remove with its guards; activity log browser.
 - **Done when**:
   - e2e as a super user changes a setting, which shows in history and changes behaviour
   - a theme version is published from uploaded files and appears in `/create`
@@ -205,7 +231,7 @@ Each part lists what to build and what has to be true before it's committed.
 - `/settings/cards`:
   - filters and CSV export
   - card detail with timeline; resend, hide link and download
-  - delete on request (confirm, then delete files, anonymise rows, `data_requests`)
+  - delete on request (confirm, then delete files, anonymise rows, delete outbox rows, Klaviyo deletion job, `data_requests`)
   - export data
   - `admin_card_viewed` logging.
 - **Done when** the KPI queries are tested against seeded rows, the timeline merges in the right order, and the delete test shows the files gone, rows anonymised and the email suppressed.
@@ -242,5 +268,11 @@ Each part lists what to build and what has to be true before it's committed.
 2. Run `scripts/register-shopify-webhook.ts` against production (orders/paid → My Magic Portraits).
 3. Point the live site's `/redeem` at `https://my.magicportraits.ai/redeem` (keep the query string), and add the MY MAGIC PORTRAITS links to its menu. This is a change in the Lovable project.
 4. Add the thank-you pop-up (`GiftSheet`) to the Shopify thank-you page, calling `/api/gift/offer-link`.
-5. Add a line to the privacy policy: greeting cards and their messages are stored, and may be viewed by staff for support.
-6. In Settings, turn on `cards.enabled`, then `gift.popup_enabled` and `gift.offer_email_enabled`. Watch Settings › Insights and the PostHog card funnel for the first day.
+5. **Klaviyo flows** (marketing).
+   - Build them in Klaviyo on the metrics My Magic Portraits now sends:
+     - "Free gift: make your card" (`free_gift_unlocked`, exit on `card_created`; copy the `Main` design)
+     - "Seasonal card reminder" (`gift_reminder_due`)
+     - "Choose your mug photo" (`mug_photo_needed`, exit on `redeem_mug_saved`).
+   - Then set `klaviyo.enabled` on.
+6. Add a line to the privacy policy: greeting cards and their messages are stored, and may be viewed by staff for support.
+7. In Settings, turn on `cards.enabled`, then `gift.popup_enabled` and `gift.offer_email_enabled`. Watch Settings › Insights and the PostHog card funnel for the first day.

@@ -20,7 +20,8 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 - **Supabase** (the app's own new project, `magic-vault`): Postgres, Auth (email OTP), Storage. Use `@supabase/ssr` for auth cookies.
 - **External reads:** Imagen and the events mirror through the read-only `vault_reader` Postgres role (`IMAGEGEN_DATABASE_URL`, `MIRROR_DATABASE_URL`; `postgres` driver via the Supabase pooler); Shopify Admin GraphQL with the r_orders app token.
 - **Card render:** `@napi-rs/canvas` (fonts registered from `assets/fonts/`). Use `sharp` for upload checks and thumbnails.
-- **Email:** React Email + Resend. Supabase Auth sends its codes through Resend SMTP.
+- **Email:** React Email + Resend for everything that must arrive at once or goes to non-customers. Supabase Auth sends its codes through Resend SMTP.
+- **Klaviyo:** events and profile properties, server-side through the `outbound_events` outbox (`docs/data.md` §10). Klaviyo flows send the offer, reminder and mug-photo emails (`SPEC.md` §14a).
 - **Analytics:** `posthog-js` + `posthog-node`, proxied at `/ingest`.
 - **Validation:** Zod on every input. **Tests:** Vitest (unit) and Playwright (e2e at 390 × 844 and 1280 × 800).
 - **Scheduled work:** Vercel Cron → `/api/cron/*`, protected by `CRON_SECRET`.
@@ -50,9 +51,10 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 
 **Data**
 - Shopify and Imagen are the sources of truth. Read them live; never copy orders or portraits into our database, except the cached session-id list and the copy of a portrait used on a card.
-- Writes outside our database are allowed in exactly two places:
+- Writes outside our database are allowed in exactly three places:
   1. The mug choice on a Shopify order: `metafieldsSet` + `tagsAdd`, as in `docs/data.md`.
-  2. The webhook-registration script, which a human runs.
+  2. Klaviyo events, profile properties and deletion jobs, through the outbox only.
+  3. The webhook-registration script, which a human runs.
   
   Never write to Imagen, the events mirror or the live site's databases.
 - Every external source sits behind an interface in `lib/sources/` with a `fixtures` implementation. Tests and local dev use fixtures (`DATA_SOURCE=fixtures`); fixtures contain made-up people only.
@@ -76,7 +78,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 - Rate-limit code requests, lookups and downloads per email and IP.
 
 **Privacy**
-- Never put message text, recipient name or recipient email into PostHog, `activity_log.props` or server logs.
+- Never put message text, recipient name or recipient email into PostHog, Klaviyo, `activity_log.props` or server logs. Never create a Klaviyo profile for a card recipient.
 - Mask emails in server logs (`s***@example.com`).
 - Session replay masks inputs and the card preview.
 
@@ -86,6 +88,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 - Business events go to both PostHog and `activity_log`; UI-only events go to PostHog only (the list is in `docs/analytics.md`).
 
 **UI**
+- **First time must be very simple:** someone with no cards gets the one-screen `FirstCard` and the simple `FirstHome` (`SPEC.md` §8.0).
 - Mobile first: build at 390 px, check at 360 px, then desktop. Match the mockups and `docs/design.md`; reuse the live site's header, menu and footer.
 - All copy goes through `t()` (English only for now).
 - Accessible: real radio groups and buttons, labels, focus states, AA contrast.

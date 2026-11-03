@@ -84,7 +84,7 @@ Seed: `holidays` Holidays 1, `new-year` New Year 2, `birthdays` Birthdays 3, `ge
 | overlay_path | text null | PNG with alpha |
 | thumbnail_path | text | made on publish |
 | layout | jsonb not null | see Layout JSON below |
-| message_ideas | text[] default '{}' | |
+| message_ideas | text[] default '{}' | may use `{pet}` (pet name from the Imagen session) and `{to}`; ideas with `{pet}` are skipped when the pet name isn't known. The first usable idea pre-fills the first card (SPEC §8.0). |
 | message_max_chars | int null | null → `cards.message_max_chars` |
 | published_at | timestamptz | |
 
@@ -144,6 +144,24 @@ Indexes: `(email, occurred_at desc)`, `(event, occurred_at desc)`, `(occurred_at
 ### email_suppressions
 `email text`, `scope` (`card_emails`: the recipients' "Don't email me cards" · `offer_emails`: offer and reminder emails, from Email preferences · `all`: bounce, complaint or deletion), `reason` (`unsubscribe` · `bounce` · `complaint` · `deletion`), `created_at`. Primary key `(email, scope)`.
 
+### outbound_events
+The outbox for Klaviyo (and any later destination). A row is written in the same transaction as the action, sent at once, and retried by `/api/cron/flush-outbox` every minute with backoff.
+
+| column | type | notes |
+|---|---|---|
+| id | uuid pk | also sent as Klaviyo's `unique_id` |
+| destination | text not null | `klaviyo` |
+| kind | text not null | `event` · `profile` |
+| dedupe_key | text unique | e.g. `free_gift_unlocked:<order_id>`, `mug_photo_needed:<order_id>`, so each fires once |
+| email | text | the profile it's about |
+| payload | jsonb not null | the exact request body; **never** message text or recipient details |
+| status | text not null | `pending` · `sent` · `failed` · `skipped` (Klaviyo off) |
+| attempts | int not null default 0 | gives up after 8 attempts |
+| next_attempt_at, sent_at | timestamptz | |
+| last_error | text | |
+
+A data-deletion request deletes the person's rows here too, and calls Klaviyo's profile deletion request (`klaviyo.delete_on_request`, default on).
+
 ### rate_limits
 `key text`, `window_start timestamptz`, `count int`, primary key `(key, window_start)`. A function `hit_rate_limit(key, window_seconds, max)` does an atomic upsert and returns whether the call is allowed. A cron job deletes windows older than a day. Keys look like `code:<email-hash>`, `code-ip:<ip-hash>`, `download:<email-hash>`, `offer-link:<ip-hash>`.
 
@@ -202,6 +220,17 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `gift.qualifying_product_ids` | [] |
 | `gift.link_valid_days` | 30 |
 | `gift.offer_email_delay_minutes` | 0 |
+| `cards.first_card_mode` | one_screen (or full_builder) |
+| `cards.first_card_default_version` | `general-love` (used when nothing is in season) |
+| `redeem.mug_reminder_after_days` | 2 |
+| `email.channel_gift_offer` | klaviyo (or resend) |
+| `email.channel_reminder` | klaviyo (or resend) |
+| `klaviyo.enabled` | false (on once the key is set and the flows exist) |
+| `klaviyo.api_revision` | "2024-10-15" (the live site's client revision; update after testing) |
+| `klaviyo.events` | `["free_gift_unlocked","vault_signed_in","card_created","card_email_sent","card_recipient_email_opened","gift_reminder_due","mug_photo_needed","redeem_mug_saved"]` |
+| `klaviyo.include_signin_link` | true (SPEC Q11) |
+| `klaviyo.profile_properties` | true |
+| `klaviyo.delete_on_request` | true |
 | `redeem.downloads_enabled` | true (kill switch) |
 | `redeem.mug_offer_active` | true (off = the mug choice is read-only) |
 | `redeem.mug_lock_mode` | print_status (or days_after_order) |

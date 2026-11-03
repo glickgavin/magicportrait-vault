@@ -1129,3 +1129,65 @@ Use the names in `analytics.md`. The legacy names and properties in 4.7 are for 
 14. **"Is a customer" status set** (5.2). This is a product decision.
 15. **PostgREST variants** in 2.4 and 3.6 were not executed. The SQL versions were run (EXPLAIN ANALYZE) on live data.
 16. ~~Revenue events and refunds.~~ **Decided:** cancelled and fully refunded orders don't count (§3.6).
+
+---
+
+## 10. Source 5: Klaviyo (events and profiles, write-only)
+
+Read from the live site's code on 3 Nov 2026 (`src/lib/analytics/*`, `supabase/functions/track-event`). My Magic Portraits follows the same conventions so its events land on the same Klaviyo profiles. What we send and why is in `SPEC.md` §14a.
+
+**How the live site uses Klaviyo today**
+- **Server side:** edge function `track-event`.
+  - Posts to `https://a.klaviyo.com/api/events/` with `Authorization: Klaviyo-API-Key <KLAVIYO_PRIVATE_KEY>` and `revision: 2024-02-15`.
+  - Sends only an allow-list: `page_view`, `image_uploaded`, `add_to_cart`, `checkout_started`, `order_placed`, `magic_shopify`, `funnel_portrait_generated`.
+  - The metric name is the internal snake_case event name, and the profile is identified by `email`, or `anonymous_id` = session id.
+  - It forwards all event properties, including the email, and makes a random `$event_id` (so retries can double-count).
+- **Client side:**
+  - The onsite `_learnq` queue, and Client Profiles / Subscriptions APIs with public company id `LD5CnH`, revision `2024-10-15`.
+  - Custom profile properties use exact, case-sensitive keys with spaces: `Pets Name`, `Source`.
+
+**What My Magic Portraits does differently**
+- Server-side only (no client snippet), through the `outbound_events` outbox (`schema.md`).
+- Sends only the events in `klaviyo.events`, with a fixed property list per event (`SPEC.md` §14a), never "all properties".
+- Sends our activity id as `unique_id`, so a retried event is deduplicated by Klaviyo.
+- Never sends message text, recipient names or emails, or card images.
+
+**Create an event**
+```http
+POST https://a.klaviyo.com/api/events/
+Authorization: Klaviyo-API-Key {KLAVIYO_PRIVATE_KEY}
+revision: {klaviyo.api_revision}
+Content-Type: application/json
+
+{ "data": { "type": "event", "attributes": {
+    "metric":  { "data": { "type": "metric",  "attributes": { "name": "card_created" } } },
+    "profile": { "data": { "type": "profile", "attributes": { "email": "customer@example.com" } } },
+    "properties": { "card_id": "C-8f3k2q", "theme_name": "Christmas", "category": "Holidays",
+                    "delivery": "email", "scheduled": false, "cards_created_total": 1, "first_card": true },
+    "time": "2026-11-03T09:14:00Z",
+    "unique_id": "<outbound_events.id>"
+} } }
+```
+A `202` is success. On `429`, honour `Retry-After`. On `5xx`, retry with backoff. On `4xx` other than 429, mark the row `failed` and show it in Settings › Data sources.
+
+**Set profile properties**
+Use `POST https://a.klaviyo.com/api/profile-import/` (create or update by email) with the same headers:
+```json
+{ "data": { "type": "profile", "attributes": {
+    "email": "customer@example.com",
+    "properties": { "My MP Has Free Gift": true, "My MP Cards Created": 1,
+                    "My MP Last Card At": "2026-11-03T09:14:00Z", "My MP Portraits": 18,
+                    "My MP Mug Photo Needed": false } } } }
+```
+Only these five properties, only for people who already have a Shopify order or signed in. Never for recipients.
+
+**Deletion**
+On a data-deletion request, call `POST https://a.klaviyo.com/api/data-privacy-deletion-jobs/` for the email (`klaviyo.delete_on_request`).
+
+**Key scopes** (create a dedicated private key for this app, not the live site's):
+- `events:write`, `profiles:write`, `data-privacy:write`
+- `metrics:read` and `flows:read`, for the Settings check that a flow has received events.
+
+**UNVERIFIED**
+- The revision date to pin: the live site uses `2024-02-15` (server) and `2024-10-15` (client). Test the newest stable revision in Part 0 and save it in `klaviyo.api_revision`.
+- Whether the shop's Klaviyo–Shopify integration already sends `Placed Order`. If it does, the "Free gift" flow could trigger on that instead. We still send `free_gift_unlocked`, because it carries the one-tap link and the portrait preview.
