@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { syncKlaviyoProfile } from "@/lib/vault/klaviyo-profile";
 import { NextResponse } from "next/server";
 import { consumeSigninLink } from "@/lib/auth/links";
 import { establishSession } from "@/lib/auth/exchange";
@@ -40,6 +42,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ token: string 
   await markSignedIn(link.email);
   await track("vault_signin_link_used", { order_id: link.order_legacy_id, expired: false }, { email: link.email });
   await track("vault_signed_in", { method: "link" }, { email: link.email });
+  after(() => syncKlaviyoProfile(link.email));
   if (link.gift_offer_id && firstUse) {
     const now = new Date().toISOString();
     await db().from("gift_offers").update({ first_used_at: now, email_opened_at: now }).eq("id", link.gift_offer_id).is("first_used_at", null);

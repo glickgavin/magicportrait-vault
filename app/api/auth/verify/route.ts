@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { syncKlaviyoProfile } from "@/lib/vault/klaviyo-profile";
 import { codeVerifySchema } from "@/lib/auth/schemas";
 import { hashKey, json, rateLimit } from "@/lib/auth/http";
 import { supabaseServer } from "@/lib/auth/supabase-server";
@@ -23,5 +25,6 @@ export async function POST(req: Request) {
   await markSignedIn(email);
   await track("vault_code_verified", {}, { email });
   await track("vault_signed_in", { method: "code" }, { email });
+  after(() => syncKlaviyoProfile(email));
   return json({ ok: true, next: safeNext(next, "/") });
 }

@@ -24,8 +24,10 @@ export type TrackOptions = {
   actor?: TrackActor;
   /** PostHog distinct id when there's no email (e.g. card recipients: the card id). */
   distinctId?: string;
-  /** Written in the same transaction as the activity row (Klaviyo outbox). */
+  /** Written in the same transaction as the activity row (Klaviyo outbox). Built automatically for Klaviyo events. */
   outbox?: OutboxInput | null;
+  /** Klaviyo-only properties (e.g. the one-tap link) that must never reach PostHog or activity_log, and a dedupe key. */
+  klaviyo?: { extra?: Record<string, unknown>; dedupeKey?: string | null };
 };
 
 export type TrackResult = { activityId: number | null; outboxId: string | null };
@@ -72,6 +74,11 @@ export async function track(event: EventName, props: Record<string, unknown> = {
   let result: TrackResult = { activityId: null, outboxId: null };
   if (EVENTS[event].business) {
     try {
+      let outbox = opts.outbox ?? null;
+      if (!outbox && email && (EVENTS[event] as { klaviyo?: boolean }).klaviyo) {
+        const { klaviyoEventOutbox } = await import("@/lib/klaviyo");
+        outbox = await klaviyoEventOutbox(event, clean, email, opts.klaviyo?.extra, opts.klaviyo?.dedupeKey);
+      }
       const { data, error } = await db().rpc("record_activity", {
         p_email: email,
         p_event: event,
@@ -80,11 +87,15 @@ export async function track(event: EventName, props: Record<string, unknown> = {
         p_ref_id: opts.ref?.id ?? null,
         p_props: clean,
         p_actor: opts.actor ?? (email ? "customer" : "system"),
-        p_outbox: opts.outbox ? { ...opts.outbox, payload: scrubProps(opts.outbox.payload) } : null,
+        p_outbox: outbox,
       });
       if (error) throw new Error(error.message);
       const d = data as { activity_id: number; outbox_id: string | null };
       result = { activityId: d.activity_id, outboxId: d.outbox_id };
+      if (d.outbox_id && outbox?.status !== "skipped") {
+        const { flushRow } = await import("@/lib/klaviyo");
+        await flushRow(d.outbox_id).catch(() => undefined); // send at once; cron retries
+      }
     } catch (e) {
       console.error(`[track] activity_log write failed for ${event} (${maskEmail(email)}): ${(e as Error).message}`);
     }

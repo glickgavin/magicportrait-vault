@@ -13,7 +13,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 4 | Sign-in and account | done (live Auth config blocked, see Blocked) |
 | 5 | Home and My portraits | done |
 | 6 | Card builder and renderer | done |
-| 7 | Email and delivery | pending |
+| 7 | Email and delivery | done |
 | 8 | Orders, downloads and mugs | pending |
 | 9 | Free gift offer | pending |
 | 10 | Settings | pending |
@@ -91,6 +91,18 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - `POST /api/track`: browser business events only, email from the session, card ownership checked; share/download/copy also add `card_deliveries` rows.
 - Tests: golden images for all 10 seed versions (0.5% pixel tolerance), text-fitting and overflow tests up to 1000 characters, crop maths; e2e for `/g` → FirstCard (no cards) and → step 1 (has cards), name-only Create, email delivery up to a queued row, a scheduled card, the public page, hidden links, `/try`, other people's cards and portraits (404), and the paused / locked / everyone_with_portrait / monthly-limit rules.
 
+## Part 7: Email and delivery
+
+- React Email templates in `emails/`: `card-delivery` (RecipientEmail: the card, "Save the card", "Open full size", the Try block, "Don't email me cards"), `card-scheduled` (to the sender), `signin-code` (rendered with `{{ .Token }}` into `supabase/templates/signin-code.html` by `scripts/gen-auth-template.tsx`), `signin-link`. Snapshot tests.
+- `lib/email/`: `EmailSender` interface with AgentMail (SDK, inbox `email.from_cards`, reply-to `email.reply_to`, idempotency keys) and a fixtures sender that writes each message to `.tmp/sent-emails/` instead of sending (used whenever `EMAIL_PROVIDER=fixtures` or no `AGENTMAIL_API_KEY`).
+- Card emails link to `/c/[slug]?d=<delivery id>`; the first visit marks the delivery and card opened, records `card_recipient_email_opened`, then redirects to the clean URL. Suppressed recipients (bounce, complaint, "Don't email me cards") are never emailed.
+- "Email now" sends as soon as the JPEG exists; scheduled cards get a confirmation email to the sender. Cron `/api/cron/send-scheduled` (every 5 min, claims each card before sending so two runs never double-send; retries stale queued deliveries). Cron auth: `Authorization: Bearer $CRON_SECRET`. `vercel.json` lists every cron.
+- Klaviyo (`lib/klaviyo.ts`): `track()` builds the outbox row automatically for the nine Klaviyo events, with the fixed property list per event (one-tap links only via a Klaviyo-only `extra`, never into PostHog or `activity_log`), dedupe keys, `unique_id` = outbox row id, sent at once and retried by `/api/cron/flush-outbox` with exponential backoff (honours `Retry-After`, 4xx fails at once, gives up after `klaviyo.max_attempts` and logs `error_klaviyo_send_failed`); `klaviyo.enabled = false` writes rows as `skipped`. Profile properties (the five "My MP" ones) after sign-in and after each card. Deletion jobs queued for Part 11.
+- `/api/webhooks/agentmail`: Svix signature checked, idempotent on `svix-id` (`processed_webhooks`), handles delivered / bounced (delivery bounced, card failed, address suppressed) / complained (suppressed).
+- `/c/[slug]/unsubscribe?d=…`: "Don't email me cards" needs a tap (so link scanners don't unsubscribe people), adds a `card_emails` suppression and records `card_recipient_unsubscribed`.
+- My cards (`/cards`): statuses Emailed · Opened · Scheduled · Shared · Downloaded · Failed · Cancelled; Share, Download, Use again (same theme, portrait and message, blank recipient), Resend (rate-limited), and a "Manage" menu for scheduled cards with Change (reopens the builder on that card, re-renders, keeps or updates the time; `card_schedule_changed`) and Cancel.
+- Tests: template snapshots, Svix valid/forged/wrong-secret, idempotency, bounce/delivered/complaint handling, scheduled send with a fake clock (not early, once, never twice), suppression, Klaviyo skip/send/property list/link handling/dedupe/backoff/give-up/4xx/cron/profile; e2e for email-now, opened via the email link, unsubscribe, resend, use again, change and cancel, cron and webhook auth.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -111,6 +123,8 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Message idea chips** are labelled "Idea 1/2/3" (the mockup's Warm/Funny/Heartfelt labels aren't in the data model); the full text shows as the chip's title and fills the message.
 - **"Change design"** on FirstCard: the first tap cycles to the next in-season design; later taps (or a long-press) open the picker sheet.
 - **Rendering is its own request** (`/api/cards/[id]/render`) rather than background work, so it works on serverless without `waitUntil` and gives the Creating screen a real result and "Try again".
+- **AgentMail sender name:** the AgentMail send API sends as the inbox and has no per-message From display name, so "{from} via Magic Portraits" (`email.from_cards`) can't be applied through the API; the recipient sees the inbox's display name. The subject still says "Sam sent you a Christmas card". If the per-sender name matters, either set the inbox display name to "Magic Portraits" or switch card sends to AgentMail's SMTP relay (which accepts a From name). Listed under Open questions.
+- **`agentmail` and `svix`** are server-external packages: the AgentMail SDK has an optional dynamic import (`@x402/fetch`) that the bundler can't resolve.
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked
@@ -120,5 +134,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - Shopify, Klaviyo and AgentMail can't be reached from this session (see Part 0). Each sits behind an interface with a fixtures implementation; the live clients are checked after deploy.
 
 ## Open questions
+
+- AgentMail per-message From display name (see Decisions). Default: inbox display name, subject carries the sender's name.
 
 - Fixture portraits are local files (`/fixtures/portraits/…`); in fixtures mode the app treats those paths as an allowed image source. Live mode only fetches from `redeem.allowed_image_hosts`.

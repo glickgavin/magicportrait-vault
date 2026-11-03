@@ -13,7 +13,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   skipTrailingSlashRedirect: true,
-  serverExternalPackages: ["@napi-rs/canvas", "sharp", "postgres", "archiver"],
+  serverExternalPackages: ["@napi-rs/canvas", "sharp", "postgres", "archiver", "agentmail", "svix"],
   outputFileTracingIncludes: {
     "/api/**": ["./assets/fonts/**"],
     "/settings/**": ["./assets/fonts/**"],

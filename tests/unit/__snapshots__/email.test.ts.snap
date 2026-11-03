@@ -1,0 +1,68 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`email templates > card-delivery renders (snapshot) 1`] = `"Sam sent you a Christmas card"`;
+
+exports[`email templates > card-delivery renders (snapshot) 2`] = `
+"SAM SENT YOU A CARD
+
+Dear Grandma Rose, here's something to make you smile.
+
+https://my.magicportraits.ai/c/example
+
+Save the card https://my.magicportraits.ai/c/example
+
+Open full size https://my.magicportraits.ai/c/example
+
+Love the portrait?
+
+Turn your own pet into a work of art with Magic Portraits.
+
+Try Magic Portraits https://my.magicportraits.ai/c/example/try?via=email
+
+You got this because Sam made you a card with My Magic Portraits. Don't email me cards https://my.magicportraits.ai/c/example/unsubscribe?d=example
+
+Magic Portraits · magicportraits.ai"
+`;
+
+exports[`email templates > card-scheduled renders (snapshot) 1`] = `"Your card to Grandma Rose is scheduled"`;
+
+exports[`email templates > card-scheduled renders (snapshot) 2`] = `
+"YOUR CARD IS SCHEDULED
+
+We'll email it to Grandma Rose on 31 Dec at 18:00 (UTC). You can change or cancel it until then.
+
+See My cards https://my.magicportraits.ai/cards
+
+Magic Portraits · magicportraits.ai"
+`;
+
+exports[`email templates > signin-code renders (snapshot) 1`] = `"Your My Magic Portraits code"`;
+
+exports[`email templates > signin-code renders (snapshot) 2`] = `
+"My Magic Portraits
+
+
+YOUR SIGN-IN CODE
+
+Enter this code to sign in. It works for 10 minutes.
+
+123456
+
+If you didn't ask for this, you can ignore this email. Someone may have typed your email by mistake.
+
+Magic Portraits · magicportraits.ai"
+`;
+
+exports[`email templates > signin-link renders (snapshot) 1`] = `"Your link to My Magic Portraits"`;
+
+exports[`email templates > signin-link renders (snapshot) 2`] = `
+"HI SAM, HERE'S YOUR LINK
+
+Tap below to open My Magic Portraits: your portraits, greeting cards, orders and downloads. No password or code needed.
+
+Open My Magic Portraits https://my.magicportraits.ai/g/example
+
+The link works for 30 days. Please don't forward this email: the link signs you in.
+
+Magic Portraits · magicportraits.ai"
+`;

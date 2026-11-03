@@ -201,7 +201,8 @@ export async function renderCard(cardId: string, opts: { firstCard?: boolean; is
       await db().from("card_deliveries").insert({ card_id: card.id, type: "email", status: "queued" });
     }
     await track("card_render_completed", { card_id: card.public_id, render_ms: ms }, { email: card.sender_email, ref: { type: "card", id: card.public_id } });
-    if (!opts.isRetry || card.status === "failed") {
+    if (!card.jpeg_path) {
+      // First successful render only (not after an edit of a scheduled card).
       const total = await countCardsBySender(card.sender_email);
       await track(
         "card_created",

@@ -1,7 +1,7 @@
-import { ZodError } from "zod";
 import { getSessionUser } from "@/lib/auth/session";
 import { json } from "@/lib/auth/http";
-import { CardError, createCard } from "@/lib/cards/create";
+import { createCard } from "@/lib/cards/create";
+import { cardErrorResponse } from "@/lib/cards/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +15,4 @@ export async function POST(req: Request) {
   } catch (e) {
     return cardErrorResponse(e);
   }
-}
-
-export function cardErrorResponse(e: unknown) {
-  if (e instanceof ZodError) return json({ error: "invalid", fields: e.issues.map((i) => i.path.join(".")) }, 400);
-  if (e instanceof CardError) return json({ error: e.code, ...e.extra }, e.status);
-  console.error(`[cards] ${(e as Error).message}`);
-  return json({ error: "server_error" }, 500);
 }
