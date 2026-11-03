@@ -10,7 +10,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 1 | App shell | done |
 | 2 | Database and settings | done |
 | 3 | Data sources | done (Test buttons UI lands with Settings, Part 10) |
-| 4 | Sign-in and account | pending |
+| 4 | Sign-in and account | done (live Auth config blocked, see Blocked) |
 | 5 | Home and My portraits | pending |
 | 6 | Card builder and renderer | pending |
 | 7 | Email and delivery | pending |
@@ -61,6 +61,17 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - `lib/sources/health.ts`: `testSource()` for shopify (scopes), imagen, mirror and a cold/warm lookup timing (target < 1.5 s warm), recording only counts and timings in `data_source_checks`. The Settings › Data sources page with its "Test" buttons is built in Part 10 (it needs the super-user guard from Part 4).
 - Tests: every row of the order rules, and profiles for a customer, a creator, a cancelled-only buyer, nobody, and an image ordered in one session but not another.
 
+## Part 4: Sign-in and account
+
+- `/signin` (`SignIn`): email → 6-digit code, resend, change email, `purpose=gift|redeem`, wording per purpose; the sample card fan is drawn by the real card renderer.
+- `POST /api/auth/code` (rate-limited per email hash and IP hash; same answer whether or not the email is known), `POST /api/auth/verify` (rate-limited), `POST /api/auth/signout` (+ `posthog.reset()` in the browser).
+- `/g/[token]`: 32-byte random tokens, stored only as `HMAC-SHA256(GIFT_LINK_SECRET, token)` in a new `signin_links` table (migration 2; gift offers keep their hash on `gift_offers` too). Server-side session exchange (admin `generateLink` → `verifyOtp` with the hashed token, nothing emailed), then a 303 to a clean path; expired → `/signin?expired=1`, unknown → `/signin`. Rate-limited per IP.
+- `/redeem`, `/redeem?order=…`, `/redeem/[order]` → `RedeemEntry` (fires the live `page_view_redeem` with `order_id_in_url`, never the raw order). After sign-in it opens `/orders/[order]`; not found and not yours show one identical message.
+- `proxy.ts` (Next 16's middleware) refreshes auth cookies; `getSessionUser()` verifies with the auth server; `requireUser`, `requireSuperUser` (404), `safeNext` (same-site only). Header shows initials; account menu with the Super user tag.
+- Local stack: the code template (`supabase/templates/signin-code.html`, shows `{{ .Token }}`), 600 s expiry, higher local rate limits for tests.
+- Migration 2 applied to `magic-vault`.
+- Tests: token valid / expired / unknown / reused-after-expiry, HMAC-only storage, `safeNext`; e2e signs in with a code read from the mail catcher, wrong code, one-tap link with the token never left in the address bar, expired and unknown links, 404 on `/settings` for non-super users, old redeem links, generic order message.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -76,7 +87,11 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Extra settings** beyond the docs, so nothing is hard-coded: rate limits (`auth.code_rate_limit_per_hour`, `auth.code_ip_rate_limit_per_hour`, `auth.verify_rate_limit_per_hour`, `vault.lookup_rate_limit_per_hour`, `redeem.download_rate_limit_per_hour`, `gift.offer_link_rate_limit_per_hour`), `cards.schedule_max_days`, `cards.signed_url_seconds`, `email.from_system`, `links.vip_login_url`, `vault.first_order_offer_code`, `tracking.*`, `klaviyo.max_attempts`. A `klaviyo` settings section was added to the allowed list.
 - **Local env**: `scripts/local-env.mjs` reads the running stack's keys (`supabase status`) for tests, e2e and `.env.local`, so no keys are committed. `scripts/dev-up.sh` restarts Docker and the stack after a session restart.
 
+- **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
+
 ## Blocked
+- **Live Auth settings for `magic-vault` not applied.** `scripts/configure-auth.ts` (`pnpm auth:configure`) is written and dry-runs cleanly, but the session's permission policy refused the `PATCH /v1/projects/{ref}/config/auth` call. The live project currently has **8-digit codes valid for 3600 s**, `site_url = http://localhost:3000`, no redirect allow-list, and default templates without `{{ .Token }}`. Until it's applied, sign-in on the preview won't work (the form expects 6 digits). To fix: run `pnpm auth:configure` from a session allowed to change it, or set these in the Supabase dashboard (Authentication › Emails: OTP length 6, expiry 600; URL configuration: site URL `https://my.magicportraits.ai`, redirect URLs for previews; Magic Link and Confirm signup templates from `supabase/templates/signin-code.html`).
+- **SMTP sender name** on `magic-vault` reads "Magic Cards"; the spec says "My Magic Portraits". Left alone (SMTP is Gavin's to set).
 
 - Shopify, Klaviyo and AgentMail can't be reached from this session (see Part 0). Each sits behind an interface with a fixtures implementation; the live clients are checked after deploy.
 

@@ -6,7 +6,7 @@ import { t } from "@/lib/i18n";
 import { resetClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 
-export function SignOutButton({ className, withIcon = true }: { className?: string; withIcon?: boolean }) {
+export function SignOutButton({ className, withIcon = true, label }: { className?: string; withIcon?: boolean; label?: string }) {
   const [busy, setBusy] = useState(false);
   async function signOut() {
     setBusy(true);
@@ -22,7 +22,7 @@ export function SignOutButton({ className, withIcon = true }: { className?: stri
   return (
     <button type="button" onClick={signOut} disabled={busy} className={cn("inline-flex items-center justify-center gap-2", className)}>
       {withIcon && <LogOut className="h-[18px] w-[18px]" aria-hidden="true" />}
-      {t("ui.account.signOut")}
+      {label ?? t("ui.account.signOut")}
     </button>
   );
 }
