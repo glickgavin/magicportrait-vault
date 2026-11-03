@@ -7,7 +7,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | Part | Name | Status |
 |---|---|---|
 | 0 | Preflight | done |
-| 1 | App shell | pending |
+| 1 | App shell | done |
 | 2 | Database and settings | pending |
 | 3 | Data sources | pending |
 | 4 | Sign-in and account | pending |
@@ -35,11 +35,23 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | Events mirror (`shopify-dailyreport`) | **Check after deploy** | Same as Imagen. |
 | Google Fonts / GitHub raw | OK | Font TTFs for the renderer fetched from `google/fonts` (OFL, licences committed beside them). |
 
+## Part 1: App shell
+
+- Next.js 16 App Router, Tailwind v4 tokens in `app/globals.css`, fonts via `next/font/google` (Plus Jakarta Sans, DM Serif Display, League Gothic).
+- `Header`, `MenuSheet` (Radix Dialog), `Footer`, `Avatar`, `AccountMenu`, `SignOutButton`, ported from `reference/live-site/`, with the MY MAGIC PORTRAITS group.
+- `t()` with one English dictionary; 404, error and global-error pages; `X-Robots-Tag: noindex` on everything except `/signin`.
+- PostHog provider (`/ingest` rewrite, cross-subdomain cookie, inputs masked, `.ph-no-capture` blocks the card preview, `before_send` strips tokens and query strings on `/g/` and `/c/`). `lib/track-client.ts` for the browser; server `lib/track.ts` comes with the database in Part 2.
+- e2e: shell at 360, 390 and 1280 px, axe clean, menu opens and closes, 404 page.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
 - **Playwright pinned to 1.63.0** to match the Chromium preinstalled at `/opt/pw-browsers`.
 - **Local seeds:** `supabase/config.toml` runs `seed.sql` then `seed.test.sql` on `db reset`, so the test stack gets the production seed plus the test overlay (live versions, `cards.enabled` on, fixture people). `magic-vault` only ever gets `seed.sql`.
+
+- **Contrast:** the live footer's muted text (black at 50%) and the menu's magenta lead label and faint numerals fail WCAG AA on the cream background. We use black at 60% for footer links, `#B8059F` for "Make something", and black at 50% for the 01–06 numerals. Everything else matches the live site.
+- **Menu product rows** follow the `Menu` mockup (compact rows with thumbnail tiles) rather than the live site's large editorial list, since the mockup adds the MY MAGIC PORTRAITS group above it. Thumbnails are placeholder tiles until `links.menu_thumbnails` is set (SPEC Q9).
+- **Brand icons** (Instagram, Facebook, WhatsApp) are inline SVGs: the current `lucide-react` no longer ships brand marks.
 
 ## Blocked
 

@@ -6,6 +6,7 @@ export const en = {
   },
   ui: {
     back: "Back",
+    skip: "Skip to content",
     footer: {
       products: "Products:",
       petPortraits: "Pet Portraits",
