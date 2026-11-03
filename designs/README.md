@@ -5,7 +5,7 @@ These are the approved mockups. File names still say "Vault" (the internal code 
 | Design | What it is | Route in the app |
 |---|---|---|
 | **Ways in** | | |
-| `Main` | Free gift offer email after an order (390 px) | React Email template `gift-offer` |
+| `Main` | Free gift offer email after an order (390 px) | Not built in this app. The design to copy when the Klaviyo offer flow is written later |
 | `GiftSheet` | Thank-you page bottom sheet | Snippet for the Shopify thank-you page (outside this repo); links to `/g/[token]` |
 | `SignIn` | Create a card: email, then 6-digit code | `/signin` (props `purpose=gift|redeem`) |
 | `RedeemEntry` | Old /redeem link: sign in with the order's email | `/redeem` → `/signin?purpose=redeem&order=…` |

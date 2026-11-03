@@ -159,13 +159,11 @@ Each part lists what to build and what has to be true before it's committed.
 
 ### Part 7: Email and delivery
 - React Email templates:
-  - `gift-offer` (`Main`)
-  - `gift-reminder` (seasonal reminder, same style)
   - `card-delivery` (`RecipientEmail`)
   - `card-scheduled` (confirmation to the sender)
   - `signin-code` (for Supabase SMTP, same style)
   - `signin-link` (when a super user resends someone's link).
-- Sending through Resend, with `cards.email_sender_name`, `email.from_offers`, `email.from_cards` and `email.reply_to`.
+- Sending through Resend, with `cards.email_sender_name`, `email.from_cards` and `email.reply_to`. No offer, reminder or mug emails: those come from Klaviyo later.
 - Cron `/api/cron/send-scheduled` every 5 minutes.
 - **Klaviyo client** (`lib/klaviyo.ts`) and the `outbound_events` outbox, `docs/data.md` §10:
   - send at once, retry from cron `/api/cron/flush-outbox` every minute
@@ -176,7 +174,7 @@ Each part lists what to build and what has to be true before it's committed.
   
   `card_created`, `card_email_sent`, `card_recipient_email_opened` and `vault_signed_in` are wired here.
 - `/api/webhooks/resend` updates `card_deliveries`, card status and `email_suppressions`.
-- The recipients' "Don't email me cards" page, and `/email-preferences/[token]` for offer and reminder emails (the `Main` footer's "Email preferences" link).
+- The recipients' "Don't email me cards" page.
 - My cards (`/cards`) with Use again, Resend, Download, Copy link, and **Change** or **Cancel** for scheduled cards. Change reopens the builder on that card, re-renders it and keeps or updates the time.
 - **Done when** there are template snapshot tests, webhook signature and idempotency tests, and a cron test with a fake clock; one real test email goes to `SMOKE_TEST_EMAIL` if set.
 
@@ -192,22 +190,20 @@ Each part lists what to build and what has to be true before it's committed.
 
 ### Part 9: Free gift offer
 - `/api/webhooks/shopify/orders-paid`: HMAC check, idempotent, creates `gift_offers`, respects every switch and `gift.unlock_rule`.
-- Cron `/api/cron/send-gift-offers`.
+- Cron `/api/cron/send-gift-offers`: queues `free_gift_unlocked` for Klaviyo when due.
 - `POST /api/gift/offer-link` for the thank-you pop-up:
   - accepts only a Shopify checkout-extension session token verified with the app secret, for an order paid within `gift.popup_window_minutes`
   - rate-limited
   - never a bare order number.
-- "Later, email me the link".
+- "Later, email me the link": built but hidden behind `gift.popup_email_later_enabled` (off); when on, it queues `free_gift_link_requested` for Klaviyo.
 - Non-qualifying orders are recorded as `skipped`, with the reason.
-- Offer channel `email.channel_gift_offer`:
-  - `klaviyo` sends `free_gift_unlocked` with the one-tap link (when `klaviyo.include_signin_link`) and the portrait preview
-  - `resend` sends `gift-offer`.
-- Seasonal reminder: cron `/api/cron/send-reminders`, using `gift.reminder_*`, `theme_categories.reminder_enabled` and `email.channel_reminder` (`gift_reminder_due` to Klaviyo, or the `gift-reminder` email).
+- `free_gift_unlocked` goes to Klaviyo with the one-tap link (when `klaviyo.include_signin_link`) and the portrait preview.
+- Seasonal reminder: cron `/api/cron/send-reminders`, using `gift.reminder_*` and `theme_categories.reminder_enabled`; queues `gift_reminder_due` for Klaviyo. **This app sends no offer or reminder email.**
 - Mug photo reminder: cron `/api/cron/mug-reminders` sends `mug_photo_needed` to Klaviyo, once per order, `redeem.mug_reminder_after_days` after the order, while no photo is chosen and the mug isn't locked.
 - `scripts/register-shopify-webhook.ts`: written but **not run**.
 - **Done when** tests show that:
   - with the switches off, nothing is sent
-  - with them on, exactly one offer is sent per qualifying order
+  - with them on, exactly one `free_gift_unlocked` event is queued per qualifying order
   - replayed webhooks are ignored
   - the offer-link endpoint rejects a missing, forged or expired session token and an old order.
 
@@ -219,7 +215,7 @@ Each part lists what to build and what has to be true before it's committed.
   - test render
   - publish with thumbnail generation
   - status and `is_new`.
-- Data-source test buttons, including Klaviyo with outbox counts and "retry failed"; the per-email channel switch in Settings › Emails; super-user add/remove with its guards; activity log browser.
+- Data-source test buttons, including Klaviyo with outbox counts and "retry failed"; super-user add/remove with its guards; activity log browser.
 - **Done when**:
   - e2e as a super user changes a setting, which shows in history and changes behaviour
   - a theme version is published from uploaded files and appears in `/create`
@@ -268,13 +264,11 @@ Each part lists what to build and what has to be true before it's committed.
 2. Run `scripts/register-shopify-webhook.ts` against production (orders/paid → My Magic Portraits).
 3. Point the live site's `/redeem` at `https://my.magicportraits.ai/redeem` (keep the query string), and add the MY MAGIC PORTRAITS links to its menu. This is a change in the Lovable project.
 4. Add the thank-you pop-up (`GiftSheet`) to the Shopify thank-you page, calling `/api/gift/offer-link`.
-5. **Klaviyo flows** (marketing).
-   - First send one test event of each kind from the preview to a staff profile, so the metrics exist.
-   - Add `magicportraits.ai` as a Klaviyo sending domain (DNS in Cloudflare), or send as "Magic Portraits" <hi@storyboards.io> for now.
-   - Build the flows, named like the account's other flows:
-     - "MP Free Gift - Make Your Card" (`free_gift_unlocked`, exit on `card_created`; copy the `Main` design)
-     - "MP Seasonal Card Reminder" (`gift_reminder_due`)
-     - "MP Choose Your Mug Photo" (`mug_photo_needed`, exit on `redeem_mug_saved`).
-   - Then set `klaviyo.enabled` on.
+5. **Klaviyo** (events now, emails later).
+   - Turn on `klaviyo.enabled` and send one test event of each kind from the preview to a staff profile, so the metrics show up in Klaviyo.
+   - Later, when the emails are written:
+     - Add `magicportraits.ai` as a Klaviyo sending domain (DNS in Cloudflare), or send as "Magic Portraits" <hi@storyboards.io>.
+     - Build the flows, named like the account's other flows: "MP Free Gift - Make Your Card" (`free_gift_unlocked`, exit on `card_created`; copy the `Main` design), "MP Seasonal Card Reminder" (`gift_reminder_due`), "MP Choose Your Mug Photo" (`mug_photo_needed`, exit on `redeem_mug_saved`).
+     - Then turn on `gift.popup_email_later_enabled`.
 6. Add a line to the privacy policy: greeting cards and their messages are stored, and may be viewed by staff for support.
-7. In Settings, turn on `cards.enabled`, then `gift.popup_enabled` and `gift.offer_email_enabled`. Watch Settings › Insights and the PostHog card funnel for the first day.
+7. In Settings, turn on `cards.enabled`, then `gift.popup_enabled` and `gift.offer_email_enabled` (sends the `free_gift_unlocked` event; no email until the Klaviyo flow exists). Watch Settings › Insights and the PostHog card funnel for the first day.

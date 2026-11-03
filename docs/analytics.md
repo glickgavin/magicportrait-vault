@@ -53,7 +53,7 @@ Business events that happen in the browser (share, copy link, download, mug tile
 | `gift_popup_shown` | Thank-you page sheet opens | `order_id` |
 | `gift_popup_cta_tapped` / `gift_popup_dismissed` | Taps on the sheet | `order_id`, `action` |
 | `menu_create_card_tapped` | "Create a card" in the site menu | `signed_in` |
-| `gift_popup_email_link_requested` | "Later, email me the link" on the sheet | `order_id` |
+| `free_gift_link_requested` | "Later, email me the link" on the sheet (hidden until the Klaviyo offer flow exists; also sent to Klaviyo) | `order_id` |
 | `gift_reminder_email_sent` (server) | Seasonal reminder sent | `category`, `theme_slug` |
 
 `entry_point` super property (the same list as `cards.entry_point` in `docs/schema.md`): `order_email` · `thankyou_popup` · `reminder_email` · `site_menu` · `home` · `my_cards` · `my_portraits` · `order_page` · `make_another` · `use_again`. Recipient pages use `recipient_page`.
@@ -171,7 +171,6 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 | `card_cancelled` | A scheduled card is cancelled | `card_id` |
 | `card_schedule_changed` | A scheduled card's time or content is changed | `card_id`, `changed` (`time` / `content`) |
 | `gift_offer_skipped` | An order didn't qualify for the free gift, or the offer was suppressed | `order_id`, `reason` |
-| `gift_preferences_updated` | Someone changed their Email preferences | `offer_emails` (on/off) |
 | `admin_signin_link_resent` | A super user resent someone's sign-in link | `customer_id` |
 | `admin_theme_updated` / `admin_category_updated` / `admin_version_updated` | Theme library edits | `theme_slug` / `category` / `version_slug` |
 | `card_recipient_email_bounced` | Recipient email bounced | `card_id` |
@@ -205,7 +204,7 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 
 - Never send the message text, recipient name or recipient email as event properties. Send `message_length`, `has_recipient_email`, `scheduled` instead.
 - Replay masks every text input by default and masks the live card preview (it shows the message).
-- No personal data in URLs. Sign-in tokens are stripped by redirect, and admin pages use opaque ids. PostHog's `before_send` also drops the path token and query string on `/g/`, `/email-preferences/` and `/c/` pages.
+- No personal data in URLs. Sign-in tokens are stripped by redirect, and admin pages use opaque ids. PostHog's `before_send` also drops the path token and query string on `/g/` and `/c/` pages.
 - Customer `email` is used only as the PostHog identity, as on the main site.
 - Respect the main site's consent setting; don't start replay before consent where it's required.
 
@@ -239,6 +238,6 @@ Everything else (`page_view_*`, taps, filters, UI-only events) goes to PostHog o
 ## 10. Definition of done for the build
 
 - Every customer page fires its `page_view_*` (list below) and its action events with the properties above. Settings pages fire `settings_viewed` with `section` instead.
-- Page views not listed elsewhere: `page_view_vault_order` (order detail; `order_id`, `mug_present`, `downloads_enabled`), `page_view_card_creating` (`card_id`), `page_view_email_preferences`, `page_view_card_unsubscribe` (`card_id`), `page_view_vault_empty` (nobody found). Old redeem links (`/redeem`) fire the live name `page_view_redeem`.
+- Page views not listed elsewhere: `page_view_vault_order` (order detail; `order_id`, `mug_present`, `downloads_enabled`), `page_view_card_creating` (`card_id`), `page_view_card_unsubscribe` (`card_id`), `page_view_vault_empty` (nobody found). Old redeem links (`/redeem`) fire the live name `page_view_redeem`.
 - Events checked in PostHog Live events with a test account (in the test-account cohort).
 - No personal message content in any event or replay.

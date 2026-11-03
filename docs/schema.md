@@ -44,7 +44,6 @@ One row per person we know: someone who signed in, got a free gift offer, or was
 | email | text pk | |
 | created_via | text not null | `sign_in` · `gift_offer` · `admin_lookup` |
 | first_signed_in_at | timestamptz null | null until they first sign in |
-| prefs_token_hash | text unique null | for `/email-preferences/[token]` |
 | display_name | text | from Shopify customer, else null |
 | shopify_customer_id | text | |
 | is_customer | boolean not null default false | has at least one paid order |
@@ -142,7 +141,7 @@ Append-only. Kept forever, except for anonymisation on a deletion request.
 Indexes: `(email, occurred_at desc)`, `(event, occurred_at desc)`, `(occurred_at desc)`, `(ref_type, ref_id)`. Block `update` and `delete` for all roles except the deletion function.
 
 ### email_suppressions
-`email text`, `scope` (`card_emails`: the recipients' "Don't email me cards" · `offer_emails`: offer and reminder emails, from Email preferences · `all`: bounce, complaint or deletion), `reason` (`unsubscribe` · `bounce` · `complaint` · `deletion`), `created_at`. Primary key `(email, scope)`.
+`email text`, `scope` (`card_emails`: the recipients' "Don't email me cards" · `all`: bounce, complaint or deletion), `reason` (`unsubscribe` · `bounce` · `complaint` · `deletion`), `created_at`. Primary key `(email, scope)`.
 
 ### outbound_events
 The outbox for Klaviyo (and any later destination). A row is written in the same transaction as the action, sent at once, and retried by `/api/cron/flush-outbox` every minute with backoff.
@@ -223,11 +222,10 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `cards.first_card_mode` | one_screen (or full_builder) |
 | `cards.first_card_default_version` | `general-love` (used when nothing is in season) |
 | `redeem.mug_reminder_after_days` | 2 |
-| `email.channel_gift_offer` | klaviyo (or resend) |
-| `email.channel_reminder` | klaviyo (or resend) |
+| `gift.popup_email_later_enabled` | false (turn on once the Klaviyo offer flow exists) |
 | `klaviyo.enabled` | false (on once the key is set and the flows exist) |
 | `klaviyo.api_revision` | "2024-10-15" (the live site's client revision; update after testing) |
-| `klaviyo.events` | `["free_gift_unlocked","vault_signed_in","card_created","card_email_sent","card_recipient_email_opened","gift_reminder_due","mug_photo_needed","redeem_mug_saved"]` |
+| `klaviyo.events` | `["free_gift_unlocked","free_gift_link_requested","vault_signed_in","card_created","card_email_sent","card_recipient_email_opened","gift_reminder_due","mug_photo_needed","redeem_mug_saved"]` |
 | `klaviyo.include_signin_link` | true (SPEC Q11) |
 | `klaviyo.profile_properties` | true |
 | `klaviyo.delete_on_request` | true |
@@ -240,7 +238,6 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `vault.lookup_cache_minutes` | 10 |
 | `themes.in_season_days_before` | 45 |
 | `brand.support_email` | "" |
-| `email.from_offers` | "Magic Portraits <hello@magicportraits.ai>" (proposed, SPEC Q10) |
 | `email.from_cards` | "{from} via Magic Portraits <cards@magicportraits.ai>" (proposed) |
 | `email.reply_to` | "support@magicportraits.ai" (proposed) |
 | `links.main_site_url` | "https://magicportraits.ai" |
