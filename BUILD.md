@@ -54,9 +54,9 @@ These need an account owner. The build checks each one in Part 0. Anything missi
 7. **PostHog.** The project key for project 540098 (the one the main site uses). Optional: a personal API key, so Settings › Tracking can show counts and the setup script can create dashboards.
 8. **Intercom.** The app id the main site uses for "Chat With Us" (`NEXT_PUBLIC_INTERCOM_APP_ID`).
 9. **Klaviyo.**
-   - In Klaviyo › Settings › API keys, create a private key just for this app (name it "My Magic Portraits") with scopes `events:write`, `profiles:write`, `data-privacy:write`, `metrics:read` and `flows:read`.
+   - In Klaviyo › Settings › API keys, create a private key just for this app (name it "My Magic Portraits") with scopes `events:write`, `profiles:write`, `data-privacy:write` and `metrics:read`.
    - Put it in Vercel as `KLAVIYO_PRIVATE_KEY`.
-   - The flows themselves are built after the build (see After the build).
+   - No flows are needed now: the app only sends events. The emails get written in Klaviyo later.
 
 ---
 

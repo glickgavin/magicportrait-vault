@@ -1186,7 +1186,7 @@ On a data-deletion request, call `POST https://a.klaviyo.com/api/data-privacy-de
 
 **Key scopes** (create a dedicated private key for this app, not the live site's):
 - `events:write`, `profiles:write`, `data-privacy:write`
-- `metrics:read` and `flows:read`, for the Settings check that a flow has received events.
+- `metrics:read`, for the connection test in Part 0 and Settings › Data sources.
 
 **Checked in the Klaviyo account (connector, read only, 3 Nov 2026)**
 - **Account:** `LD5CnH`, "Storyboards Inc", time zone US/Pacific.
