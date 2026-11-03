@@ -19,7 +19,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 10 | Settings | done |
 | 11 | Insights | done |
 | 12 | Analytics pass | done |
-| 13 | Final check and preview | pending |
+| 13 | Final check and preview | done |
 
 ## Part 0: Preflight (3 Nov 2026)
 
@@ -153,6 +153,16 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - `prebuild` runs the event-name check, so `pnpm build` (and Vercel) fails on any event name that isn't in the list; `pnpm lint` runs it too.
 - Tests: e2e asserts every customer page fires its `page_view_*` (19 screens and states) and every Settings page fires `settings_viewed` with a section; signed-in pages identify the person; a card made with a distinctive message, recipient name and email leaves none of them in browser events, `activity_log` or the Klaviyo outbox (with Klaviyo switched on for the test); replay-masking checks.
 
+## Part 13: Final check and preview
+
+- **Full e2e** against a production build, at 390 × 844 and 1280 × 800: **96 passed** (the 18 skipped are the on-demand screenshot spec). axe (WCAG 2.2 AA tags) runs on every customer screen and every Settings page with no violations.
+- **Unit and integration tests:** 171 passed (local Supabase stack, fixtures).
+- **Client bundle:** `scripts/check-bundle.mjs` scans `.next/static` for secret patterns (Supabase secret/service-role keys, Shopify tokens, Svix and Klaviyo keys, Postgres URLs, server env names) and the actual local secret values: none found. Only `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_POSTHOG_KEY`/`_HOST` and `NEXT_PUBLIC_INTERCOM_APP_ID` reach the browser.
+- **Lighthouse (mobile, signed in, production build):** `/` (VaultHome) 92 / 100, `/create?step=theme` 89 / 100, `/orders` 93 / 100; first-time screens `/` (FirstHome) 87 / 100 and `/create` (FirstCard) 93 / 100 (performance / accessibility). CLS 0 everywhere. `posthog-js` is now loaded lazily after the page is idle, which lifted `/` from 83 to 92.
+- **`magic-vault`:** all 3 migrations recorded in `supabase_migrations.schema_migrations`, `seed.sql` applied; 101 settings, 10 theme versions all draft, 0 cards, 0 activity rows (no test data), super users gavin@ and gideon@; every launch switch off (`cards.enabled`, `gift.offer_email_enabled`, `gift.popup_enabled`, `gift.popup_email_later_enabled`, `gift.reminder_email_enabled`, `klaviyo.enabled`, `redeem.mug_reminder_enabled`).
+- **Screenshots** of every route at 390 px (fixture data only) are in `docs/build-screens/` (35 images: 21 customer screens and states, 13 Settings pages, the menu).
+- **Preview:** Vercel builds every push of this branch (all READY up to Part 12; the final commit was building when this was written).
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -198,3 +208,58 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - AgentMail per-message From display name (see Decisions). Default: inbox display name, subject carries the sender's name.
 
 - Fixture portraits are local files (`/fixtures/portraits/…`); in fixtures mode the app treats those paths as an allowed image source. Live mode only fetches from `redeem.allowed_image_hosts`.
+
+## Security walk-through (CLAUDE.md, item by item)
+
+| Rule | Result |
+|---|---|
+| Every customer action re-checks ownership and that it's allowed | ✅ Cards: `getOwnedCard` on render, image, resend, cancel, change, track; portraits must be in the person's own profile (`POST /api/cards`, e2e). Orders: `findOwnedOrder` re-reads the order on every view, mug save and download; mug present, not cancelled, not locked, offer open, tile in order; downloads re-check eligibility and the kill switch (unit + e2e). |
+| No debug fields; never another person's data; errors don't reveal whether an email or order exists | ✅ Error bodies are `{ error }` only (e2e asserts no `debug`, emails or gids); "not yours" and "not found" are the same 404 and the same page; code requests answer the same for any email; the pop-up endpoint answers `unavailable`. |
+| Downloads and card images use short-lived signed URLs or access-checked routes; no permanent public links to private files | ✅ Card images via `/api/cards/[id]/image` (owner or super user) and `/c/[slug]/image` (share link, 404 when hidden); downloads via `/api/orders/[name]/download*`; exports use 7-day signed URLs; `portraits` and `cards` buckets are private. |
+| Only the allowed `NEXT_PUBLIC_*` values reach the browser | ✅ Bundle scan (above). |
+| RLS on every table, deny by default; the browser never queries tables | ✅ RLS on all 18 tables with no policies; `anon`/`authenticated` grants revoked on tables and functions (integration test with the browser key). All reads/writes are server-side with the service role. |
+| Verify Shopify and AgentMail webhook signatures; idempotent handlers | ✅ HMAC on the raw body / Svix signatures; `processed_webhooks` on `X-Shopify-Webhook-Id` and `svix-id`, plus the order id unique key (tests: forged, wrong secret, replay). |
+| `/settings/*` and `/api/admin/*` 404 unless super user | ✅ Layout guard and `adminOr404` on all 28 admin routes (e2e for anonymous and a signed-in customer). |
+| `/g/[token]`: random 32+ bytes, stored only as HMAC, expire, stripped from the address | ✅ 32-byte base64url, HMAC-SHA256 with `GIFT_LINK_SECRET`, `expires_at`, 303 to a clean path with `no-referrer`; PostHog drops `/g/` paths (tests). |
+| Share slugs random, 16+ chars | ✅ 16 random bytes → 22 chars, DB check `length >= 16`. |
+| No emails or tokens in URLs; admin pages use opaque ids | ✅ Customer search and card search in request bodies, activity-log email filter in a cookie, customers by `vault_members.id`, CSV export posted. Email links carry only an opaque delivery id. |
+| Pop-up link endpoint: only a verified checkout session token for a recent order | ✅ HS256 verified with the app secret, `exp`/`nbf`/`dest` checked, paid within `gift.popup_window_minutes` (tests: missing, forged, expired, `alg: none`, old order). |
+| Rate-limit code requests, lookups and downloads per email and IP | ✅ `hit_rate_limit()`: code per email and IP, verify per email, one-tap links per IP, downloads per person, mug saves, resends, track calls, pop-up per IP; limits are settings. |
+| Never put message text or recipient details into PostHog, Klaviyo, `activity_log` or logs; no Klaviyo profile for recipients | ✅ `scrubProps` in every sender, fixed Klaviyo property lists, recipient events credited to the sender; e2e checks browser events, `activity_log` and the outbox for a distinctive message, name and address. |
+| Mask emails in server logs | ✅ `maskEmail()` in every log line that mentions a person; health checks strip emails from error text. |
+| Session replay masks inputs and the card preview | ✅ `maskAllInputs`, `.ph-no-capture` on previews and card images, `data-ph-mask` on names and messages (tests). |
+| Klaviyo and Shopify writes only in the allowed places | ✅ Shopify writes only in `saveMugChoice` (`metafieldsSet` + `tagsAdd`); Klaviyo only through the outbox; `scripts/register-shopify-webhook.ts` written and not run. Nothing writes to Imagen, the mirror or the live site. |
+
+## Summary
+
+### What works
+- Sign-in with a 6-digit code and one-tap links; old `/redeem` links; account menu and site menu.
+- Home in all four states, My portraits, the first card on one screen, the full card builder with a live canvas preview identical to the server JPEG, scheduled and immediate email delivery, sharing, the public card page and referral redirect, My cards with change/cancel/resend/use again.
+- Orders, the free-mug picker with the print lock and exact Shopify writes, downloads and streamed zips.
+- The free gift offer (webhook, cron, pop-up endpoint, reminders) behind switches, all off; the Klaviyo outbox with retries.
+- Settings: insights, customers with timelines, all cards, general settings, theme library and template editor, redeem, emails, tracking, data sources, super users, activity log; export and deletion on request.
+- Analytics: every documented event, identity, super properties, replay masking.
+
+### Stubbed or blocked, and why
+- **Live Auth settings on `magic-vault`** (6-digit codes, 600 s, templates, site URL, redirect URLs): the session's permission policy refused the Management API change. Run `pnpm auth:configure` (or set them in the dashboard). Until then, sign-in on the preview won't accept codes: the project still sends 8-digit codes. **This is the one thing blocking a usable preview.**
+- **Shopify, Imagen, events mirror, Klaviyo, AgentMail:** not reachable from this session (no secrets / not allowed by the egress proxy). Live clients are built to `docs/data.md`; check each with Settings › Data sources › "Test" and Settings › Emails › "Send me a test" on the preview once the Vercel secrets are in.
+- **AgentMail per-sender display name** isn't supported by its send API (see Decisions).
+- **PostHog dashboards:** `scripts/posthog-setup.ts` needs `POSTHOG_PERSONAL_API_KEY`.
+- **Thank-you pop-up:** the Shopify checkout extension is outside this repo (`docs/gift-sheet.md`).
+- **Theme artwork** is placeholder art; real artwork is uploaded in the template editor.
+
+### Preview
+- Branch previews: the Vercel project `magic-vault` (team Storyboards) builds every push of `claude/cool-volta-69zljg`, e.g. https://magic-vault-2jlhil01t-storyboards-a409a671.vercel.app (final commit) and https://magic-vault-aje83422k-storyboards-a409a671.vercel.app (Part 12, READY). Previews use `magic-vault` with every switch off and are behind Vercel Authentication.
+
+### Launch checklist (BUILD.md › After the build)
+| # | Step | Status |
+|---|---|---|
+| 0 | Apply the live Auth settings (`pnpm auth:configure`) | ⬜ Blocked in this session; needed before anyone can sign in |
+| 1 | Review the preview on a phone; run every "Test" in Settings › Data sources and "Send me a test" in Settings › Emails; upload real theme artwork and publish the first versions | ⬜ Ready to do (needs the Vercel secrets from BUILD.md steps 2–8) |
+| 2 | Merge the pull request into `main` (deploys my.magicportraits.ai; nothing is switched on) | ⬜ Not done, on purpose |
+| 3 | Run `scripts/register-shopify-webhook.ts` against production | ⬜ Script ready, not run |
+| 4 | Point the live `/redeem` to `https://my.magicportraits.ai/redeem` and add the MY MAGIC PORTRAITS menu links (Lovable) | ⬜ Outside this repo; `/redeem`, `/redeem?order=` and `/redeem/[order]` are ready |
+| 5 | Add the thank-you pop-up calling `/api/gift/offer-link` | ⬜ Endpoint ready; notes in `docs/gift-sheet.md` |
+| 6 | Klaviyo: turn on `klaviyo.enabled`, send one test event of each kind; later build the flows and turn on `gift.popup_email_later_enabled` | ⬜ Outbox, events and Data sources card ready |
+| 7 | Privacy policy line about stored cards and staff access | ⬜ Outside this repo |
+| 8 | Turn on `cards.enabled`, then `gift.popup_enabled` and `gift.offer_email_enabled`; watch Insights and PostHog | ⬜ All off in `magic-vault` (verified) |
