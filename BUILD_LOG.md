@@ -10,7 +10,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 1 | App shell | done |
 | 2 | Database and settings | done |
 | 3 | Data sources | done |
-| 4 | Sign-in and account | done (live Auth config blocked, see Blocked) |
+| 4 | Sign-in and account | done |
 | 5 | Home and My portraits | done |
 | 6 | Card builder and renderer | done |
 | 7 | Email and delivery | done |
@@ -198,7 +198,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked
-- **Live Auth settings for `magic-vault` not applied.** `scripts/configure-auth.ts` (`pnpm auth:configure`) is written and dry-runs cleanly, but the session's permission policy refused the `PATCH /v1/projects/{ref}/config/auth` call. The live project currently has **8-digit codes valid for 3600 s**, `site_url = http://localhost:3000`, no redirect allow-list, and default templates without `{{ .Token }}`. Until it's applied, sign-in on the preview won't work (the form expects 6 digits). To fix: run `pnpm auth:configure` from a session allowed to change it, or set these in the Supabase dashboard (Authentication › Emails: OTP length 6, expiry 600; URL configuration: site URL `https://my.magicportraits.ai`, redirect URLs for previews; Magic Link and Confirm signup templates from `supabase/templates/signin-code.html`).
+- ~~Live Auth settings for `magic-vault`~~ **Resolved 3 Nov:** `pnpm auth:configure` applied after Gavin allowed it. Verified: 6-digit codes, 600 s, site URL `https://my.magicportraits.ai`, preview redirect URLs, Magic Link and Confirm signup templates showing `{{ .Token }}`. SMTP untouched.
 - **SMTP sender name** on `magic-vault` reads "Magic Cards"; the spec says "My Magic Portraits". Left alone (SMTP is Gavin's to set).
 
 - Shopify, Klaviyo and AgentMail can't be reached from this session (see Part 0). Each sits behind an interface with a fixtures implementation; the live clients are checked after deploy.
@@ -241,7 +241,6 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - Analytics: every documented event, identity, super properties, replay masking.
 
 ### Stubbed or blocked, and why
-- **Live Auth settings on `magic-vault`** (6-digit codes, 600 s, templates, site URL, redirect URLs): the session's permission policy refused the Management API change. Run `pnpm auth:configure` (or set them in the dashboard). Until then, sign-in on the preview won't accept codes: the project still sends 8-digit codes. **This is the one thing blocking a usable preview.**
 - **Shopify, Imagen, events mirror, Klaviyo, AgentMail:** not reachable from this session (no secrets / not allowed by the egress proxy). Live clients are built to `docs/data.md`; check each with Settings › Data sources › "Test" and Settings › Emails › "Send me a test" on the preview once the Vercel secrets are in.
 - **AgentMail per-sender display name** isn't supported by its send API (see Decisions).
 - **PostHog dashboards:** `scripts/posthog-setup.ts` needs `POSTHOG_PERSONAL_API_KEY`.
@@ -254,7 +253,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 ### Launch checklist (BUILD.md › After the build)
 | # | Step | Status |
 |---|---|---|
-| 0 | Apply the live Auth settings (`pnpm auth:configure`) | ⬜ Blocked in this session; needed before anyone can sign in |
+| 0 | Apply the live Auth settings (`pnpm auth:configure`) | ✅ Done 3 Nov, verified |
 | 1 | Review the preview on a phone; run every "Test" in Settings › Data sources and "Send me a test" in Settings › Emails; upload real theme artwork and publish the first versions | ⬜ Ready to do (needs the Vercel secrets from BUILD.md steps 2–8) |
 | 2 | Merge the pull request into `main` (deploys my.magicportraits.ai; nothing is switched on) | ⬜ Not done, on purpose |
 | 3 | Run `scripts/register-shopify-webhook.ts` against production | ⬜ Script ready, not run |
