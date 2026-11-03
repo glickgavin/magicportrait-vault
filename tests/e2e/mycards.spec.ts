@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { admin, signInWithLink } from "./auth";
 import { deleteCardsOf } from "./db";
 import { expectNoAxeViolations } from "./helpers";
 
-const OUTBOX = path.join(process.cwd(), ".tmp/sent-emails");
+const OUTBOX = process.env.EMAIL_OUTBOX_DIR || path.join(tmpdir(), "magic-vault", "sent-emails");
 function mailsTo(to: string) {
   let files: string[] = [];
   try {

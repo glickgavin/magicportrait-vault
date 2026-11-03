@@ -1,6 +1,7 @@
 import "server-only";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { db } from "@/lib/db/client";
 import { env } from "@/lib/env";
 import { getSettings } from "@/lib/settings";
@@ -134,7 +135,7 @@ class FixtureTransport implements KlaviyoTransport {
   async post(p: string, body: unknown): Promise<SendOutcome> {
     const fail = Number(process.env.KLAVIYO_FIXTURE_FAIL || 0);
     if (fail) return { ok: false, status: fail, permanent: fail >= 400 && fail < 500 && fail !== 429, error: "fixture failure" };
-    const dir = process.env.KLAVIYO_OUTBOX_DIR || path.join(process.cwd(), ".tmp/klaviyo");
+    const dir = process.env.KLAVIYO_OUTBOX_DIR || path.join(tmpdir(), "magic-vault", "klaviyo");
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, `${Date.now()}-${Math.random().toString(36).slice(2)}.json`), JSON.stringify({ path: p, body }, null, 2));
     return { ok: true, status: 202 };

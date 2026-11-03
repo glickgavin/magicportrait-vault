@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { tmpdir } from "node:os";
 import { env } from "@/lib/env";
 
 export type OutgoingEmail = { from: string; to: string; replyTo?: string; subject: string; html: string; text: string; headers?: Record<string, string>; idempotencyKey?: string };
@@ -23,7 +24,7 @@ class FixtureSender implements EmailSender {
   readonly kind = "fixtures" as const;
   async send(m: OutgoingEmail): Promise<SendResult> {
     const id = `fx-${randomUUID()}`;
-    const dir = process.env.EMAIL_OUTBOX_DIR || path.join(process.cwd(), ".tmp/sent-emails");
+    const dir = process.env.EMAIL_OUTBOX_DIR || path.join(tmpdir(), "magic-vault", "sent-emails");
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, `${Date.now()}-${id}.json`), JSON.stringify({ id, ...m, sentAt: new Date().toISOString() }, null, 2));
     return { ok: true, messageId: id };

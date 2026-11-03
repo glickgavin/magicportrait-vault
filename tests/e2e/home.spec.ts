@@ -4,6 +4,9 @@ import { deleteCardsOf, insertCard, setSetting } from "./db";
 import { expectNoAxeViolations } from "./helpers";
 
 test.describe("home and my portraits", () => {
+  test.beforeAll(async ({ request }) => {
+    expect((await request.post("/api/test/reset-fixtures")).status()).toBe(200);
+  });
   test.afterAll(async () => {
     await deleteCardsOf("rose@example.com");
     await setSetting("cards.enabled", true);

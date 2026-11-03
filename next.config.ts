@@ -14,9 +14,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   skipTrailingSlashRedirect: true,
   serverExternalPackages: ["@napi-rs/canvas", "sharp", "postgres", "archiver", "agentmail", "svix"],
+  // The renderer reads fonts, the placeholder artwork and the sample portrait from disk at runtime.
   outputFileTracingIncludes: {
-    "/api/**": ["./assets/fonts/**"],
-    "/settings/**": ["./assets/fonts/**"],
+    "/api/**": ["./assets/**", "./public/theme-placeholders/**", "./public/fixtures/**"],
+    "/settings/**": ["./assets/**", "./public/theme-placeholders/**"],
   },
   images: { unoptimized: true },
   async rewrites() {

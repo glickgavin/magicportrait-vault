@@ -9,14 +9,14 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 0 | Preflight | done |
 | 1 | App shell | done |
 | 2 | Database and settings | done |
-| 3 | Data sources | done (Test buttons UI lands with Settings, Part 10) |
+| 3 | Data sources | done |
 | 4 | Sign-in and account | done (live Auth config blocked, see Blocked) |
 | 5 | Home and My portraits | done |
 | 6 | Card builder and renderer | done |
 | 7 | Email and delivery | done |
 | 8 | Orders, downloads and mugs | done |
 | 9 | Free gift offer | done |
-| 10 | Settings | pending |
+| 10 | Settings | done |
 | 11 | Insights | pending |
 | 12 | Analytics pass | pending |
 | 13 | Final check and preview | pending |
@@ -122,6 +122,19 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - `scripts/register-shopify-webhook.ts`: written, **not run**.
 - Tests: HMAC and session-token verification (valid, forged, expired, wrong shop, `alg: none`), webhook replay ignored, skipped reasons, unlock rule, switches off → nothing sent, on → exactly one event per qualifying order (also after replays), delay, the offer-link endpoint rejecting a missing, forged or expired token and an old order, email-later gating, mug reminder once per order.
 
+## Part 10: Settings
+
+- `AdminShell` (dark sidebar: INSIGHTS · SETUP · GREETING CARDS · REDEEM · SYSTEM, "Back to My Magic Portraits"); `/settings/*` layout and every `/api/admin/*` route return 404 unless `is_super_user(email)`.
+- **General & variables** (`/settings`): card and redeem switches, the searchable table of every setting edited inline with the registry's type checks (validated again on the server), "Add variable", super users, data-source status and recent changes. Every change goes to `settings_history` (trigger) and `setting_changed` (key and section, never the value).
+- **Theme library** (`/settings/themes`): themes by category with dates, status, versions (thumbnail, status, NEW, use counts, up/down ordering), new theme and new version forms, the gift panel (same `cards.*`/`gift.*` settings), "Manage categories" (seasonal reminder per category).
+- **Template editor** (`/settings/themes/[themeId]/versions/[versionId]`): live preview with draggable/resizable photo and text zones (also keyboard-movable), zone fields (x/y/w/h, shape, radius, frame; font from the approved list, size, colour, alignment, template), message max chars, message ideas, background/overlay upload checked on the server (1500 × 2100, sRGB, under 2 MB, overlay PNG with real transparency), "Test render JPEG" (real renderer, sample portrait), "Publish version" (renders and stores a thumbnail, sets live), back to draft / archive, and the designer rules as help text. `/settings/template` lists versions to edit.
+- **Downloads & mugs** (`/settings/redeem`): the redeem constants with validation and a read-only order lookup (what the customer would see, no personal details).
+- **Emails**: sender and reply-to settings, a live preview of each template, "Send me a test" (to the super user's own address), the bounce and unsubscribe list.
+- **Tracking**: PostHog project and links; counts from PostHog when `POSTHOG_PERSONAL_API_KEY` is set, plus counts from `activity_log`.
+- **Data sources**: a card per source (Shopify scopes, Imagen, mirror, a cold/warm portrait lookup, Klaviyo, AgentMail, PostHog) with "Test", last success and "Test all"; the Klaviyo outbox per event over 7 days with "Retry failed".
+- **Super users**: add, remove; you can't remove yourself or the last one. **Activity log**: filter by email (sent in a short-lived cookie, never the URL), event, source and actor; paging.
+- e2e (against a production build): 404 on every page and admin API for others; every page renders for a super user with no axe violations; a setting change appears in history and pauses the builder; super users add/remove guard; data sources "Test all"; a version published from uploaded files appears in `/create`.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -148,6 +161,9 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **`/api/test/reset-fixtures`** exists only when `DATA_SOURCE=fixtures` and `E2E_FIXTURE_RESET=1` (set only by the local test env); otherwise 404.
 - **New switches** `redeem.mug_reminder_enabled` (off) and `redeem.mug_reminder_max_age_days` (30): the spec says the mug reminder is off by default but names no switch.
 - **Pop-up request shape:** the session token proves the request comes from the store's checkout; the order id comes in the body and must be recent and paid. Shopify's checkout session token doesn't carry the order id itself.
+- **Settings copy** (super users only) is written inline in English in the admin components rather than through `t()`; every customer-facing string goes through `t()`. Moving the admin strings into the dictionary is mechanical if a second language is ever needed there.
+- **e2e runs against a production build** (`scripts/prod-server.sh`), and Playwright writes its artefacts to the OS temp folder; the fixture email/Klaviyo recorders do too. In dev mode the on-demand compiler reloads open pages, which made browser tests flaky.
+- **Placeholder artwork and the sample portrait are traced into the serverless bundle** (`outputFileTracingIncludes`), because the renderer reads them from disk at runtime.
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked

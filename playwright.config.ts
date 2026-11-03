@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { appTestEnv } from "./scripts/local-env.mjs";
 
 const PORT = 3100;
@@ -7,6 +9,8 @@ for (const [k, v] of Object.entries(env)) process.env[k] ??= v;
 
 export default defineConfig({
   testDir: "tests/e2e",
+  // Outside the project: the dev server watches the project and reloads pages when trace files appear.
+  outputDir: path.join(tmpdir(), "magic-vault-playwright"),
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

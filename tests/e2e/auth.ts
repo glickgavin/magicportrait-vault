@@ -53,5 +53,6 @@ export async function makeLink(email: string, opts: { days?: number; purpose?: s
 /** Fast sign-in for screens that don't test sign-in itself. */
 export async function signInWithLink(page: Page, email: string, redirect = "/") {
   await page.goto(await makeLink(email, { redirect }));
-  await page.waitForLoadState("domcontentloaded");
+  await page.waitForURL((u) => !u.pathname.startsWith("/g/"));
+  await page.waitForLoadState("load");
 }
