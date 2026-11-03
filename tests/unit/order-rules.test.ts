@@ -30,6 +30,7 @@ const O = (lines: ShopifyLineItem[], extra: Partial<ShopifyOrder> = {}): Shopify
   fulfillmentStatus: "UNFULFILLED",
   tags: [],
   statusPageUrl: null,
+  total: null,
   mugChoice: null,
   lineItems: lines,
   ...extra,

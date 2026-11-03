@@ -9,7 +9,7 @@ import { expectNoAxeViolations } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
-const PAGES = ["/settings", "/settings/themes", "/settings/template", "/settings/redeem", "/settings/emails", "/settings/tracking", "/settings/data-sources", "/settings/super-users", "/settings/activity"];
+const PAGES = ["/settings/insights", "/settings/customers", "/settings/cards", "/settings", "/settings/themes", "/settings/template", "/settings/redeem", "/settings/emails", "/settings/tracking", "/settings/data-sources", "/settings/super-users", "/settings/activity"];
 
 test.describe("settings (super users)", () => {
   test.afterAll(async () => {
@@ -29,6 +29,9 @@ test.describe("settings (super users)", () => {
       ["post", "/api/admin/klaviyo/retry"],
       ["post", "/api/admin/emails/test"],
       ["post", "/api/admin/redeem/lookup"],
+      ["post", "/api/admin/customers/search"],
+      ["post", "/api/admin/cards/list"],
+      ["post", "/api/admin/cards/export"],
     ] as const) {
       const r = await page.request[method](url, { data: {} });
       expect(r.status(), url).toBe(404);
@@ -127,5 +130,32 @@ test.describe("settings (super users)", () => {
     await page.evaluate(() => sessionStorage.clear());
     await page.goto("/create?step=theme&category=general");
     await expect(page.getByRole("radio", { name: /Congratulations · Confetti/ })).toBeVisible();
+  });
+
+  test("insights, customer search and timeline, card detail is logged", async ({ page }) => {
+    const card = await insertCard("rose@example.com", { to_name: "Grandma Rose" });
+    await signInWithLink(page, "super@example.com", "/settings/insights?range=all");
+    await expect(page.getByTestId("kpi-cards_created").getByTestId("kpi-value")).not.toHaveText("0");
+    await page.goto("/settings/customers");
+    await page.getByLabel("Email or name").fill("rose@example.com");
+    await page.getByRole("button", { name: "Search" }).click();
+    await page.getByTestId("customer-results").getByRole("link").first().click();
+    await expect(page).toHaveURL(/\/settings\/customers\/[0-9a-f-]{36}$/);
+    expect(page.url()).not.toContain("rose");
+    await expect(page.getByTestId("timeline")).toContainText("Order #1003");
+    await page.getByRole("radio", { name: "Imagen" }).click();
+    await expect(page.getByTestId("timeline").locator("li[data-source=shopify]")).toHaveCount(0);
+    await page.goto(`/settings/cards?card=${card.public_id}`);
+    await expect(page.getByTestId("card-detail")).toContainText("Test message");
+    const viewed = await admin().from("activity_log").select("actor").eq("event", "admin_card_viewed").eq("ref_id", card.public_id);
+    expect(viewed.data?.[0]?.actor).toBe("super_user:super@example.com");
+    await page.getByTestId("toggle-share").click();
+    await expect(page.getByTestId("toggle-share")).toHaveText("Show link");
+    expect((await page.request.get(`/c/${card.share_slug}/image`)).status()).toBe(404);
+    // a customer who isn't in our database yet is looked up live and gets a row
+    await page.goto("/settings/customers");
+    await page.getByLabel("Email or name").fill("charlie@example.com");
+    await page.getByRole("button", { name: "Search" }).click();
+    await expect(page.getByTestId("customer-results")).toContainText("charlie@example.com");
   });
 });

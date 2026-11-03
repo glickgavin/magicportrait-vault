@@ -91,7 +91,7 @@ export const REGISTRY = {
   "gift.qualifying_product_ids": list("gift", [], { label: "Qualifying product ids", item: numericId }),
   "gift.link_valid_days": num("gift", 30, { label: "One-tap link valid (days)", min: 1, max: 90 }),
   "gift.offer_email_delay_minutes": num("gift", 0, { label: "Offer event delay (minutes)", min: 0, max: 10080 }),
-  "gift.offer_link_rate_limit_per_hour": num("gift", 30, { label: "Pop-up link requests per IP per hour", min: 1, max: 1000 }),
+  "gift.offer_link_rate_limit_per_hour": num("gift", 30, { label: "Pop-up link requests per IP per hour", min: 1, max: 1000000 }),
 
   // ---------- redeem ----------
   "redeem.downloads_enabled": bool("redeem", true, { label: "Downloads on (kill switch)" }),
@@ -132,20 +132,20 @@ export const REGISTRY = {
   "redeem.zip_name_template": text("redeem", "magic-portraits-{orderName}.zip", { label: "Zip file name", allowEmpty: false }),
   "redeem.allowed_image_hosts": list("redeem", ["ngyunrirwrjudbgaijek.supabase.co", "afqxjwizbmpzmvzzkzdb.supabase.co", "storyboards-magic-portraits.s3.us-east-2.amazonaws.com"], { label: "Allowed image hosts", item: host }),
   "redeem.order_line_items_page_size": num("redeem", 100, { label: "Line items per page", min: 10, max: 250 }),
-  "redeem.download_rate_limit_per_hour": num("redeem", 120, { label: "Downloads per person per hour", min: 1, max: 10000 }),
+  "redeem.download_rate_limit_per_hour": num("redeem", 120, { label: "Downloads per person per hour", min: 1, max: 1000000 }),
 
   // ---------- auth ----------
   "auth.code_valid_minutes": num("auth", 10, { label: "Sign-in code valid (minutes)", description: "Must match the Supabase Auth OTP expiry (600 s).", readOnly: true }),
-  "auth.code_rate_limit_per_hour": num("auth", 6, { label: "Code requests per email per hour", min: 1, max: 100 }),
-  "auth.code_ip_rate_limit_per_hour": num("auth", 30, { label: "Code requests per IP per hour", min: 1, max: 1000 }),
-  "auth.verify_rate_limit_per_hour": num("auth", 20, { label: "Code checks per email per hour", min: 1, max: 1000 }),
-  "auth.link_ip_rate_limit_per_hour": num("auth", 60, { label: "One-tap link opens per IP per hour", min: 1, max: 100000 }),
+  "auth.code_rate_limit_per_hour": num("auth", 6, { label: "Code requests per email per hour", min: 1, max: 1000000 }),
+  "auth.code_ip_rate_limit_per_hour": num("auth", 30, { label: "Code requests per IP per hour", min: 1, max: 1000000 }),
+  "auth.verify_rate_limit_per_hour": num("auth", 20, { label: "Code checks per email per hour", min: 1, max: 1000000 }),
+  "auth.link_ip_rate_limit_per_hour": num("auth", 60, { label: "One-tap link opens per IP per hour", min: 1, max: 1000000 }),
 
   // ---------- vault: data-source plumbing ----------
   "vault.first_order_offer": text("vault", "", { label: "First-order offer (creators)", description: "Short text, e.g. “10% off with code FIRST10”. Empty hides it.", max: 200 }),
   "vault.first_order_offer_code": text("vault", "", { label: "First-order offer code", max: 40 }),
   "vault.lookup_cache_minutes": num("vault", 10, { label: "Portrait lookup cache (minutes)", min: 0, max: 1440 }),
-  "vault.lookup_rate_limit_per_hour": num("vault", 120, { label: "Lookups per person per hour", min: 1, max: 10000 }),
+  "vault.lookup_rate_limit_per_hour": num("vault", 120, { label: "Lookups per person per hour", min: 1, max: 1000000 }),
   "vault.shopify_api_version": text("vault", "2025-07", { label: "Shopify Admin API version", pattern: /^\d{4}-\d{2}$/ }),
   "vault.order_search_page_size": num("vault", 25, { label: "Orders per page", min: 1, max: 250 }),
   "vault.imagen_public_image_base_url": url("vault", "https://ngyunrirwrjudbgaijek.supabase.co/storage/v1/object/public/images/", { label: "Imagen public image base" }),

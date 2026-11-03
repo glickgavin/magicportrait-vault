@@ -32,6 +32,7 @@ export type ShopifyOrder = {
   fulfillmentStatus: string | null;
   tags: string[];
   statusPageUrl: string | null;
+  total: { amount: string; currency: string } | null;
   mugChoice: { value: string; updatedAt: string | null; compareDigest: string | null } | null;
   lineItems: ShopifyLineItem[];
 };

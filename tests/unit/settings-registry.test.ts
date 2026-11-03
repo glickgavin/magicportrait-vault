@@ -39,6 +39,11 @@ describe("seed files", () => {
     expect(readFileSync("supabase/seed.sql", "utf8")).toBe(buildSeedSql());
     expect(readFileSync("supabase/seed.test.sql", "utf8")).toBe(buildTestSeedSql());
   });
+  it("every value the test seed writes passes validation", () => {
+    for (const m of buildTestSeedSql().matchAll(/set value = '([^']+)'::jsonb.*?where key = '([^']+)'/g)) {
+      expect(validateSetting(m[2], JSON.parse(m[1])).ok, m[2]).toBe(true);
+    }
+  });
   it("the live seed keeps every version draft and is idempotent", () => {
     const sql = buildSeedSql();
     expect(sql).not.toMatch(/'live', (true|false), \d+, 'builtin/);

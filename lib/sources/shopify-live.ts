@@ -13,6 +13,7 @@ const ORDER_FIELDS = `
   id legacyResourceId name createdAt processedAt cancelledAt test email
   customer { id firstName lastName defaultEmailAddress { emailAddress } }
   displayFinancialStatus displayFulfillmentStatus tags statusPageUrl
+  currentTotalPriceSet { shopMoney { amount currencyCode } }
   mugChoice: metafield(namespace: "custom", key: "mug_choice") { value updatedAt compareDigest }
   lineItems(first: $lines) { pageInfo { hasNextPage endCursor } edges { node { ${LINE_FIELDS} } } }`;
 
@@ -68,6 +69,7 @@ type RawOrder = {
   displayFulfillmentStatus: string | null;
   tags: string[];
   statusPageUrl: string | null;
+  currentTotalPriceSet?: { shopMoney: { amount: string; currencyCode: string } } | null;
   mugChoice: { value: string; updatedAt: string | null; compareDigest: string | null } | null;
   lineItems: Conn<RawLine>;
 };
@@ -143,6 +145,7 @@ export class ShopifyLive implements ShopifySource {
       fulfillmentStatus: o.displayFulfillmentStatus,
       tags: o.tags,
       statusPageUrl: o.statusPageUrl,
+      total: o.currentTotalPriceSet ? { amount: o.currentTotalPriceSet.shopMoney.amount, currency: o.currentTotalPriceSet.shopMoney.currencyCode } : null,
       mugChoice: o.mugChoice,
       lineItems: lines,
     };

@@ -148,6 +148,7 @@ function order(o: Partial<ShopifyOrder> & { legacyId: string; name: string; emai
     fulfillmentStatus: "UNFULFILLED",
     tags: [],
     statusPageUrl: null,
+    total: { amount: String(29 + o.lineItems.length * 20) + ".00", currency: "USD" },
     mugChoice: null,
     ...o,
   };

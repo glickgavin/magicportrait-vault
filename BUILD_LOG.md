@@ -17,7 +17,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 8 | Orders, downloads and mugs | done |
 | 9 | Free gift offer | done |
 | 10 | Settings | done |
-| 11 | Insights | pending |
+| 11 | Insights | done |
 | 12 | Analytics pass | pending |
 | 13 | Final check and preview | pending |
 
@@ -135,6 +135,15 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Super users**: add, remove; you can't remove yourself or the last one. **Activity log**: filter by email (sent in a short-lived cookie, never the URL), event, source and actor; paging.
 - e2e (against a production build): 404 on every page and admin API for others; every page renders for a super user with no axe violations; a setting change appears in history and pauses the builder; super users add/remove guard; data sources "Test all"; a version published from uploaded files appears in `/create`.
 
+## Part 11: Insights
+
+- Migration 3 (applied to `magic-vault`): `insights_kpis`, `insights_cards_per_day`, `insights_top_themes`, `insights_funnel` (security definer, service role only).
+- `/settings/insights`: Today / 7 days / 30 days / All time; tiles with change vs the previous period (cards created, people creating, emailed, recipient opens, recipients who tapped Try MP, sign-ins, mug photos chosen, downloads), cards per day, the card funnel (people per step) with a link to PostHog, top themes and a live feed. All from our database.
+- `/settings/customers`: search sent in the request body; a full email we don't know yet is looked up live and, if Shopify or Imagen know the person, gets a `vault_members` row with `created_via = 'admin_lookup'`. `/settings/customers/[id]` (opaque id): badges, orders / spent / cards / portraits, links to PostHog and Shopify, Resend sign-in link (AgentMail, `admin_signin_link_resent`), Export data (JSON: cards with 7-day image links, activity, settings changes), Delete data (type the email to confirm), and one timeline merged by time (activity_log as My MP/Email, live Shopify orders, live Imagen sessions) with filter chips. Opening it records `admin_customer_viewed` with a hash of the email.
+- `/settings/cards`: search (in the body), category/status/date filters, paging, CSV export (posted form; no message text or recipient email; formula-injection safe), card detail with message, sender (links to the customer), recipient, portrait, deliveries and timeline; Download JPEG, Resend email, Hide/Show link, Delete on request (type the card id). Opening a card records `admin_card_viewed`.
+- **Delete on request** (customer): deletes their cards, card JPEGs and portrait copies, anonymises their activity (`anonymise_activity`), deletes their outbox rows, queues the Klaviyo deletion job, suppresses the address (`all`, `deletion`), removes sign-in links and the member row, pseudonymises the email on `gift_offers`, and records the request in `data_requests`.
+- Tests: KPI queries against seeded rows (this and the previous period), cards per day, top themes, funnel; timeline order across sources; export; deletion (files gone, rows anonymised, outbox cleared, email suppressed, Klaviyo job queued, request recorded); e2e for the pages, customer search to an opaque URL, timeline filters, logged card views, hiding a link.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -164,6 +173,8 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Settings copy** (super users only) is written inline in English in the admin components rather than through `t()`; every customer-facing string goes through `t()`. Moving the admin strings into the dictionary is mechanical if a second language is ever needed there.
 - **e2e runs against a production build** (`scripts/prod-server.sh`), and Playwright writes its artefacts to the OS temp folder; the fixture email/Klaviyo recorders do too. In dev mode the on-demand compiler reloads open pages, which made browser tests flaky.
 - **Placeholder artwork and the sample portrait are traced into the serverless bundle** (`outputFileTracingIncludes`), because the renderer reads them from disk at runtime.
+- **"Delete on request" on a single card** (All cards) deletes that card and its files only; the full person deletion (SPEC §15) is on the customer page.
+- **Rate-limit settings** accept up to 1,000,000 per hour (the local test seed lifts them; a test now checks every test-seed value validates).
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked
