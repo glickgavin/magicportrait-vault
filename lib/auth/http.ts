@@ -7,8 +7,8 @@ export function hashKey(v: string): string {
   return createHash("sha256").update(v.toLowerCase()).digest("hex").slice(0, 24);
 }
 
-export async function clientIp(): Promise<string> {
-  const h = await headers();
+export async function clientIp(req?: Request): Promise<string> {
+  const h = req ? req.headers : await headers();
   return (h.get("x-forwarded-for")?.split(",")[0] || h.get("x-real-ip") || "unknown").trim();
 }
 

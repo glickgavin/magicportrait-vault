@@ -33,6 +33,8 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('redeem.mug_lock_mode', '"print_status"'::jsonb, 'choice', 'redeem', 'Mug lock rule', null, '["print_status","days_after_order"]'::jsonb, 'seed', now()),
   ('redeem.mug_lock_days', '14'::jsonb, 'number', 'redeem', 'Lock mug after (days, days_after_order mode)', null, null, 'seed', now()),
   ('redeem.mug_reminder_after_days', '2'::jsonb, 'number', 'redeem', 'Mug photo reminder after (days)', null, null, 'seed', now()),
+  ('redeem.mug_reminder_enabled', 'false'::jsonb, 'boolean', 'redeem', 'Mug photo reminder event', 'Sends mug_photo_needed to Klaviyo for orders with no photo chosen.', null, 'seed', now()),
+  ('redeem.mug_reminder_max_age_days', '30'::jsonb, 'number', 'redeem', 'Mug reminders only for orders newer than (days)', null, null, 'seed', now()),
   ('redeem.mug_variant_id', '"46177764769988"'::jsonb, 'shopify_id', 'redeem', 'Mug variant id', null, null, 'seed', now()),
   ('redeem.mug_product_id', '"8600824643780"'::jsonb, 'shopify_id', 'redeem', 'Mug product id', null, null, 'seed', now()),
   ('redeem.mug_gift_attr_key', '"_free_gift"'::jsonb, 'text', 'redeem', 'Mug line attribute key', null, null, 'seed', now()),

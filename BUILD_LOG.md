@@ -15,7 +15,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 6 | Card builder and renderer | done |
 | 7 | Email and delivery | done |
 | 8 | Orders, downloads and mugs | done |
-| 9 | Free gift offer | pending |
+| 9 | Free gift offer | done |
 | 10 | Settings | pending |
 | 11 | Insights | pending |
 | 12 | Analytics pass | pending |
@@ -112,6 +112,16 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - Fixed versus live: all lines read; Masterpiece `_image_id` tiles work for the mug and downloads; "Download all" works for all three products, the add-on and Masterpiece; downloads re-check eligibility; mug saves check the mug, cancellation and the print lock.
 - Tests: every row of the eligibility rules (downloads by each product, add-on, Masterpiece, prints-only, kill switch; mug present/absent, none_selected, metafield vs line attribute), the lock rule in both modes, exact Shopify writes on fixtures, file names; e2e for choose, save, saved state, locked state, downloads, another email's order (404 on view, mug save and both downloads), signed-out calls, and a no-debug/no-PII check on every error body.
 
+## Part 9: Free gift offer
+
+- `/api/webhooks/shopify/orders-paid`: HMAC of the raw body checked first, idempotent on `X-Shopify-Webhook-Id` and on the order id; one `gift_offers` row per order: qualifying → `pending`, otherwise `skipped` with the reason (test order, cancelled, not paid, no email, no qualifying product) and `gift_offer_skipped`. Respects `gift.unlock_rule` and `gift.qualifying_product_ids`.
+- `/api/cron/send-gift-offers` (every 5 min): due offers get a fresh one-tap link and exactly one `free_gift_unlocked` (dedupe `free_gift_unlocked:<order id>`) with `card_link`, `link_expires_at`, `portrait_image_url` and `suggested_design` for Klaviyo only. With `gift.offer_email_enabled` off nothing is sent and the offer is marked skipped. This app sends no offer email.
+- `POST /api/gift/offer-link`: only with a valid checkout-extension session token (HS256 with the app secret, `exp`/`nbf`, `dest` = the store) for an order paid within `gift.popup_window_minutes` that unlocks the gift; rate-limited per IP; generic errors; CORS for the extension; off unless `gift.popup_enabled`. "Later, email me the link" (`action: email_later`) is built but returns 404 until `gift.popup_email_later_enabled`. Wiring notes in `docs/gift-sheet.md`.
+- Seasonal reminder (`/api/cron/send-reminders`, daily): when `gift.reminder_email_enabled`, `gift.reminder_days_before` days before a category with `reminder_enabled` comes into season, queues `gift_reminder_due` (once per category, year and person) for customers with the free gift and no card in `gift.reminder_skip_if_card_within_days`.
+- Mug photo reminder (`/api/cron/mug-reminders`, daily): when `redeem.mug_reminder_enabled`, `mug_photo_needed` once per order `redeem.mug_reminder_after_days` after payment, while no photo is chosen and the mug isn't locked, with a one-tap link to the order.
+- `scripts/register-shopify-webhook.ts`: written, **not run**.
+- Tests: HMAC and session-token verification (valid, forged, expired, wrong shop, `alg: none`), webhook replay ignored, skipped reasons, unlock rule, switches off → nothing sent, on → exactly one event per qualifying order (also after replays), delay, the offer-link endpoint rejecting a missing, forged or expired token and an old order, email-later gating, mug reminder once per order.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -136,6 +146,8 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **`agentmail` and `svix`** are server-external packages: the AgentMail SDK has an optional dynamic import (`@x402/fetch`) that the bundler can't resolve.
 - **Mug lock in `days_after_order` mode** still locks once printing has started or the mug line is fulfilled (the print pipeline wins over the day count), so a choice can never change after printing.
 - **`/api/test/reset-fixtures`** exists only when `DATA_SOURCE=fixtures` and `E2E_FIXTURE_RESET=1` (set only by the local test env); otherwise 404.
+- **New switches** `redeem.mug_reminder_enabled` (off) and `redeem.mug_reminder_max_age_days` (30): the spec says the mug reminder is off by default but names no switch.
+- **Pop-up request shape:** the session token proves the request comes from the store's checkout; the order id comes in the body and must be recent and paid. Shopify's checkout session token doesn't carry the order id itself.
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked

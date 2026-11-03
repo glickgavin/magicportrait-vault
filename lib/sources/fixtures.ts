@@ -9,6 +9,11 @@ export class ShopifyFixtures implements ShopifySource {
   readonly writes: { type: "metafieldsSet" | "tagsAdd"; orderGid: string; payload: unknown }[] = [];
   failNextWrite: string | null = null;
 
+  /** Tests only: add an order (e.g. one paid a minute ago). */
+  add(order: ShopifyOrder) {
+    this.orders.push(structuredClone(order));
+  }
+
   reset() {
     this.orders = buildFixtureOrders();
     this.writes.length = 0;

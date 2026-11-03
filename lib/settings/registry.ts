@@ -99,6 +99,8 @@ export const REGISTRY = {
   "redeem.mug_lock_mode": choice("redeem", ["print_status", "days_after_order"] as const, "print_status", { label: "Mug lock rule" }),
   "redeem.mug_lock_days": num("redeem", 14, { label: "Lock mug after (days, days_after_order mode)", min: 0, max: 365 }),
   "redeem.mug_reminder_after_days": num("redeem", 2, { label: "Mug photo reminder after (days)", min: 0, max: 60 }),
+  "redeem.mug_reminder_enabled": bool("redeem", false, { label: "Mug photo reminder event", description: "Sends mug_photo_needed to Klaviyo for orders with no photo chosen." }),
+  "redeem.mug_reminder_max_age_days": num("redeem", 30, { label: "Mug reminders only for orders newer than (days)", min: 1, max: 365 }),
   "redeem.mug_variant_id": shopifyId("redeem", "46177764769988", { label: "Mug variant id" }),
   "redeem.mug_product_id": shopifyId("redeem", "8600824643780", { label: "Mug product id" }),
   "redeem.mug_gift_attr_key": text("redeem", "_free_gift", { label: "Mug line attribute key", allowEmpty: false }),
@@ -213,4 +215,4 @@ export function validateSetting(key: string, value: unknown): ValidationResult<u
 }
 
 /** Keys that must stay off on the live project until launch (BUILD.md). */
-export const LAUNCH_SWITCHES: SettingKey[] = ["cards.enabled", "gift.offer_email_enabled", "gift.popup_enabled", "gift.popup_email_later_enabled", "gift.reminder_email_enabled", "klaviyo.enabled"];
+export const LAUNCH_SWITCHES: SettingKey[] = ["cards.enabled", "gift.offer_email_enabled", "gift.popup_enabled", "gift.popup_email_later_enabled", "gift.reminder_email_enabled", "klaviyo.enabled", "redeem.mug_reminder_enabled"];

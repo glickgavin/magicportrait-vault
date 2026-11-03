@@ -58,7 +58,7 @@ async function main() {
 
   if (!dryRun) {
     const check = await query<{ key: string; value: unknown }[]>(
-      `select key, value from public.settings where key in ('cards.enabled','gift.offer_email_enabled','gift.popup_enabled','gift.popup_email_later_enabled','gift.reminder_email_enabled','klaviyo.enabled') order by key`,
+      `select key, value from public.settings where key in ('cards.enabled','gift.offer_email_enabled','gift.popup_enabled','gift.popup_email_later_enabled','gift.reminder_email_enabled','klaviyo.enabled','redeem.mug_reminder_enabled') order by key`,
     );
     const on = check.filter((r) => r.value === true);
     console.log(`switches: ${check.map((r) => `${r.key}=${JSON.stringify(r.value)}`).join(", ")}`);
