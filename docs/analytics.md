@@ -125,7 +125,7 @@ Business events that happen in the browser (share, copy link, download, mug tile
 ### Recipient (the growth loop)
 | Event | When | Key properties |
 |---|---|---|
-| `card_recipient_email_opened` (server) | Recipient opens the email | `card_id` |
+| `card_recipient_email_opened` (server) | Recipient opens the card from the email link (first visit with `?d=<delivery id>`; AgentMail has no open event) | `card_id` |
 | `page_view_card_received` | Recipient opens the card page | `card_id` |
 | `card_recipient_saved` | Recipient saves it | `card_id` |
 | `card_recipient_cta_tapped` (server) | "Try Magic Portraits", recorded by `/c/[slug]/try` before the redirect | `card_id`, `via` (`email` / `page`) |
@@ -167,7 +167,7 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 | Event | When | Key properties |
 |---|---|---|
 | `vault_signin_link_used` | A `/g/[token]` link signs someone in | `order_id`, `expired` |
-| `gift_offer_email_opened` | Gift offer email opened (Resend webhook) | `order_id` |
+| `gift_offer_email_opened` | Gift offer link first opened (first use of its `/g/[token]`) | `order_id` |
 | `card_cancelled` | A scheduled card is cancelled | `card_id` |
 | `card_schedule_changed` | A scheduled card's time or content is changed | `card_id`, `changed` (`time` / `content`) |
 | `gift_offer_skipped` | An order didn't qualify for the free gift, or the offer was suppressed | `order_id`, `reason` |

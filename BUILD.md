@@ -24,13 +24,14 @@ The whole app is built in a single Claude Code run. It works through the parts b
    - Add it in Vercel (Sensitive, Production and Preview): `imagegen-prod` → `IMAGEGEN_DATABASE_URL`, `shopify-dailyreport` → `MIRROR_DATABASE_URL`.
 3. **Supabase `magic-vault` keys and email.**
    - Project Settings › API Keys: copy the **secret** key into Vercel as `SUPABASE_SERVICE_ROLE_KEY` (Sensitive).
-   - Authentication › Emails › SMTP settings: use Resend (host `smtp.resend.com`, port 465, user `resend`, password = the Resend API key from step 4), with the sender from `SPEC.md` Q10.
+   - Authentication › Emails › SMTP settings: use AgentMail (host `smtp.agentmail.to`, port 465, user `cards@magicportraitspartners.com`, password = the AgentMail API key from step 4, sender `cards@magicportraitspartners.com`, name "My Magic Portraits"). The sender must be the inbox address, or AgentMail rejects it (`SPEC.md` Q10).
    - The build sets the rest of Auth (6-digit codes, 600 s expiry, the email templates showing the code, site URL) through the Management API in Part 4.
-4. **Resend.**
-   - Verify `magicportraits.ai` as a sending domain (its DNS records go in Cloudflare).
-   - Create an API key → Vercel `RESEND_API_KEY`.
-   - Add a webhook to `https://my.magicportraits.ai/api/webhooks/resend` for delivered, opened, bounced and complained → its signing secret goes in Vercel as `RESEND_WEBHOOK_SECRET`.
-   - Turn on open tracking.
+4. **AgentMail.**
+   - Add `magicportraitspartners.com` as a custom domain and put its DNS records where that domain's DNS is hosted. Wait for it to show verified.
+   - Create the inbox `cards@magicportraitspartners.com`.
+   - Create an API key → Vercel `AGENTMAIL_API_KEY` (Sensitive, Production and Preview).
+   - Add a webhook to `https://my.magicportraits.ai/api/webhooks/agentmail` for `message.delivered`, `message.bounced` and `message.complained` → its signing secret (`whsec_...`) goes in Vercel as `AGENTMAIL_WEBHOOK_SECRET`.
+   - AgentMail has no open-tracking event: "opened" is counted when the recipient opens the card from the email link (`SPEC.md` D19).
 5. **Shopify (r_orders app).**
    - Confirm the Admin API token has `read_orders`, `read_all_orders` (orders older than 60 days), `write_orders` (the mug choice) and `read_customers`. Add any that are missing.
    - Vercel: `SHOPIFY_STORE_DOMAIN` (the `.myshopify.com` domain), `SHOPIFY_ADMIN_ACCESS_TOKEN`, `SHOPIFY_WEBHOOK_SECRET` (the app's API secret, which signs webhooks).
@@ -61,7 +62,7 @@ The whole app is built in a single Claude Code run. It works through the parts b
    - **Optional network secrets**, so Part 0 can test them live. Without them, Part 0 marks these "check after deploy".
      - Shopify: host `<store>.myshopify.com`, header `X-Shopify-Access-Token`.
      - Klaviyo: host `a.klaviyo.com`, header `Authorization` with prefix `Klaviyo-API-Key`.
-     - Resend: host `api.resend.com`, Bearer.
+     - AgentMail: host `api.agentmail.to`, Bearer.
    - Start a session in this environment on `glickgavin/magicportrait-vault` and paste the prompt below.
 
 **What the build session can and can't reach.** It has no app secrets. It reaches `magic-vault` only through the Management API (the token is attached outside the session). It can't open Postgres connections to Imagen or the events mirror, so those are tested from the deployed preview in Settings › Data sources.
@@ -93,7 +94,7 @@ Each part lists what to build and what has to be true before it's committed.
 - For each optional network secret that's present, one harmless read:
   - Shopify: shop name, and `currentAppInstallation { accessScopes { handle } }` (list any of the four in step 5 that are missing)
   - Klaviyo: `GET /api/metrics/?page[size]=1`; try the newest API revision and save the one that works as the default of `klaviyo.api_revision`
-  - Resend: domain status.
+  - AgentMail: the domain is verified and the inbox `cards@magicportraitspartners.com` exists.
 - Imagen and the events mirror are Postgres and can't be reached from the session: mark them "check after deploy".
 - **Done when** `BUILD_LOG.md` lists each source as OK, Blocked or Check after deploy, with the reason.
 
@@ -125,7 +126,7 @@ Each part lists what to build and what has to be true before it's committed.
 - `/signin` (email → 6-digit code, resend, change email, `purpose=gift|redeem`).
 - `/g/[token]` links: random opaque tokens, stored hashed on `gift_offers`, expiry from `gift.link_valid_days`. A server-side session exchange, then a redirect that strips the token from the address.
 - `/redeem`, `/redeem?order=…` and `/redeem/[order]` → `RedeemEntry`. A wrong or unknown order shows one generic message.
-- Live Auth settings for `magic-vault` through the Management API (`PATCH /v1/projects/$SUPABASE_PROJECT_REF/config/auth`): 6-digit email codes, 600 s expiry, the Magic Link and Confirm signup templates showing `{{ .Token }}`, site URL `https://my.magicportraits.ai`, and redirect URLs for previews. Leave SMTP alone: Gavin sets it, because it holds the Resend key.
+- Live Auth settings for `magic-vault` through the Management API (`PATCH /v1/projects/$SUPABASE_PROJECT_REF/config/auth`): 6-digit email codes, 600 s expiry, the Magic Link and Confirm signup templates showing `{{ .Token }}`, site URL `https://my.magicportraits.ai`, and redirect URLs for previews. Leave SMTP alone: Gavin sets it, because it holds the AgentMail key.
 - Middleware; avatar and initials; account menu; sign out (with `posthog.reset()`); super-user guard; rate limits via `hit_rate_limit()`.
 - **Done when**:
   - e2e signs in with a 6-digit code against the local stack, fetched in the test through the admin API (`auth.admin.generateLink` returns `email_otp`) or the stack's mail catcher.
@@ -171,7 +172,7 @@ Each part lists what to build and what has to be true before it's committed.
   - `card-scheduled` (confirmation to the sender)
   - `signin-code` (for Supabase SMTP, same style)
   - `signin-link` (when a super user resends someone's link).
-- Sending through Resend, with `cards.email_sender_name`, `email.from_cards` and `email.reply_to`. No offer, reminder or mug emails: those come from Klaviyo later.
+- Sending through AgentMail (`lib/email/` behind an interface, with a fixtures implementation that records instead of sending), from the inbox in `email.from_cards`, with `cards.email_sender_name` and `email.reply_to`. Each card email links to `/c/[slug]?d=<card_deliveries.id>`; the first visit with that id marks the delivery `opened`, records `card_recipient_email_opened`, and redirects to the clean `/c/[slug]`. No offer, reminder or mug emails: those come from Klaviyo later.
 - Cron `/api/cron/send-scheduled` every 5 minutes.
 - **Klaviyo client** (`lib/klaviyo.ts`) and the `outbound_events` outbox, `docs/data.md` §10:
   - send at once, retry from cron `/api/cron/flush-outbox` every minute
@@ -181,7 +182,7 @@ Each part lists what to build and what has to be true before it's committed.
   - `klaviyo.enabled = false` marks rows `skipped`.
   
   `card_created`, `card_email_sent`, `card_recipient_email_opened` and `vault_signed_in` are wired here.
-- `/api/webhooks/resend` updates `card_deliveries`, card status and `email_suppressions`.
+- `/api/webhooks/agentmail` (Svix signature checked, idempotent on the `svix-id` header) updates `card_deliveries`, card status and `email_suppressions` from `message.delivered`, `message.bounced` and `message.complained`.
 - The recipients' "Don't email me cards" page.
 - My cards (`/cards`) with Use again, Resend, Download, Copy link, and **Change** or **Cancel** for scheduled cards. Change reopens the builder on that card, re-renders it and keeps or updates the time.
 - **Done when** there are template snapshot tests, webhook signature and idempotency tests, and a cron test with a fake clock. Real sending is checked after deploy with Settings › Emails › "Send me a test".

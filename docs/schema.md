@@ -238,7 +238,7 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `vault.lookup_cache_minutes` | 10 |
 | `themes.in_season_days_before` | 45 |
 | `brand.support_email` | "" |
-| `email.from_cards` | "{from} via Magic Portraits <cards@magicportraits.ai>" (proposed) |
+| `email.from_cards` | "{from} via Magic Portraits <cards@magicportraitspartners.com>" (the address must be the AgentMail inbox) |
 | `email.reply_to` | "support@magicportraits.ai" (proposed) |
 | `links.main_site_url` | "https://magicportraits.ai" |
 | `links.start_portrait_url` | (from `docs/data.md`) |
