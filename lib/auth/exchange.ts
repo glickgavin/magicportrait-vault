@@ -8,14 +8,12 @@ import { supabaseServer } from "./supabase-server";
  */
 export async function establishSession(email: string): Promise<boolean> {
   const admin = db().auth.admin;
-  let gen = await admin.generateLink({ type: "magiclink", email });
-  if (gen.error) {
-    await admin.createUser({ email, email_confirm: true });
-    gen = await admin.generateLink({ type: "magiclink", email });
-  }
+  // For someone new this returns a "signup" token; verifying with type "email" accepts both kinds.
+  const gen = await admin.generateLink({ type: "magiclink", email });
   const hashed = gen.data?.properties?.hashed_token;
   if (gen.error || !hashed) return false;
   const sb = await supabaseServer();
-  const { error } = await sb.auth.verifyOtp({ type: "magiclink", token_hash: hashed });
+  const { error } = await sb.auth.verifyOtp({ type: "email", token_hash: hashed });
+  if (error) console.error(`[auth] link exchange failed: ${error.code ?? error.message}`);
   return !error;
 }

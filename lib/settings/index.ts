@@ -2,7 +2,7 @@ import "server-only";
 import { db, must } from "@/lib/db/client";
 import { REGISTRY, getDef, isSettingKey, validateSetting, type SettingKey, type SettingValue, type Section, type SettingType } from "./registry";
 
-const CACHE_MS = 15_000;
+const CACHE_MS = Number(process.env.SETTINGS_CACHE_MS ?? 15_000);
 let cache: { at: number; values: Map<string, unknown> } | null = null;
 
 export function clearSettingsCache() {

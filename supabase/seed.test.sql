@@ -3,6 +3,13 @@
 
 update public.settings set value = 'true'::jsonb, updated_by = 'seed-test', updated_at = now() where key = 'cards.enabled';
 insert into public.super_users (email, added_by) values ('super@example.com', 'seed-test') on conflict (email) do nothing;
+update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'auth.link_ip_rate_limit_per_hour';
+update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'auth.code_ip_rate_limit_per_hour';
+update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'auth.code_rate_limit_per_hour';
+update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'auth.verify_rate_limit_per_hour';
+update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'redeem.download_rate_limit_per_hour';
+update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'vault.lookup_rate_limit_per_hour';
+update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'gift.offer_link_rate_limit_per_hour';
 update public.theme_versions v set status = 'live', published_at = now() from public.themes t where v.theme_id = t.id and t.slug = 'christmas' and v.slug = 'snowfall';
 update public.theme_versions v set status = 'live', published_at = now() from public.themes t where v.theme_id = t.id and t.slug = 'christmas' and v.slug = 'classic';
 update public.theme_versions v set status = 'live', published_at = now() from public.themes t where v.theme_id = t.id and t.slug = 'new-year' and v.slug = 'midnight';

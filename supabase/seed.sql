@@ -69,6 +69,7 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('auth.code_rate_limit_per_hour', '6'::jsonb, 'number', 'auth', 'Code requests per email per hour', null, null, 'seed', now()),
   ('auth.code_ip_rate_limit_per_hour', '30'::jsonb, 'number', 'auth', 'Code requests per IP per hour', null, null, 'seed', now()),
   ('auth.verify_rate_limit_per_hour', '20'::jsonb, 'number', 'auth', 'Code checks per email per hour', null, null, 'seed', now()),
+  ('auth.link_ip_rate_limit_per_hour', '60'::jsonb, 'number', 'auth', 'One-tap link opens per IP per hour', null, null, 'seed', now()),
   ('vault.first_order_offer', '""'::jsonb, 'text', 'vault', 'First-order offer (creators)', 'Short text, e.g. “10% off with code FIRST10”. Empty hides it.', null, 'seed', now()),
   ('vault.first_order_offer_code', '""'::jsonb, 'text', 'vault', 'First-order offer code', null, null, 'seed', now()),
   ('vault.lookup_cache_minutes', '10'::jsonb, 'number', 'vault', 'Portrait lookup cache (minutes)', null, null, 'seed', now()),

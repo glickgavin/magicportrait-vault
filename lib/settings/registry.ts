@@ -137,6 +137,7 @@ export const REGISTRY = {
   "auth.code_rate_limit_per_hour": num("auth", 6, { label: "Code requests per email per hour", min: 1, max: 100 }),
   "auth.code_ip_rate_limit_per_hour": num("auth", 30, { label: "Code requests per IP per hour", min: 1, max: 1000 }),
   "auth.verify_rate_limit_per_hour": num("auth", 20, { label: "Code checks per email per hour", min: 1, max: 1000 }),
+  "auth.link_ip_rate_limit_per_hour": num("auth", 60, { label: "One-tap link opens per IP per hour", min: 1, max: 100000 }),
 
   // ---------- vault: data-source plumbing ----------
   "vault.first_order_offer": text("vault", "", { label: "First-order offer (creators)", description: "Short text, e.g. “10% off with code FIRST10”. Empty hides it.", max: 200 }),

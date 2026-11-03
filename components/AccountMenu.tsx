@@ -46,7 +46,7 @@ export function AccountMenu({ user }: { user: SessionUser }) {
       <button
         ref={btn}
         type="button"
-        aria-label={t("ui.account.open")}
+        aria-label={t("ui.account.openFor", { initials: user.initials })}
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="avatar-button"

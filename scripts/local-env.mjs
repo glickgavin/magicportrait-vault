@@ -35,6 +35,7 @@ export function appTestEnv(port = 3100) {
     SUPABASE_DB_URL: sb?.DB_URL ?? "",
     MAILPIT_URL: sb?.MAILPIT_URL ?? "",
     NEXT_TELEMETRY_DISABLED: "1",
+    SETTINGS_CACHE_MS: "0",
   };
 }
 

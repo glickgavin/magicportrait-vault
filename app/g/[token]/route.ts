@@ -6,6 +6,7 @@ import { markSignedIn } from "@/lib/db/members";
 import { db } from "@/lib/db/client";
 import { env } from "@/lib/env";
 import { track } from "@/lib/track";
+import { getSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ token: string 
     res.headers.set("referrer-policy", "no-referrer");
     return res;
   };
-  if (!(await rateLimit(`glink-ip:${hashKey(await clientIp())}`, 60))) return go("/signin");
+  if (!(await rateLimit(`glink-ip:${hashKey(await clientIp())}`, await getSetting("auth.link_ip_rate_limit_per_hour")))) return go("/signin");
 
   const result = await consumeSigninLink(token);
   if (result.status === "unknown") return go("/signin");

@@ -11,7 +11,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 2 | Database and settings | done |
 | 3 | Data sources | done (Test buttons UI lands with Settings, Part 10) |
 | 4 | Sign-in and account | done (live Auth config blocked, see Blocked) |
-| 5 | Home and My portraits | pending |
+| 5 | Home and My portraits | done |
 | 6 | Card builder and renderer | pending |
 | 7 | Email and delivery | pending |
 | 8 | Orders, downloads and mugs | pending |
@@ -72,6 +72,14 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - Migration 2 applied to `magic-vault`.
 - Tests: token valid / expired / unknown / reused-after-expiry, HMAC-only storage, `safeNext`; e2e signs in with a code read from the mail catcher, wrong code, one-tap link with the token never left in the address bar, expired and unknown links, 404 on `/settings` for non-super users, old redeem links, generic order message.
 
+## Part 5: Home and My portraits
+
+- `/` picks one of four states: `FirstHome` (customer with no cards: "Hi Sam", one big "Make my card" panel with a live preview of their first card, My portraits, Orders with "Choose your free mug photo" when needed), `VaultHome` (tabs, cards panel, recent cards, portraits, "More digital gifts coming"), `VaultGuest` (latest session, All my portraits, locked cards, first-order offer when `vault.first_order_offer` is set) and the empty state ("Try another email", "Create a portrait").
+- `/portraits`: summary, a real radio-group filter (All · Ordered · Not ordered, kept in `?filter=`), session groups newest first (theme, pet, date, order badge, ORDERED tiles, "More looks" for recommendation children), "Order as wall art"/"Order more" deep links (`links.order_session_url_template` with the lptemp id, else `links.start_portrait_url`), "Make a card", "Create a new portrait", and the "may not show yet" note.
+- Theme catalog (`lib/db/themes.ts`) and season rules (`lib/themes/season.ts`, windows that wrap the year), card access rules (`lib/cards/rules.ts`: paused, locked, monthly limit with the next date).
+- `cards.enabled = false` hides every card entry point (home panels, menu). Fixed a one-tap-link bug found here: brand-new users get a `signup` token, so the exchange now verifies with type `email`.
+- e2e: all four states plus paused, portraits filters and links, at 390 and 1280 px, axe clean.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -87,6 +95,8 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Extra settings** beyond the docs, so nothing is hard-coded: rate limits (`auth.code_rate_limit_per_hour`, `auth.code_ip_rate_limit_per_hour`, `auth.verify_rate_limit_per_hour`, `vault.lookup_rate_limit_per_hour`, `redeem.download_rate_limit_per_hour`, `gift.offer_link_rate_limit_per_hour`), `cards.schedule_max_days`, `cards.signed_url_seconds`, `email.from_system`, `links.vip_login_url`, `vault.first_order_offer_code`, `tracking.*`, `klaviyo.max_attempts`. A `klaviyo` settings section was added to the allowed list.
 - **Local env**: `scripts/local-env.mjs` reads the running stack's keys (`supabase status`) for tests, e2e and `.env.local`, so no keys are committed. `scripts/dev-up.sh` restarts Docker and the stack after a session restart.
 
+- **"In season"** counts only themes with a date window. Always-available themes (Birthday, Thank you…) never make their category "in season", otherwise Birthdays and General would always sort first.
+- **Settings cache** is 15 s in production; `SETTINGS_CACHE_MS=0` in tests so e2e can flip settings. The local test seed lifts the per-IP rate limits (every e2e request comes from one IP); `auth.link_ip_rate_limit_per_hour` is now a setting.
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked
