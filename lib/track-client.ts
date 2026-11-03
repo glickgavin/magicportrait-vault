@@ -1,6 +1,6 @@
 "use client";
 
-import posthog from "posthog-js";
+import { ph, whenPosthog } from "@/lib/ph";
 import { EVENTS, isEventName, scrubProps, type EventName } from "@/lib/events";
 
 function assertKnown(event: string): asserts event is EventName {
@@ -11,9 +11,7 @@ function assertKnown(event: string): asserts event is EventName {
   }
 }
 
-function posthogReady(): boolean {
-  return typeof window !== "undefined" && Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY) && posthog.__loaded;
-}
+const enabled = () => typeof window !== "undefined" && Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY);
 
 /**
  * Browser-side tracking. UI events go to PostHog only.
@@ -35,17 +33,17 @@ export function trackClient(event: EventName, props?: Record<string, unknown>) {
     }).catch(() => undefined);
     return;
   }
-  if (posthogReady()) posthog.capture(event, clean);
+  if (enabled()) whenPosthog((p) => p.capture(event, clean));
 }
 
 export function identifyClient(email: string, props?: Record<string, unknown>) {
-  if (posthogReady()) posthog.identify(email.toLowerCase(), scrubProps(props));
+  if (enabled()) whenPosthog((p) => p.identify(email.toLowerCase(), scrubProps(props)));
 }
 
 export function resetClient() {
-  if (posthogReady()) posthog.reset();
+  ph()?.reset();
 }
 
 export function setSuperProps(props: Record<string, unknown>) {
-  if (posthogReady()) posthog.register(scrubProps(props));
+  if (enabled()) whenPosthog((p) => p.register(scrubProps(props)));
 }

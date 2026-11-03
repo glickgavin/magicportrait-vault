@@ -1,8 +1,8 @@
 "use client";
 
-import posthog from "posthog-js";
 import { useEffect } from "react";
 import { sanitizeEventProperties } from "@/lib/posthog-sanitize";
+import { loadPosthog, whenPosthog } from "@/lib/ph";
 
 let started = false;
 
@@ -11,7 +11,9 @@ export function PostHogProvider({ children, identity }: { children: React.ReactN
     const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
     if (!key || started) return;
     started = true;
-    posthog.init(key, {
+    const start = () =>
+      void loadPosthog((posthog) =>
+        posthog.init(key, {
       api_host: "/ingest",
       ui_host: "https://us.posthog.com",
       defaults: "2025-05-24",
@@ -41,18 +43,19 @@ export function PostHogProvider({ children, identity }: { children: React.ReactN
         }
         ph.register({ app: "vault", ...utm });
       },
-    });
+        }),
+      );
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(start, { timeout: 3000 });
+    else setTimeout(start, 1500);
   }, []);
 
   useEffect(() => {
     if (!identity?.email || !process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
-    const t = setTimeout(() => {
-      if (posthog.__loaded) {
-        posthog.identify(identity.email.toLowerCase(), { email: identity.email.toLowerCase() });
-        if (identity.isCustomer !== undefined) posthog.register({ is_customer: identity.isCustomer });
-      }
-    }, 0);
-    return () => clearTimeout(t);
+    whenPosthog((posthog) => {
+      posthog.identify(identity.email.toLowerCase(), { email: identity.email.toLowerCase() });
+      if (identity.isCustomer !== undefined) posthog.register({ is_customer: identity.isCustomer });
+    });
   }, [identity?.email, identity?.isCustomer]);
 
   return <>{children}</>;
