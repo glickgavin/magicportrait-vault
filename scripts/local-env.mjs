@@ -36,6 +36,7 @@ export function appTestEnv(port = 3100) {
     MAILPIT_URL: sb?.MAILPIT_URL ?? "",
     NEXT_TELEMETRY_DISABLED: "1",
     SETTINGS_CACHE_MS: "0",
+    E2E_FIXTURE_RESET: "1",
   };
 }
 

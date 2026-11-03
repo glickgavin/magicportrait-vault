@@ -14,7 +14,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 5 | Home and My portraits | done |
 | 6 | Card builder and renderer | done |
 | 7 | Email and delivery | done |
-| 8 | Orders, downloads and mugs | pending |
+| 8 | Orders, downloads and mugs | done |
 | 9 | Free gift offer | pending |
 | 10 | Settings | pending |
 | 11 | Insights | pending |
@@ -103,6 +103,15 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - My cards (`/cards`): statuses Emailed · Opened · Scheduled · Shared · Downloaded · Failed · Cancelled; Share, Download, Use again (same theme, portrait and message, blank recipient), Resend (rate-limited), and a "Manage" menu for scheduled cards with Change (reopens the builder on that card, re-renders, keeps or updates the time; `card_schedule_changed`) and Cancel.
 - Tests: template snapshots, Svix valid/forged/wrong-secret, idempotency, bounce/delivered/complaint handling, scheduled send with a fake clock (not early, once, never twice), suppression, Klaviyo skip/send/property list/link handling/dedupe/backoff/give-up/4xx/cron/profile; e2e for email-now, opened via the email link, unsubscribe, resend, use again, change and cancel, cron and webhook auth.
 
+## Part 8: Orders, downloads and mugs
+
+- `/orders` (`Orders`): every order newest first, status chips ("Free mug · choose photo", "N downloads ready", "Mug printed", fulfilment), the gradient banner when a mug photo is needed, "Missing an order? … Switch account".
+- `/orders/[orderName]` (`OrderDetail`): the free mug (a real radio group, deduped by tile id; Save disabled when nothing changed; "Saved. This is the photo we'll print."; locked → "Your mug is being printed with this photo"; `redeem.mug_offer_active` off → read-only), downloads (one row per portrait with the live file name, "Download all (.zip)"), then "Create a greeting card".
+- `lib/redeem/service.ts`: every constant from settings; `viewOrder` (parse all lines, mug lock rule, kill switch); `saveMugChoice` re-checks owned → has mug → not cancelled → not locked → offer open → tile in this order, then `metafieldsSet` (same value and key order as live, with `compareDigest`) and `tagsAdd ["mug:ready"]`; tag errors go to the activity log. Codes: 404 not found/not yours, 409 locked/not eligible, 422 invalid tile, 502 Shopify error. Responses carry only `{ error }`.
+- `lib/redeem/downloads.ts`: single files and a streamed zip through access-checked app routes (never the raw `_image_url`), fetching only from `redeem.allowed_image_hosts`, same numbering in both, missing files listed in `missing-files.txt` inside the zip, rate-limited per person.
+- Fixed versus live: all lines read; Masterpiece `_image_id` tiles work for the mug and downloads; "Download all" works for all three products, the add-on and Masterpiece; downloads re-check eligibility; mug saves check the mug, cancellation and the print lock.
+- Tests: every row of the eligibility rules (downloads by each product, add-on, Masterpiece, prints-only, kill switch; mug present/absent, none_selected, metafield vs line attribute), the lock rule in both modes, exact Shopify writes on fixtures, file names; e2e for choose, save, saved state, locked state, downloads, another email's order (404 on view, mug save and both downloads), signed-out calls, and a no-debug/no-PII check on every error body.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -125,6 +134,8 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Rendering is its own request** (`/api/cards/[id]/render`) rather than background work, so it works on serverless without `waitUntil` and gives the Creating screen a real result and "Try again".
 - **AgentMail sender name:** the AgentMail send API sends as the inbox and has no per-message From display name, so "{from} via Magic Portraits" (`email.from_cards`) can't be applied through the API; the recipient sees the inbox's display name. The subject still says "Sam sent you a Christmas card". If the per-sender name matters, either set the inbox display name to "Magic Portraits" or switch card sends to AgentMail's SMTP relay (which accepts a From name). Listed under Open questions.
 - **`agentmail` and `svix`** are server-external packages: the AgentMail SDK has an optional dynamic import (`@x402/fetch`) that the bundler can't resolve.
+- **Mug lock in `days_after_order` mode** still locks once printing has started or the mug line is fulfilled (the print pipeline wins over the day count), so a choice can never change after printing.
+- **`/api/test/reset-fixtures`** exists only when `DATA_SOURCE=fixtures` and `E2E_FIXTURE_RESET=1` (set only by the local test env); otherwise 404.
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked
