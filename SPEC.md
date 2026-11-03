@@ -52,7 +52,7 @@ People are identified by **email**. Shopify and Imagen stay the sources of truth
 | D16 | Analytics has two layers: PostHog (clicks, funnels, replays), plus our own `activity_log` table, which is permanent and powers Settings › Insights. |
 | D17 | Every card is kept forever. Super users can see all of them. A card is only removed on the customer's data-deletion request. |
 | D18 | The whole app is built in one Claude Code run, in ordered parts with a commit after each (`BUILD.md`). |
-| D19 | Email: **Resend** sends only what must arrive at once or goes to someone who isn't a customer: sign-in codes, cards to recipients, scheduled-card confirmations, resent sign-in links. **Klaviyo** receives our events and profile properties. **For now we only log events to Klaviyo.** The lifecycle emails (free gift offer, seasonal reminder, mug photo reminder) will be written later as Klaviyo flows on those events (§14a). |
+| D19 | Email: **AgentMail** (inbox `cards@magicportraitspartners.com`) sends only what must arrive at once or goes to someone who isn't a customer: sign-in codes, cards to recipients, scheduled-card confirmations, resent sign-in links. **Klaviyo** receives our events and profile properties. **For now we only log events to Klaviyo.** The lifecycle emails (free gift offer, seasonal reminder, mug photo reminder) will be written later as Klaviyo flows on those events (§14a). AgentMail reports delivered, bounced and complained but not opens, so an email counts as **opened** when the recipient opens the card from its email link. |
 | D20 | **A first card is one screen.** Someone with no cards yet gets a card already made (in-season design, their newest portrait, a suggested message). They type who it's for and tap Create. The full four-step builder is for later cards, or one tap away (§8.0). |
 
 ## 3. Words we use
@@ -115,13 +115,13 @@ People are identified by **email**. Shopify and Imagen stay the sources of truth
                          ├── writes outside its own database (only these):
                          │     • Shopify order: mug choice metafield + "mug:ready" tag
                          │
-                         ├── sends: Resend (sign-in codes, cards to recipients, confirmations)
+                         ├── sends: AgentMail (sign-in codes, cards to recipients, confirmations)
                          ├── Klaviyo (private key, server-side): events + profile properties
                          │       → Klaviyo flows send the offer, reminder and mug-photo emails
                          └── tracks: PostHog project 540098 (same as the main site), via /ingest
 
  Shopify ──orders/paid webhook──► /api/webhooks/shopify/orders-paid ──► free gift offer email
- Resend  ──delivery webhooks────► /api/webhooks/resend ──► card status, bounces, opens
+ AgentMail ──delivery webhooks──► /api/webhooks/agentmail ──► card status, bounces, complaints
  Vercel Cron ──► scheduled cards, offer emails, reminders, Klaviyo outbox retries
 ```
 
@@ -129,7 +129,7 @@ How a person's portraits are found: email → `analytics_events_mirror` (`proper
 
 ## 7. Sign-in and the account menu
 
-- **6-digit code.** Supabase Auth email OTP, sent from our domain via Resend. The sign-in screen (`SignIn`) has two steps: email, then code. It has "Resend code" and "Change email".
+- **6-digit code.** Supabase Auth email OTP, sent from `cards@magicportraitspartners.com` via AgentMail SMTP. The sign-in screen (`SignIn`) has two steps: email, then code. It has "Resend code" and "Change email".
 - **One-tap link.** The offer email and the thank-you pop-up carry `/g/[token]`.
   - The token is a random, opaque value (32+ bytes). It is stored only as a hash on the `gift_offers` row, and never contains the email or the order number.
   - It expires after `gift.link_valid_days` (default 30).
@@ -301,7 +301,7 @@ Behaviour matches the live `/redeem`; the exact rules are in `docs/data.md` §4 
   - `redeem.mug_reminder_after_days` (default 2) after an order with the free mug and no photo chosen, while not locked, we send `mug_photo_needed` to Klaviyo with a one-tap link to that order.
   - A Klaviyo flow, written later, will send "Choose the photo for your free mug".
   - Choosing a photo sends `redeem_mug_saved`, which the flow uses as its exit condition.
-- **Email preferences.** The lifecycle emails will come from Klaviyo, so Klaviyo's own unsubscribe and consent apply. This is separate from the recipients' "Don't email me cards", which covers card emails sent by Resend.
+- **Email preferences.** The lifecycle emails will come from Klaviyo, so Klaviyo's own unsubscribe and consent apply. This is separate from the recipients' "Don't email me cards", which covers card emails sent by AgentMail.
 - **Switches** `cards.enabled`, `gift.offer_email_enabled`, `gift.popup_enabled` and `gift.reminder_email_enabled` all start **off**. Turning them on is the launch.
 
 ## 13. Settings (super users only)
@@ -356,7 +356,7 @@ At `/settings`; desktop first, with a dark sidebar. Anyone else gets a 404. Ever
 - A read-only "look up an order" box that shows what the customer would see.
 
 **System**
-- **Emails:** sender, reply-to, a preview of each Resend template, "Send me a test", and the bounce and unsubscribe list.
+- **Emails:** sender, reply-to, a preview of each AgentMail template, "Send me a test", and the bounce and unsubscribe list.
 - **Klaviyo** (under Data sources): connection test, events sent and failed in the outbox, and a "retry failed" button.
 - **Tracking:** PostHog project, proxy status, recent counts, links to dashboards.
 - **Data sources:** a status card per source with "Test" and its last success; "Test all".
@@ -485,7 +485,7 @@ This pass reviewed all 28 screens against the decisions above.
 - "Recipients who tried MP" became "Recipients who tapped Try MP". We can only count the tap; what they did next is in PostHog.
 - The desktop step bar said "Send"; it now says "Ready", matching mobile.
 - The blueprint's `cards` table now matches the real schema.
-- The email sender shows "Resend".
+- The email sender shows the sending service (now AgentMail, D19).
 - Every "vault" and "gift card" label is renamed (D5, D6). Settings keys are split into `cards.*` and `gift.*`.
 
 **Fixed after an independent check of the whole pack**
@@ -534,7 +534,7 @@ This pass reviewed all 28 screens against the decisions above.
 
 | # | Question | Default if not answered |
 |---|---|---|
-| Q1 | Email: Klaviyo for the offer, reminder and mug emails, with Resend for the rest (D19)? | Yes. Each lifecycle email can be switched to Resend in Settings. |
+| Q1 | Email: Klaviyo for the offer, reminder and mug emails, with AgentMail for the rest (D19)? | Yes. Each lifecycle email can be switched to AgentMail in Settings. |
 | Q2 | Does the r_orders token have `write_orders` (mug save), `read_all_orders` (orders older than 60 days) and `read_customers`? | Checked in Part 0; mug save is blocked until confirmed |
 | Q3 | At which print status should the mug choice lock? `generating` and `file_ready` let 7 changes through. | Lock from `draft_created` (setting `redeem.mug_lock_states`) |
 | Q4 | May we add a `lower(email)` index on the events mirror? Without it, 2.3% of emails stored in mixed case are missed. | Search both spellings, no index |
@@ -543,7 +543,7 @@ This pass reviewed all 28 screens against the decisions above.
 | Q7 | Does the free gift unlock with any order, or only some products? | Any paid order (`gift.unlock_rule`) |
 | Q8 | Later: should My Magic Portraits absorb the VIP Portal (store credit), so there's one sign-in? | Not in v1 |
 | Q9 | The six product thumbnails in the site menu: can someone export them from the live site? (They are binary files and couldn't be copied.) | Placeholder tiles, with the image URLs set in `links.menu_thumbnails` |
-| Q10 | Sender for cards and sign-in codes (Resend): `cards@magicportraits.ai`? *(The Klaviyo sender is for later: Klaviyo has no `magicportraits.ai` sending domain yet, only `sending.storyboards.io`.)* | Verify `magicportraits.ai` in Resend now (DNS in Cloudflare). Add it to Klaviyo later, when the emails are written. |
+| Q10 | Sender for cards and sign-in codes? *(The Klaviyo sender is for later: Klaviyo has no `magicportraits.ai` sending domain yet, only `sending.storyboards.io`.)* | **Decided:** the AgentMail inbox `cards@magicportraitspartners.com` on the custom domain `magicportraitspartners.com`. The From address must be the inbox address; the display name can vary ("{from} via Magic Portraits"). Reply-to stays `support@magicportraits.ai`. |
 | Q11 | *(For later, when the emails are written.)* Klaviyo stores the one-tap link (30-day expiry) as an event property so its email can carry it. Is that acceptable, or should Klaviyo emails link to the sign-in page instead? | Include the link (`klaviyo.include_signin_link`) |
 | Q12 | *(For later, when the emails are written.)* Is the free gift offer a marketing email (needs consent) or a transactional one? This decides whether the Klaviyo flow can go to everyone who orders. | Treat it as marketing: Klaviyo's consent rules apply. The thank-you pop-up and "Create a card" in the menu cover everyone else. |
 

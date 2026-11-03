@@ -20,7 +20,7 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 - **Supabase** (the app's own project, `magic-vault`, ref `koudexolfdvzmrglzhaz`; the only one, live): Postgres, Auth (email OTP), Storage. Use `@supabase/ssr` for auth cookies; the browser key is the publishable key.
 - **External reads:** Imagen and the events mirror through the read-only `vault_reader` Postgres role (`IMAGEGEN_DATABASE_URL`, `MIRROR_DATABASE_URL`; `postgres` driver via the Supabase pooler); Shopify Admin GraphQL with the r_orders app token.
 - **Card render:** `@napi-rs/canvas` (fonts registered from `assets/fonts/`). Use `sharp` for upload checks and thumbnails.
-- **Email:** React Email + Resend for everything that must arrive at once or goes to non-customers. Supabase Auth sends its codes through Resend SMTP.
+- **Email:** React Email + **AgentMail** (API, `agentmail` SDK) for everything that must arrive at once or goes to non-customers, sent from the inbox `cards@magicportraitspartners.com`. Supabase Auth sends its codes through AgentMail's SMTP relay (`smtp.agentmail.to`).
 - **Klaviyo:** events and profile properties only, server-side through the `outbound_events` outbox (`docs/data.md` §10). This app sends no offer, reminder or mug-photo emails; they'll be written later as Klaviyo flows (`SPEC.md` §14a).
 - **Analytics:** `posthog-js` + `posthog-node`, proxied at `/ingest`.
 - **Validation:** Zod on every input. **Tests:** Vitest (unit) and Playwright (e2e at 390 × 844 and 1280 × 800).
@@ -70,7 +70,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 - Downloads and card images use short-lived signed URLs or app routes that check access. Never hand out permanent public links to private files.
 - Only `NEXT_PUBLIC_*` values reach the browser, and those are the Supabase URL and anon key, the PostHog key and host, and the Intercom app id. No other keys in client code.
 - RLS on every table in our database, deny by default. The browser never queries tables directly.
-- Verify Shopify and Resend webhook signatures. Make webhook handlers idempotent.
+- Verify Shopify and AgentMail (Svix) webhook signatures. Make webhook handlers idempotent.
 - `/settings/*` and `/api/admin/*` return 404 unless `is_super_user(email)`.
 - Sign-in link tokens (`/g/[token]`) are random, 32+ bytes, and stored only as `HMAC(GIFT_LINK_SECRET, token)`. They expire, and they're stripped from the address by a redirect after use. Share slugs are random, 16+ chars.
 - No emails or tokens in URLs. Admin pages use opaque ids (`vault_members.id`).
