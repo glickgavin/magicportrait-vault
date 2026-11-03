@@ -12,7 +12,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 3 | Data sources | done (Test buttons UI lands with Settings, Part 10) |
 | 4 | Sign-in and account | done (live Auth config blocked, see Blocked) |
 | 5 | Home and My portraits | done |
-| 6 | Card builder and renderer | pending |
+| 6 | Card builder and renderer | done |
 | 7 | Email and delivery | pending |
 | 8 | Orders, downloads and mugs | pending |
 | 9 | Free gift offer | pending |
@@ -80,6 +80,17 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - `cards.enabled = false` hides every card entry point (home panels, menu). Fixed a one-tap-link bug found here: brand-new users get a `signup` token, so the exchange now verifies with type `email`.
 - e2e: all four states plus paused, portraits filters and links, at 390 and 1280 px, axe clean.
 
+## Part 6: Card builder and renderer
+
+- **One drawing routine** (`lib/render/draw.ts`) used by the server (`@napi-rs/canvas`, fonts from `assets/fonts`) and by `CardPreview` (an HTML canvas with the page's own fonts), so the preview is the JPEG. Layout maths in `lib/render/layout.ts`: Zod schema for the layout JSON, text that shrinks before it wraps and never overflows (falls back to an ellipsis below 30%), cover/zoom/pan crop, photo shapes (rect, rounded, circle, arch), `{pet}` ideas skipped without a pet name.
+- `FirstCard` (`/create` with no cards and `cards.first_card_mode = one_screen`): in-season design, newest ordered portrait, first usable idea, their first name; "Change design" cycles once, then (or on long-press) opens the picker sheet; "Change photo", "Try another", "From … change", "I'll share it" / "Email it for me" (one email field, sends now), "See all designs" hands the draft to the full builder.
+- Full builder: `/create` (`M1Theme`: tabs with counts, "All" rows with In season + See all, category grids, radio tiles, sticky footer), `/create/portrait` (`M2Portrait`: sessions, ORDERED, optional zoom/move sliders), `/create/message` (`M3Message`: To/From/Message with counter and idea chips, live preview, Email it (now or a date) / I'll share it). The draft lives in session storage plus each step's URL.
+- `POST /api/cards` re-checks everything on the server (switch, who can create, monthly limit, the version is live and on sale today, the portrait is one of theirs, message length, schedule window, suppressed recipients), copies the portrait into `portraits/` as a normalised JPEG and creates the row; `/create/creating/[id]` (`M4Creating`) calls `POST /api/cards/[id]/render` (idempotent; "Try again" on failure) which renders, saves `cards/<id>.jpg`, sets `ready` / `scheduled`, queues a `card_deliveries` email row for "email now", and records `card_render_completed` and `card_created`.
+- `/cards/[publicId]` (`M5Ready`): status line, Share (native share with the JPEG), Download, Copy link, WhatsApp, Messages, Facebook, Instagram (share sheet, else download + tip), Make another, Go to My cards.
+- `/c/[slug]` public page (noindex, no-referrer, sender's first name only), `/c/[slug]/image` (404 when hidden), `/c/[slug]/try` (records `card_recipient_cta_tapped` against the sender server-side, then redirects with `utm_source=greetingcard&utm_medium=referral&utm_campaign=<theme>&card=<public id>`). `?d=<delivery id>` marks an email delivery opened and redirects to the clean URL.
+- `POST /api/track`: browser business events only, email from the session, card ownership checked; share/download/copy also add `card_deliveries` rows.
+- Tests: golden images for all 10 seed versions (0.5% pixel tolerance), text-fitting and overflow tests up to 1000 characters, crop maths; e2e for `/g` → FirstCard (no cards) and → step 1 (has cards), name-only Create, email delivery up to a queued row, a scheduled card, the public page, hidden links, `/try`, other people's cards and portraits (404), and the paused / locked / everyone_with_portrait / monthly-limit rules.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -97,6 +108,9 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 
 - **"In season"** counts only themes with a date window. Always-available themes (Birthday, Thank you…) never make their category "in season", otherwise Birthdays and General would always sort first.
 - **Settings cache** is 15 s in production; `SETTINGS_CACHE_MS=0` in tests so e2e can flip settings. The local test seed lifts the per-IP rate limits (every e2e request comes from one IP); `auth.link_ip_rate_limit_per_hour` is now a setting.
+- **Message idea chips** are labelled "Idea 1/2/3" (the mockup's Warm/Funny/Heartfelt labels aren't in the data model); the full text shows as the chip's title and fills the message.
+- **"Change design"** on FirstCard: the first tap cycles to the next in-season design; later taps (or a long-press) open the picker sheet.
+- **Rendering is its own request** (`/api/cards/[id]/render`) rather than background work, so it works on serverless without `waitUntil` and gives the Creating screen a real result and "Try again".
 - **`signin_links` table** in addition to `gift_offers.token_hash`, because one-tap links are also needed for admin "Resend sign-in link" and the mug-photo reminder's order link, which aren't gift offers.
 
 ## Blocked

@@ -16,6 +16,8 @@ const SHOTS: { name: string; as: string | null; path: string }[] = [
   { name: "home-empty", as: "nobody@example.com", path: "/" },
   { name: "portraits", as: "sam@example.com", path: "/portraits" },
   { name: "portraits-rose", as: "rose@example.com", path: "/portraits" },
+  { name: "create-theme", as: "rose@example.com", path: "/create?step=theme" },
+  { name: "create-first", as: "charlie@example.com", path: "/create" },
 ];
 
 for (const s of SHOTS) {
