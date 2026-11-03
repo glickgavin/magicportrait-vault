@@ -66,7 +66,7 @@ People are identified by **email**. Shopify and Imagen stay the sources of truth
 | **Creator** | Has made portraits in Imagen but has no order. |
 | **Super user** | Can open Settings. |
 | **Session** | One Imagen portrait session: a set of portraits from one photo and one theme. |
-| **Ordered** | A portrait that appears in a Shopify order (rule in `docs/data.md` §1). |
+| **Ordered** | A portrait that appears in a Shopify order that isn't cancelled or fully refunded (rule in `docs/data.md` §3.6). |
 
 ## 4. Scope
 
@@ -127,8 +127,12 @@ How a person's portraits are found: email → `analytics_events_mirror` (`proper
 ## 7. Sign-in and the account menu
 
 - **6-digit code.** Supabase Auth email OTP, sent from our domain via Resend. The sign-in screen (`SignIn`) has two steps: email, then code. It has "Resend code" and "Change email".
-- **One-tap link.** The offer email and the thank-you pop-up carry `/g/[token]`. The token is HMAC-signed, holds the email and the Shopify order id, and expires after `gift.link_valid_days` (`0` = never). Opening it signs the person in (server-side magic-link exchange) and goes straight to the card builder.
-- **Old redeem links.** `/redeem?…` lands on `RedeemEntry`: the sign-in screen worded for an order. After sign-in it opens that order. If the order is on another email it says so and offers "Switch account". It never says whose email the order is on.
+- **One-tap link.** The offer email and the thank-you pop-up carry `/g/[token]`.
+  - The token is a random, opaque value (32+ bytes). It is stored only as a hash on the `gift_offers` row, and never contains the email or the order number.
+  - It expires after `gift.link_valid_days` (default 30).
+  - Opening it signs the person in (server-side magic-link exchange), then redirects to the builder with the token removed from the address.
+  - An expired or unknown token falls back to the normal sign-in screen.
+- **Old redeem links.** `/redeem`, `/redeem?order=…` and `/redeem/[order]` land on `RedeemEntry`: the sign-in screen worded for an order. After sign-in it opens that order. If the order isn't on the signed-in email, it shows **one generic message**, identical whether or not the order exists: "We couldn't find that order on this email", with "Switch account".
 - **Initials circle.** In the header, left of the bag, on every page. Initials come from the Shopify customer's first and last name, or else the first two letters of the email. When signed out, the same spot shows a person icon labelled "Sign in".
 - **Account menu** (`Account`), opened from the circle: name and email, then My cards, My portraits, Orders/downloads & mugs, Settings (super users only, with a "Super user" tag), and Sign out.
 - **Sign out** clears the session and calls `posthog.reset()`.
@@ -169,7 +173,14 @@ Steps are mobile first; the desktop step bar reads Theme · Portrait · Message 
 
 ### 8.3 Rules
 - `cards.enabled` off → the builder says "Cards are paused" and every entry point is hidden.
-- `cards.who_can_create`: `customers_with_order` (default) or `everyone_with_portrait`.
+- **Who has the free gift.** `gift.unlock_rule` decides which orders unlock cards and trigger the offer email:
+  - `any_paid_order` (default)
+  - `qualifying_products`: only orders containing a product in `gift.qualifying_product_ids`.
+  
+  Cancelled or fully refunded orders never count.
+- **Who can make cards.** `cards.who_can_create`:
+  - `customers_with_order` (default): only people with the free gift (above).
+  - `everyone_with_portrait`: creators too.
 - `cards.per_customer`: `unlimited` (default) or a number per month. Over the limit, say when the next one is available.
 - `cards.price`: `free` only in v1.
 - The chosen portrait is **copied** into our storage when the card is made, so old cards never break.
@@ -191,7 +202,10 @@ Steps are mobile first; the desktop step bar reads Theme · Portrait · Message 
 - **What the recipient gets** (`RecipientEmail`).
   - From "<Sender> via Magic Portraits"; subject "<Sender> sent you a <theme> card".
   - The card, "Save the card" and "Open full size" (both open `/c/[slug]`).
-  - A "Love the portrait? Try Magic Portraits" block, with a link carrying `utm_source=greetingcard&utm_medium=referral&utm_campaign=<theme_slug>&card=<public_id>`.
+  - A "Love the portrait? Try Magic Portraits" block.
+    - Its link goes through `/c/[slug]/try`, which records `card_recipient_cta_tapped` server-side.
+    - It then redirects to `links.main_site_url` with `utm_source=greetingcard&utm_medium=referral&utm_campaign=<theme_slug>&card=<public_id>`.
+    - The sender is credited server-side from the card; the sender's email never reaches the recipient's browser.
   - Footer: "Don't email me cards", which blocks future card emails to that address.
 - **Public card page** `/c/[slug]`.
   - The card full size, Save image, and the same "Try Magic Portraits" block.
@@ -219,9 +233,14 @@ Behaviour matches the live `/redeem`; the exact rules are in `docs/data.md` §4 
   - "Missing an order? It may be on another email. Switch account".
 - **Order detail** (`OrderDetail`).
   - **Your free mug.** Shown when the order includes the free mug.
-    - Pick one of the order's portraits and save. Saving writes `custom.mug_choice` and the `mug:ready` tag exactly as live.
-    - It locks once printing starts. The lock is read from the mug print pipeline (`mug_fulfillment_jobs`, `docs/data.md` §6.6). Locked text: "Your mug is being printed with this photo".
-  - **Your downloads.** Shown when downloads are enabled for the order: one row per portrait, plus "Download all (.zip)". Live's file names are kept.
+    - Pick one of the order's portraits and save. Saving writes `custom.mug_choice` and the `mug:ready` tag exactly as live. Saved text: "Saved. This is the photo we'll print."
+    - Lock: `redeem.mug_lock_mode`.
+      - `print_status` (default): locks once printing starts, read from the mug print pipeline (`mug_fulfillment_jobs`, `docs/data.md` §6.6).
+      - `days_after_order`: locks `redeem.mug_lock_days` days after the order.
+      
+      Locked text: "Your mug is being printed with this photo".
+    - `redeem.mug_offer_active` off → the mug section shows the current choice read-only.
+  - **Your downloads.** Shown when downloads are enabled for the order and `redeem.downloads_enabled` is on (a kill switch): one row per portrait, plus "Download all (.zip)". Live's file names are kept.
   - Then a "Create a greeting card" call to action.
 - **Fixed compared with live:**
   - Every action re-checks on the server that the signed-in email owns the order and that the action is allowed: mug present and not locked, not cancelled; downloads enabled.
@@ -233,9 +252,19 @@ Behaviour matches the live `/redeem`; the exact rules are in `docs/data.md` §4 
 
 ## 12. The free gift offer
 
-- **After an order.** The Shopify `orders/paid` webhook creates one `gift_offers` row per order (HMAC checked, idempotent). The offer email (`Main`) is sent after `gift.offer_email_delay_minutes`, with a personal `/g/[token]` link.
-- **Thank-you pop-up.** `GET /api/gift/offer-link?order=…` returns the personal link for the Shopify thank-you page (`GiftSheet`). Wiring it into Shopify is a launch step outside this repo.
-- **Seasonal reminder** (built, off by default). `gift.reminder_days_before` days before a category comes into season, email customers who have the free gift and haven't made a card in 60 days. Turned on per category in the theme library.
+- **After an order.**
+  - The Shopify `orders/paid` webhook creates one `gift_offers` row per qualifying order (HMAC checked, idempotent; `gift.unlock_rule`).
+  - The offer email (`Main`) is sent after `gift.offer_email_delay_minutes`, with a personal `/g/[token]` link.
+  - Non-qualifying orders are recorded as skipped, with the reason.
+- **Thank-you pop-up.**
+  - `POST /api/gift/offer-link` returns the personal link for the Shopify thank-you page (`GiftSheet`).
+  - It accepts **only** a request carrying a Shopify checkout-extension session token, verified with the app secret, for an order paid within `gift.popup_window_minutes` (default 60). It never accepts a bare order number.
+  - "Later, email me the link" sends the offer email now.
+  - Wiring the pop-up into Shopify (a checkout UI extension) is a launch step outside this repo.
+- **Seasonal reminder** (built, off by default).
+  - `gift.reminder_days_before` days before a category comes into season, it emails customers who have the free gift and haven't made a card in `gift.reminder_skip_if_card_within_days` days (default 60).
+  - It's turned on per category in the theme library.
+- **Email preferences.** The offer and reminder emails link to `/email-preferences/[token]`, where the person can stop offer and reminder emails. This is separate from the recipients' "Don't email me cards".
 - **Switches** `cards.enabled`, `gift.offer_email_enabled`, `gift.popup_enabled` and `gift.reminder_email_enabled` all start **off**. Turning them on is the launch.
 
 ## 13. Settings (super users only)
@@ -257,7 +286,7 @@ At `/settings`; desktop first, with a dark sidebar. Anyone else gets a 404. Ever
   - Also: cards per day, the card funnel (with a link to PostHog), top themes, and a live feed.
   - All numbers come from our database.
 - **Customers** (`AdminCustomer`).
-  - Search by email or name.
+  - Search by email or name. The search is sent in the request body. Results open `/settings/customers/[id]` using the person's opaque `vault_members.id`, never their email in the address.
   - Header: badges, plus stats for orders, spent, cards and portraits.
   - Links: Open in PostHog (replays), Open in Shopify, Resend sign-in link, Export or delete data.
   - **One timeline** merged by time: activity_log (My MP, Email) plus live Shopify orders plus live Imagen sessions, with filter chips.
@@ -268,7 +297,7 @@ At `/settings`; desktop first, with a dark sidebar. Anyone else gets a 404. Ever
   - **Opening a card's message is logged.**
 
 **Setup: General & variables** (`Settings`)
-- Card and redeem switches.
+- Card switches (`cards.enabled`, `cards.who_can_create`, `cards.per_customer`, `cards.price`) and redeem switches (`redeem.downloads_enabled`, `redeem.mug_offer_active`, `redeem.mug_lock_mode`).
 - A searchable table of every setting (key, value, type, updated by and when), edited inline with type checks, plus "Add variable".
 - Super users and data source status at a glance; recent changes.
 
@@ -298,8 +327,9 @@ At `/settings`; desktop first, with a dark sidebar. Anyone else gets a 404. Ever
 
 **Setting keys** (full list and defaults in `docs/schema.md` and `docs/data.md` §7):
 - `cards.*`: the product. `enabled`, `who_can_create`, `per_customer`, `price`, `message_max_chars`, `size_px`, `jpeg_quality`, `email_sender_name`, `footer_text`.
-- `gift.*`: the offer. `offer_email_enabled`, `popup_enabled`, `reminder_email_enabled`, `reminder_days_before`, `unlock_rule`, `link_valid_days`, `offer_email_delay_minutes`.
-- `redeem.*`: the /redeem rules and constants.
+- `gift.*`: the offer. `offer_email_enabled`, `popup_enabled`, `popup_window_minutes`, `reminder_email_enabled`, `reminder_days_before`, `reminder_skip_if_card_within_days`, `unlock_rule`, `qualifying_product_ids`, `link_valid_days`, `offer_email_delay_minutes`.
+- `redeem.*`: the /redeem rules and constants, plus `downloads_enabled`, `mug_offer_active`, `mug_lock_mode`, `mug_lock_days`.
+- `email.*`: `from_offers`, `from_cards`, `reply_to`.
 - `vault.*`: data-source plumbing and the first-order offer.
 - Also `themes.*`, `auth.*`, `brand.*`, `email.*`, `links.*`.
 
@@ -310,6 +340,9 @@ At `/settings`; desktop first, with a dark sidebar. Anyone else gets a 404. Ever
   - Event prefixes: `vault_` (My Magic Portraits area), `card_` (greeting cards), `gift_` (the offer), `redeem_` (kept from live so old charts continue).
   - Full list in `docs/analytics.md`.
 - **Our own `activity_log`.** Every business event is written server-side with who did it. It is permanent and joins with cards and orders. It powers Settings › Insights.
+  - Business events that happen in the browser (share, copy link, download) go through `POST /api/track`. It checks the name against the list and takes the email from the session, never from the request.
+  - Recipient taps are recorded by `/c/[slug]/try`.
+- **No personal data in addresses.** URLs never contain emails or sign-in tokens. Tokens are stripped by redirect, admin pages use opaque ids, and PostHog drops query strings on `/g/` and `/email-preferences/`.
 - **Never tracked:** message text, recipient names or recipient emails, in either system.
 
 ## 15. Data export and deletion
@@ -335,8 +368,9 @@ The live /redeem's problems are listed in `docs/data.md` §8. This app must not 
 - Error messages never reveal whether an email or order exists. No debug fields.
 - Private files use short-lived signed URLs; image fetches only from allowed hosts.
 - RLS on every table in our database, deny by default; the browser never queries tables directly.
-- Webhooks are signature-checked and idempotent. Gift links are signed. Share slugs are random and 16+ characters.
-- Code requests, lookups and downloads are rate-limited.
+- Webhooks are signature-checked and idempotent.
+- Sign-in links are opaque, random, stored hashed and expire. The pop-up link endpoint accepts only Shopify-signed session tokens for recent orders (§12). Share slugs are random and 16+ characters.
+- Code requests, lookups, link requests and downloads are rate-limited, with counters in the `rate_limits` table.
 - Card messages are personal. Super users can read them for support; every view is logged; the privacy policy must say so (launch step).
 - Server logs mask emails; no message text in logs.
 
@@ -366,6 +400,23 @@ This pass reviewed all 28 screens against the decisions above.
 - The email sender shows "Resend".
 - Every "vault" and "gift card" label is renamed (D5, D6). Settings keys are split into `cards.*` and `gift.*`.
 
+**Fixed after an independent check of the whole pack**
+- The pop-up link endpoint could have handed anyone a sign-in link from an order number. It now accepts only Shopify-signed session tokens for recent orders. Links are opaque, stored hashed, expire after 30 days and are stripped from the address.
+- A wrong-email order lookup now shows one generic message, so it doesn't reveal that the order exists.
+- The sender's email no longer reaches the recipient's browser. Referrals are credited server-side.
+- No emails or tokens in URLs. Admin customer pages use opaque ids.
+- Cancelled and refunded orders no longer count as "ordered" or unlock the free gift.
+- Settings keys behind every switch in the mockups now exist (`redeem.downloads_enabled`, `redeem.mug_offer_active`, `redeem.mug_lock_mode`/`_days`, `gift.unlock_rule`, sender addresses).
+- Added what the build plan was missing:
+  - changing a scheduled card
+  - `/redeem/[order]`
+  - a `rate_limits` table
+  - `POST /api/track`
+  - the reminder and resend-link emails
+  - Email preferences
+  - page-view names for every page.
+- Tests run against a separate dev database (`magic-vault-dev`) with live sample themes. Production is never touched by tests, and sign-in tests need no Docker.
+
 **In this spec but not drawn (build to the spec)**
 - Changing or cancelling scheduled cards in My cards (§9).
 - The footer on My portraits and the creator home (§17).
@@ -394,10 +445,12 @@ This pass reviewed all 28 screens against the decisions above.
 | Q2 | Does the r_orders token have `write_orders` (mug save), `read_all_orders` (orders older than 60 days) and `read_customers`? | Checked in Part 0; mug save is blocked until confirmed |
 | Q3 | At which print status should the mug choice lock? `generating` and `file_ready` let 7 changes through. | Lock from `draft_created` (setting `redeem.mug_lock_states`) |
 | Q4 | May we add a `lower(email)` index on the events mirror? Without it, 2.3% of emails stored in mixed case are missed. | Search both spellings, no index |
-| Q5 | Should cancelled or refunded orders still count as "ordered" and still unlock cards? | No |
+| Q5 | Should cancelled or refunded orders still count as "ordered" and still unlock cards? | No (built this way; `docs/data.md` §3.6) |
 | Q6 | Does the main site's order page still open old sessions from their link? | Fall back to "Create a new portrait" |
-| Q7 | Does the free gift unlock with any order, or only some products? | Any paid order |
+| Q7 | Does the free gift unlock with any order, or only some products? | Any paid order (`gift.unlock_rule`) |
 | Q8 | Later: should My Magic Portraits absorb the VIP Portal (store credit), so there's one sign-in? | Not in v1 |
+| Q9 | The six product thumbnails in the site menu: can someone export them from the live site? (They are binary files and couldn't be copied.) | Placeholder tiles, with the image URLs set in `links.menu_thumbnails` |
+| Q10 | Sender addresses: `hello@magicportraits.ai` for offers and `cards@magicportraits.ai` for cards? | As proposed, once the domain is verified in Resend |
 
 ## 21. Problems found on the live systems (outside this build, needs an owner)
 

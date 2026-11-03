@@ -26,13 +26,15 @@ Verified on 3 Nov 2026 against the live PostHog project:
 | Error tracking | Turn on exception autocapture for My Magic Portraits and add `error_*` events below |
 | Super properties | Every event carries `app: "vault"`, `entry_point`, `is_customer`, `utm_*` |
 
-One wrapper, `track(event, props)`, is the only way the app sends events. It adds the super properties and checks names against the list below. If the analytics mirror is not fed from PostHog, the same wrapper also posts to it.
+One wrapper, `track(event, props)`, is the only way the app sends events. It adds the super properties and checks names against the list below. The app never writes to the events mirror; it is read-only (`CLAUDE.md`).
+
+Business events that happen in the browser (share, copy link, download, mug tile picked) are sent to `POST /api/track`. The server checks the name against this list, takes the email from the session (never from the request), and writes PostHog and `activity_log` server-side. Pure UI events go straight to PostHog from the browser.
 
 ## 2. Identity
 
 - On sign-in (signed link from the order email or the 6-digit code), call `identify(email.toLowerCase())`. This matches the main site, so My Magic Portraits joins the person's existing history.
 - Set person properties: `email`, `is_customer`, `first_order_at`, `portrait_count`, `session_count`, `cards_created` (increment), `vault_first_seen_at` (set once).
-- Card recipients stay anonymous. Their events carry `card_id` and `sender_distinct_id`, so referrals can be credited to the sender.
+- Card recipients stay anonymous. Their events carry `card_id` only. The server credits the sender by looking up the card, so the sender's email never reaches the recipient's browser.
 
 ## 3. Naming rules (match the existing site)
 
@@ -54,7 +56,7 @@ One wrapper, `track(event, props)`, is the only way the app sends events. It add
 | `gift_popup_email_link_requested` | "Later, email me the link" on the sheet | `order_id` |
 | `gift_reminder_email_sent` (server) | Seasonal reminder sent | `category`, `theme_slug` |
 
-`entry_point` super property: `order_email` · `thankyou_popup` · `site_menu` · `vault_home` · `my_cards` · `recipient_page`.
+`entry_point` super property (the same list as `cards.entry_point` in `docs/schema.md`): `order_email` · `thankyou_popup` · `reminder_email` · `site_menu` · `home` · `my_cards` · `my_portraits` · `order_page` · `make_another` · `use_again`. Recipient pages use `recipient_page`.
 
 ### Sign-in
 | Event | When | Key properties |
@@ -112,9 +114,9 @@ One wrapper, `track(event, props)`, is the only way the app sends events. It add
 | Event | When | Key properties |
 |---|---|---|
 | `card_recipient_email_opened` (server) | Recipient opens the email | `card_id` |
-| `page_view_card_received` | Recipient opens the card page | `card_id`, `sender_distinct_id` |
+| `page_view_card_received` | Recipient opens the card page | `card_id` |
 | `card_recipient_saved` | Recipient saves it | `card_id` |
-| `card_recipient_cta_tapped` | "Try Magic Portraits" | `card_id`, `sender_distinct_id` |
+| `card_recipient_cta_tapped` (server) | "Try Magic Portraits", recorded by `/c/[slug]/try` before the redirect | `card_id`, `via` (`email` / `page`) |
 
 The CTA link carries `utm_source=greetingcard&utm_medium=referral&utm_campaign=<theme_slug>`. Recipients who then upload show up in the existing `page_view_start` → `funnel_generation_started` events.
 
@@ -155,6 +157,11 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 | `vault_signin_link_used` | A `/g/[token]` link signs someone in | `order_id`, `expired` |
 | `gift_offer_email_opened` | Gift offer email opened (Resend webhook) | `order_id` |
 | `card_cancelled` | A scheduled card is cancelled | `card_id` |
+| `card_schedule_changed` | A scheduled card's time or content is changed | `card_id`, `changed` (`time` / `content`) |
+| `gift_offer_skipped` | An order didn't qualify for the free gift, or the offer was suppressed | `order_id`, `reason` |
+| `gift_preferences_updated` | Someone changed their Email preferences | `offer_emails` (on/off) |
+| `admin_signin_link_resent` | A super user resent someone's sign-in link | `customer_id` |
+| `admin_theme_updated` / `admin_category_updated` / `admin_version_updated` | Theme library edits | `theme_slug` / `category` / `version_slug` |
 | `card_recipient_email_bounced` | Recipient email bounced | `card_id` |
 | `card_recipient_unsubscribed` | "Don't email me cards" | `card_id` |
 
@@ -180,6 +187,7 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 
 - Never send the message text, recipient name or recipient email as event properties. Send `message_length`, `has_recipient_email`, `scheduled` instead.
 - Replay masks every text input by default and masks the live card preview (it shows the message).
+- No personal data in URLs. Sign-in tokens are stripped by redirect, and admin pages use opaque ids. PostHog's `before_send` also drops the path token and query string on `/g/`, `/email-preferences/` and `/c/` pages.
 - Customer `email` is used only as the PostHog identity, as on the main site.
 - Respect the main site's consent setting; don't start replay before consent where it's required.
 
@@ -208,6 +216,7 @@ Everything else (`page_view_*`, taps, filters, UI-only events) goes to PostHog o
 
 ## 10. Definition of done for the build
 
-- Every new screen fires its `page_view_*` and its action events with the properties above.
+- Every customer page fires its `page_view_*` (list below) and its action events with the properties above. Settings pages fire `settings_viewed` with `section` instead.
+- Page views not listed elsewhere: `page_view_vault_order` (order detail; `order_id`, `mug_present`, `downloads_enabled`), `page_view_card_creating` (`card_id`), `page_view_email_preferences`, `page_view_card_unsubscribe` (`card_id`), `page_view_vault_empty` (nobody found). Old redeem links (`/redeem`) fire the live name `page_view_redeem`.
 - Events checked in PostHog Live events with a test account (in the test-account cohort).
 - No personal message content in any event or replay.

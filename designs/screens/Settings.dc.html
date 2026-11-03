@@ -57,7 +57,7 @@ a{color:#B8059F}a:hover{color:#8E047B}
 <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
 <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
 <section style="background: #FFFFFF; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
-<h2 style="margin: 0; font-size: 17px; font-weight: 800">Gift cards</h2>
+<h2 style="margin: 0; font-size: 17px; font-weight: 800">Greeting cards</h2>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px">
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 12px; background: #FAF8F5"><span style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 700">Cards live</span><span style="font-size: 12px; color: rgba(0,0,0,0.6)">cards.enabled</span></span><button type="button" role="switch" aria-checked="true" aria-label="Cards live" style="flex: none; width: 48px; height: 28px; border-radius: 999px; border: 0; background: #DD07C4; padding: 3px; display: flex; justify-content: flex-end; cursor: pointer"><span style="width: 22px; height: 22px; border-radius: 999px; background: #FFFFFF"></span></button></div>
 <div style="display: flex; flex-direction: column; gap: 4px"><label for="s-unlock" style="font-size: 13px; font-weight: 700">Who can create cards</label><select id="s-unlock" style="min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #FFFFFF; font: inherit; font-size: 14px"><option>Customers with an order</option><option>Everyone with a portrait</option></select></div>
@@ -126,9 +126,9 @@ class Component extends DCLogic {
         { key: 'auth.code_valid_minutes', value: '10', type: 'Number', updated: 'Gavin · 1 Nov' },
         { key: 'vault.first_order_offer', value: '[OFFER]', type: 'Text', updated: 'Gideon · 31 Oct' },
         { key: 'themes.in_season_days_before', value: '45', type: 'Number', updated: 'Gavin · 31 Oct' },
-        { key: 'redeem.download_products', value: '3 Shopify products + hires add-on', type: 'List', updated: 'Gavin · 3 Nov' },
+        { key: 'redeem.download_product_ids', value: '3 Shopify products (+ hires add-on rule)', type: 'List', updated: 'Gavin · 3 Nov' },
         { key: 'redeem.mug_variant_id', value: '46177764769988', type: 'Shopify ID', updated: 'Gavin · 3 Nov' },
-        { key: 'redeem.mug_metafield', value: 'custom.mug_choice', type: 'Text', updated: 'Gavin · 3 Nov' },
+        { key: 'redeem.mug_metafield_key', value: 'mug_choice', type: 'Text', updated: 'Gavin · 3 Nov' },
         { key: 'redeem.mug_ready_tag', value: 'mug:ready', type: 'Text', updated: 'Gavin · 3 Nov' }
       ],
       supers: [

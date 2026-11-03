@@ -17,7 +17,6 @@ This is the reference for every external read and write the vault (`my.magicport
 
 | `SHOPIFY_STORE_DOMAIN` | `<shop>.myshopify.com`. **UNVERIFIED value**: the live code reads it from env and it was not visible |
 | `SHOPIFY_ADMIN_ACCESS_TOKEN` | Admin API token of the existing custom app "r_orders" |
-| `SHOPIFY_API_VERSION` | defaults to the `vault.shopify_api_version` setting |
 | `SHOPIFY_WEBHOOK_SECRET` | HMAC secret for the `orders/paid` webhook |
 
 The live site authenticates differently. Its redeem functions use `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET` and `SHOPIFY_STORE_DOMAIN` with a `client_credentials` grant to `https://{domain}/admin/oauth/access_token`, and cache the token for 5 minutes. The vault does not copy this. It uses the r_orders token.
@@ -56,7 +55,7 @@ The live site authenticates differently. Its redeem functions use `SHOPIFY_CLIEN
                                     (mug lock state, keyed by Shopify mug line item id)
 ```
 
-The vault reads all three sources live. It copies nothing except the cached lookup in `vault_members.imagen_session_ids` (`schema.md`).
+The vault reads all three sources live. It copies nothing except the cached lookup in `vault_members.imagen_sessions` (`schema.md`).
 
 ---
 
@@ -99,7 +98,7 @@ CREATE INDEX analytics_events_mirror_device_created_idx ON public.analytics_even
 
 There is **no index on `lower(email)`**.
 
-**RLS:** enabled. There are two policies: `"anon read"` (roles `{public}`, SELECT, `USING (true)`) and `"service role full access"` (`{service_role}`, ALL, `true`). Anyone holding this project's anon key can read every event, including emails (section 8, item 12). The vault reads with the service-role key on the server.
+**RLS:** enabled. There are two policies: `"anon read"` (roles `{public}`, SELECT, `USING (true)`) and `"service role full access"` (`{service_role}`, ALL, `true`). Anyone holding this project's anon key can read every event, including emails (section 8, item 12). The app reads with the read-only `vault_reader` role on the server (see the decision at the top of this file).
 
 **Freshness:** a sync job fills the mirror. It ran 96 times in the last 24 h, so roughly every 15 minutes. The newest mirrored event was 8 minutes old when checked. Expect up to about 15 minutes of lag, so a portrait made a moment ago may not show yet.
 
@@ -426,9 +425,12 @@ order by i.created_at desc, i.session_id, i.tile_index nulls first;
 **Final `ordered` flag in the vault:**
 
 ```
-ordered = r.ordered
-       OR image_id ∈ { lineTileId of every line in this email's Shopify orders }
+ordered = ( r.ordered
+            OR image_id ∈ { lineTileId of every line in this email's Shopify orders } )
+          AND NOT every matching order is cancelled or fully refunded
 ```
+
+**Cancelled and refunded orders don't count** (decided: SPEC Q5). An order is excluded when `cancelledAt` is set or `displayFinancialStatus` is `REFUNDED` or `VOIDED`. For `revenue_events` rows, look up `shopify_order_ids` in this email's Shopify order list. If an order isn't in that list (it was placed on another email), count it as ordered. The same rule decides whether someone has the free gift (`gift.unlock_rule`, SPEC §8.3).
 
 Here `lineTileId = _tile_id ?? (_masterpiece === 'true' ? _image_id : undefined)`, the same rule as 6.3. When ordered, show the Shopify order. Prefer the vault's own order list, matching legacy ids from `shopify_order_ids` to `Order.legacyResourceId`, so the order `name` (`#1001`) can be shown.
 
@@ -675,7 +677,7 @@ The vault's own event names and properties live in `analytics.md`. Should the va
 
 ### 5.1 Connection
 
-- `POST https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}/graphql.json`
+- `POST https://{SHOPIFY_STORE_DOMAIN}/admin/api/{vault.shopify_api_version}/graphql.json` (the version is a setting, not an env var)
 - Headers: `Content-Type: application/json` and `X-Shopify-Access-Token: <SHOPIFY_ADMIN_ACCESS_TOKEN>`. This is the r_orders custom app token, server-side only.
 - Version: `2025-07`, the same as live (setting `vault.shopify_api_version`).
 - Every query below was **validated by running it** against the Shopify MCP's pinned Admin schema, which is newer than 2025-07. Each run used a placeholder email or id and returned no rows.
@@ -707,7 +709,7 @@ query VaultOrdersByEmail($search: String!, $first: Int!, $after: String) {
         cancelledAt
         test
         email
-        customer { id defaultEmailAddress { emailAddress } }
+        customer { id firstName lastName defaultEmailAddress { emailAddress } }
         displayFinancialStatus
         displayFulfillmentStatus
         tags
@@ -773,7 +775,7 @@ query VaultOrderForRedeem($id: ID!) {
     legacyResourceId
     name
     email
-    customer { id defaultEmailAddress { emailAddress } }
+    customer { id firstName lastName defaultEmailAddress { emailAddress } }
     cancelledAt
     displayFinancialStatus
     displayFulfillmentStatus
@@ -1115,7 +1117,7 @@ Use the names in `analytics.md`. The legacy names and properties in 4.7 are for 
 2. **Deployed edge functions = repo HEAD.** Reading project `afqxjwizbmpzmvzzkzdb` was not permitted. The event data supports the code as read.
 3. **Mug lock cut-off.** Where does the mug pipeline run? (No edge functions were found in `kztxlpfrullqzphkvkiv`.) After which state does it stop applying a new `custom.mug_choice`? Does it filter on `source`? What do `manual_approval` values mean for the customer? The proposed default is in 6.6.
 4. **`lower(email)` expression index on the mirror** (2.4). It needs the project owner's approval; it was not created. Without it, 876 emails (2.3%) stored only in mixed case are missed unless the typed spelling matches.
-5. **Read-only database role.** Should the vault get a read-only Postgres role, or a narrow RPC, for both projects instead of the service-role key? The service-role key can also write.
+5. ~~Read-only database role.~~ **Decided:** the read-only `vault_reader` role (`BUILD.md` step 3); no service-role keys.
 6. **Include recommendation child sessions?** They are not in the mirror. The default here is yes.
 7. **Optional browser-session expansion** (2.5). Its size is unknown, and it carries a shared-device risk.
 8. **Shopify `email:` search.** Is it case-insensitive? Should it be combined with a `customer_id:` search?
@@ -1123,7 +1125,7 @@ Use the names in `analytics.md`. The legacy names and properties in 4.7 are for 
 10. **`Customer.defaultEmailAddress` in `2025-07`.** Confirmed in the newer pinned schema only.
 11. **Deep link.** Does `/order?...&session={lptemp_session_id}` still work for old sessions? It depends on `get-user-session-by-id` and the main site's `user_sessions` table on `afqxjwizbmpzmvzzkzdb`, which was not read.
 12. **Image hosts.** Is `redeem.allowed_image_hosts` complete? It is based on the last 300 orders.
-13. **Legacy event names.** Should the vault also emit the live `redeem_*` events (4.7) for dashboard continuity, on top of the `analytics.md` names?
+13. ~~Legacy event names.~~ **Decided:** keep the live `redeem_*` names (`analytics.md`, Orders, downloads & mugs).
 14. **"Is a customer" status set** (5.2). This is a product decision.
 15. **PostgREST variants** in 2.4 and 3.6 were not executed. The SQL versions were run (EXPLAIN ANALYZE) on live data.
-16. **Revenue events and refunds.** `revenue_events` has no refund or cancel state. Should "ordered" exclude cancelled or refunded orders? The vault can check `cancelledAt` and `displayFinancialStatus` on the matched Shopify order.
+16. ~~Revenue events and refunds.~~ **Decided:** cancelled and fully refunded orders don't count (§3.6).

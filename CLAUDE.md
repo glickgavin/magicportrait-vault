@@ -56,6 +56,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
   
   Never write to Imagen, the events mirror or the live site's databases.
 - Every external source sits behind an interface in `lib/sources/` with a `fixtures` implementation. Tests and local dev use fixtures (`DATA_SOURCE=fixtures`); fixtures contain made-up people only.
+- Our own database: tests, previews and local dev use the **dev** project (`magic-vault-dev`). Production (`magic-vault`) gets migrations and the production seed only.
 
 **No hard-coding**
 - Anything a super user might change lives in `settings`, declared once in `lib/settings/registry.ts` with type, default and validation. This covers ids, limits, copy toggles, product lists, links and timings.
@@ -65,11 +66,13 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 - Every customer action re-checks on the server that the signed-in email owns the thing (card, order) and that the action is allowed: mug present and not locked; downloads enabled.
 - No debug fields in responses. Never return another person's email or data. Error messages don't reveal whether an email or order exists.
 - Downloads and card images use short-lived signed URLs or app routes that check access. Never hand out permanent public links to private files.
-- Only `NEXT_PUBLIC_*` values reach the browser, and those are the Supabase URL and anon key, the PostHog key and host. No other keys in client code.
+- Only `NEXT_PUBLIC_*` values reach the browser, and those are the Supabase URL and anon key, the PostHog key and host, and the Intercom app id. No other keys in client code.
 - RLS on every table in our database, deny by default. The browser never queries tables directly.
 - Verify Shopify and Resend webhook signatures. Make webhook handlers idempotent.
 - `/settings/*` and `/api/admin/*` return 404 unless `is_super_user(email)`.
-- Gift links are HMAC-signed with `GIFT_LINK_SECRET` and checked with a constant-time compare. Share slugs are random, 16+ chars.
+- Sign-in link tokens (`/g/[token]`) and email-preferences tokens are random, 32+ bytes, and stored only as `HMAC(GIFT_LINK_SECRET, token)`. They expire, and they're stripped from the address by a redirect after use. Share slugs are random, 16+ chars.
+- No emails or tokens in URLs. Admin pages use opaque ids (`vault_members.id`).
+- The thank-you pop-up's link endpoint accepts only a verified Shopify checkout session token for a recent order, never a bare order number.
 - Rate-limit code requests, lookups and downloads per email and IP.
 
 **Privacy**

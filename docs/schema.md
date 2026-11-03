@@ -36,16 +36,20 @@ Master data and variables, edited in Settings. Secrets never go here.
 Seed: `gavin@storyboards.io`, `gideon@storyboards.io` (added_by `seed`).
 
 ### vault_members
-One row per person who has signed in.
+One row per person we know: someone who signed in, got a free gift offer, or was looked up by a super user.
 
 | column | type | notes |
 |---|---|---|
+| id | uuid unique not null default gen_random_uuid() | opaque id used in admin URLs (`/settings/customers/[id]`) |
 | email | text pk | |
+| created_via | text not null | `sign_in` · `gift_offer` · `admin_lookup` |
+| first_signed_in_at | timestamptz null | null until they first sign in |
+| prefs_token_hash | text unique null | for `/email-preferences/[token]` |
 | display_name | text | from Shopify customer, else null |
 | shopify_customer_id | text | |
 | is_customer | boolean not null default false | has at least one paid order |
 | first_order_at | timestamptz | |
-| imagen_session_ids | text[] not null default '{}' | cached lookup |
+| imagen_sessions | jsonb not null default '[]' | cached lookup: `[{imagen_session_id, lptemp_session_id}]` (the lptemp id builds the "Order as wall art" link) |
 | portrait_count | int | cached |
 | lookup_refreshed_at | timestamptz | the cache is 10 minutes |
 | first_seen_at, last_seen_at | timestamptz | |
@@ -107,7 +111,7 @@ Kept forever. Rows are deleted only by a data-deletion request.
 | status | text | `rendering` · `ready` · `scheduled` · `emailed` · `opened` · `failed` · `cancelled` |
 | share_hidden | boolean default false | set by super users |
 | render_ms | int | |
-| entry_point | text | `order_email` · `thankyou_popup` · `site_menu` · `vault_home` · `my_cards` |
+| entry_point | text | `order_email` · `thankyou_popup` · `reminder_email` · `site_menu` · `home` · `my_cards` · `my_portraits` · `order_page` · `make_another` · `use_again` (same list as the `entry_point` property in `docs/analytics.md`) |
 | gift_offer_id | uuid null fk → gift_offers | |
 | reused_from | uuid null fk → cards | "Use again" |
 
@@ -118,7 +122,7 @@ Indexes: `(sender_email, created_at desc)`, `(status, scheduled_for)`, `(created
 
 ### gift_offers
 One per Shopify order: the free gift offer email and the pop-up link.
-`id uuid pk`, `shopify_order_id text unique`, `order_name`, `email`, `send_after timestamptz`, `sent_at`, `email_opened_at`, `first_used_at`, `status` (`pending` · `sent` · `skipped` · `failed`), `skip_reason`.
+`id uuid pk`, `shopify_order_id text unique`, `order_name`, `email`, `paid_at timestamptz`, `send_after timestamptz`, `sent_at`, `email_opened_at`, `first_used_at`, `status` (`pending` · `sent` · `skipped` · `failed`), `skip_reason`, `token_hash text unique` (hash of the opaque `/g/[token]` value; the token itself is never stored), `token_expires_at timestamptz`.
 
 ### activity_log
 Append-only. Kept forever, except for anonymisation on a deletion request.
@@ -138,7 +142,10 @@ Append-only. Kept forever, except for anonymisation on a deletion request.
 Indexes: `(email, occurred_at desc)`, `(event, occurred_at desc)`, `(occurred_at desc)`, `(ref_type, ref_id)`. Block `update` and `delete` for all roles except the deletion function.
 
 ### email_suppressions
-`email text pk`, `reason` (`unsubscribe` · `bounce` · `complaint` · `deletion`), `created_at`.
+`email text`, `scope` (`card_emails`: the recipients' "Don't email me cards" · `offer_emails`: offer and reminder emails, from Email preferences · `all`: bounce, complaint or deletion), `reason` (`unsubscribe` · `bounce` · `complaint` · `deletion`), `created_at`. Primary key `(email, scope)`.
+
+### rate_limits
+`key text`, `window_start timestamptz`, `count int`, primary key `(key, window_start)`. A function `hit_rate_limit(key, window_seconds, max)` does an atomic upsert and returns whether the call is allowed. A cron job deletes windows older than a day. Keys look like `code:<email-hash>`, `code-ip:<ip-hash>`, `download:<email-hash>`, `offer-link:<ip-hash>`.
 
 ### data_requests
 `id uuid pk`, `email`, `type` (`export` · `delete`), `requested_by`, `status`, `completed_at`, `notes`.
@@ -187,19 +194,31 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `cards.footer_text` | "Made with Magic Portraits AI" |
 | `gift.offer_email_enabled` | false |
 | `gift.popup_enabled` | false |
+| `gift.popup_window_minutes` | 60 (the pop-up link only works this long after payment) |
 | `gift.reminder_email_enabled` | false |
 | `gift.reminder_days_before` | 14 |
-| `gift.unlock_rule` | any_paid_order |
-| `gift.link_valid_days` | 0 (never expires) |
+| `gift.reminder_skip_if_card_within_days` | 60 |
+| `gift.unlock_rule` | any_paid_order (or qualifying_products) |
+| `gift.qualifying_product_ids` | [] |
+| `gift.link_valid_days` | 30 |
 | `gift.offer_email_delay_minutes` | 0 |
+| `redeem.downloads_enabled` | true (kill switch) |
+| `redeem.mug_offer_active` | true (off = the mug choice is read-only) |
+| `redeem.mug_lock_mode` | print_status (or days_after_order) |
+| `redeem.mug_lock_days` | 14 (used with days_after_order) |
 | `auth.code_valid_minutes` | 10 (must match the Supabase Auth OTP expiry; Settings shows it read-only with that note) |
 | `vault.first_order_offer` | "" |
 | `vault.lookup_cache_minutes` | 10 |
 | `themes.in_season_days_before` | 45 |
 | `brand.support_email` | "" |
-| `email.from_address` | "" |
-| `email.reply_to` | "" |
+| `email.from_offers` | "Magic Portraits <hello@magicportraits.ai>" (proposed, SPEC Q10) |
+| `email.from_cards` | "{from} via Magic Portraits <cards@magicportraits.ai>" (proposed) |
+| `email.reply_to` | "support@magicportraits.ai" (proposed) |
 | `links.main_site_url` | "https://magicportraits.ai" |
 | `links.start_portrait_url` | (from `docs/data.md`) |
+| `links.menu_thumbnails` | [] (six image URLs for the menu's product list; placeholders until set, SPEC Q9) |
 
-- The four categories, and themes Christmas, Happy Holidays, New Year, Birthday, Thank you, With love and Congratulations, each with one **draft** version, a plain placeholder background (generated solid colour plus a headline) and a default layout. The 10 versions in the designs (`CardPreview` variants) are the target set; real artwork comes from the designers (`ThemeSpec`).
+- The four categories, and themes Christmas, Happy Holidays, New Year, Birthday, Thank you, With love and Congratulations. Each has one version with a plain placeholder background (a generated solid colour plus a headline) and a default layout. The 10 versions in the designs (`CardPreview` variants) are the target set; real artwork comes from the designers (`ThemeSpec`).
+- **Two seed files:**
+  - `supabase/seed.sql` (production): every version is **draft**, and every `cards.enabled` and `gift.*` switch is off.
+  - `supabase/seed.dev.sql` (dev project, previews and tests): one **live** version per category, `cards.enabled = true`, and fixture people. The e2e tests have something to pick.

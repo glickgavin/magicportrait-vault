@@ -9,11 +9,17 @@ The whole app is built in a single Claude Code run. It works through the parts b
 These need an account owner. The build checks each one in Part 0. Anything missing is replaced with test data and listed in `BUILD_LOG.md`, so the build still runs; that part just can't go live until it's fixed.
 
 1. **GitHub.** Done: `glickgavin/magicportrait-vault`, with this build pack committed.
-2. **Supabase: new project** `magic-vault` in the Storyboards org, same region as `imagegen-prod`. Then, in Auth settings:
+2. **Supabase: two new projects** in the Storyboards org, same region as `imagegen-prod`:
+   - `magic-vault` (production)
+   - `magic-vault-dev`, used for local development, Vercel previews and every test. The build never touches production data.
+   
+   In both, in Auth settings:
    - Email OTP length 6, expiry 600 s.
    - The "Magic Link" and "Confirm signup" email templates show `{{ .Token }}` (the code), not a link.
-   - Site URL `https://my.magicportraits.ai`.
+   - Site URL `https://my.magicportraits.ai` (dev: the preview URL).
    - Custom SMTP: Resend (step 4).
+   
+   For Claude Code to run migrations, also create a Supabase personal access token. Put it, with both project refs and database passwords, in the Claude Code environment (not Vercel): `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF_DEV`, `SUPABASE_PROJECT_REF_PROD`, `SUPABASE_DB_PASSWORD_DEV`, `SUPABASE_DB_PASSWORD_PROD`.
 3. **Read-only access to Imagen and the events mirror.** Run this in the SQL editor of **imagegen-prod** and of **shopify-dailyreport**, keeping only the `grant`/`policy` lines for tables in that project. Use a long generated password.
    ```sql
    create role vault_reader with login password '<long random password>';
@@ -42,10 +48,11 @@ These need an account owner. The build checks each one in Part 0. Anything missi
    - The webhook itself is registered after the build (see After the build).
 6. **Vercel.**
    - New project in the Storyboards team, linked to the repo.
-   - Add every variable in `.env.example` for Production and Preview.
+   - Add every variable in `.env.example`: Production gets the `magic-vault` keys, Preview gets the `magic-vault-dev` keys.
    - Add the domain `my.magicportraits.ai`.
    - In Cloudflare, add a CNAME `my` → `cname.vercel-dns.com`, DNS only (grey cloud).
 7. **PostHog.** The project key for project 540098 (the one the main site uses). Optional: a personal API key, so Settings › Tracking can show counts and the setup script can create dashboards.
+8. **Intercom.** The app id the main site uses for "Chat With Us" (`NEXT_PUBLIC_INTERCOM_APP_ID`).
 
 ---
 
@@ -57,7 +64,7 @@ Open Claude Code in the repo and paste:
 >
 > - For each part: build it, write its tests, run `pnpm typecheck && pnpm lint && pnpm test` (and the e2e suite when the part adds screens), fix until green, commit `feat(part-N): <name>`, push, and update `BUILD_LOG.md`.
 > - Don't stop to ask questions. If something is missing (a secret, a permission, an unclear rule), use the fixture or the most reasonable reading, write it in `BUILD_LOG.md` under "Blocked" or "Decisions", and continue.
-> - Never turn on `cards.enabled` or any `gift.*` switch, never send email to anyone but the test address in `SMOKE_TEST_EMAIL`, and never write to Shopify except the mug choice on a test order named in `SMOKE_TEST_ORDER` (skip it if that isn't set).
+> - Run migrations, seeds and every test against the **dev** project (`magic-vault-dev`). In **production** (`magic-vault`), apply migrations and `supabase/seed.sql` only, and never turn on `cards.enabled` or any `gift.*` switch. Never send email to anyone but the test address in `SMOKE_TEST_EMAIL`. Never write to Shopify except the mug choice on a test order named in `SMOKE_TEST_ORDER` (skip it if that isn't set).
 > - If `BUILD_LOG.md` already exists, you are resuming: read it and continue from the first unfinished part.
 
 ---
@@ -88,8 +95,9 @@ Each part lists what to build and what has to be true before it's committed.
 - **Done when** a placeholder `/` renders the shell at 360, 390 and 1280 px and matches `VaultHome`'s header, menu and footer; axe shows no violations.
 
 ### Part 2: Database and settings
-- Migrations for everything in `docs/schema.md`: tables, checks, indexes, RLS, `is_super_user`, `settings_history` trigger, the activity_log append-only guard, buckets.
-- `supabase/seed.sql`.
+- Migrations for everything in `docs/schema.md`: tables, checks, indexes, RLS, `is_super_user`, `settings_history` trigger, the activity_log append-only guard, `rate_limits` with `hit_rate_limit()`, buckets.
+- `supabase/seed.sql` (production: drafts, switches off) and `supabase/seed.dev.sql` (dev: one live version per category, `cards.enabled` on, fixture people).
+- Apply to `magic-vault-dev` with the Supabase CLI (`supabase link` + `db push`, using the `SUPABASE_*` variables). Apply to production at the end of Part 13.
 - `lib/settings/registry.ts` with every key from `docs/schema.md` § Seed and `docs/data.md` § Constants, plus typed `getSetting`/`setSetting` (short cache, validation, history).
 - `track()` now also writes `activity_log` for business events.
 - **Done when** migrations apply cleanly to a fresh database and the seed loads; unit tests cover settings validation, history and the activity_log guard.
@@ -103,13 +111,14 @@ Each part lists what to build and what has to be true before it's committed.
 
 ### Part 4: Sign-in and account
 - `/signin` (email → 6-digit code, resend, change email, `purpose=gift|redeem`).
-- `/g/[token]` signed links (sign, verify, expiry from settings, server-side session exchange).
-- `/redeem` → `RedeemEntry`.
-- Middleware; avatar and initials; account menu; sign out (with `posthog.reset()`); super-user guard; rate limits.
+- `/g/[token]` links: random opaque tokens, stored hashed on `gift_offers`, expiry from `gift.link_valid_days`. A server-side session exchange, then a redirect that strips the token from the address.
+- `/redeem`, `/redeem?order=…` and `/redeem/[order]` → `RedeemEntry`. A wrong or unknown order shows one generic message.
+- Middleware; avatar and initials; account menu; sign out (with `posthog.reset()`); super-user guard; rate limits via `hit_rate_limit()`.
 - **Done when**:
-  - e2e signs in with a code, using the local Supabase mail catcher
-  - token tests cover valid, expired, tampered and wrong-secret
-  - a non-super user gets 404 on `/settings`.
+  - e2e signs in with a 6-digit code, fetched in the test through the Supabase admin API (`auth.admin.generateLink` returns `email_otp`) against the dev project. No Docker or mail catcher is needed.
+  - token tests cover valid, expired, unknown and reused-after-expiry
+  - a non-super user gets 404 on `/settings`
+  - the address bar never shows a token after sign-in.
 
 ### Part 5: Home and My portraits
 - `/` for the customer, the creator (`VaultGuest`, with locked cards and the first-order offer) and nobody (empty state).
@@ -126,24 +135,27 @@ Each part lists what to build and what has to be true before it's committed.
   4. render the JPEG with `@napi-rs/canvas` (`cards.jpeg_quality`, `cards.footer_text`)
   5. save it.
 - `/create/creating/[id]` and the ready state (share sheet, download, copy link, app buttons).
-- `/c/[slug]` public page and image route; `share_hidden` handling.
+- `/c/[slug]` public page and image route; `share_hidden` handling; `/c/[slug]/try` (logs the tap, then redirects with the UTM tags).
+- `POST /api/track` for business events from the browser (allow-listed names; email from the session only).
 - **Done when**:
   - the renderer has golden-image tests for each seed version (small pixel tolerance) and a test that long messages shrink and never overflow
-  - e2e covers both deliveries (email and self)
+  - e2e covers both deliveries: self, and email up to a queued `card_deliveries` row. Sending is tested in Part 7.
   - a `/g/[token]` link lands on step 1
   - `cards.enabled=false` and the `cards.who_can_create` and `cards.per_customer` rules work.
 
 ### Part 7: Email and delivery
 - React Email templates:
   - `gift-offer` (`Main`)
+  - `gift-reminder` (seasonal reminder, same style)
   - `card-delivery` (`RecipientEmail`)
-  - `signin-code` (for Supabase SMTP, in the same style)
-  - `card-scheduled` (confirmation to the sender).
-- Sending through Resend, with `cards.email_sender_name` and `email.*` settings.
+  - `card-scheduled` (confirmation to the sender)
+  - `signin-code` (for Supabase SMTP, same style)
+  - `signin-link` (when a super user resends someone's link).
+- Sending through Resend, with `cards.email_sender_name`, `email.from_offers`, `email.from_cards` and `email.reply_to`.
 - Cron `/api/cron/send-scheduled` every 5 minutes.
 - `/api/webhooks/resend` updates `card_deliveries`, card status and `email_suppressions`.
-- Unsubscribe link and page.
-- My cards (`/cards`) with Use again, Resend, Download, Copy link and Cancel.
+- The recipients' "Don't email me cards" page, and `/email-preferences/[token]` for offer and reminder emails (the `Main` footer's "Email preferences" link).
+- My cards (`/cards`) with Use again, Resend, Download, Copy link, and **Change** or **Cancel** for scheduled cards. Change reopens the builder on that card, re-renders it and keeps or updates the time.
 - **Done when** there are template snapshot tests, webhook signature and idempotency tests, and a cron test with a fake clock; one real test email goes to `SMOKE_TEST_EMAIL` if set.
 
 ### Part 8: Orders, downloads and mugs
@@ -159,10 +171,19 @@ Each part lists what to build and what has to be true before it's committed.
 ### Part 9: Free gift offer
 - `/api/webhooks/shopify/orders-paid`: HMAC check, idempotent, creates `gift_offers`, respects every switch and `gift.unlock_rule`.
 - Cron `/api/cron/send-gift-offers`.
-- `GET /api/gift/offer-link` for the thank-you pop-up, and "Later, email me the link".
+- `POST /api/gift/offer-link` for the thank-you pop-up:
+  - accepts only a Shopify checkout-extension session token verified with the app secret, for an order paid within `gift.popup_window_minutes`
+  - rate-limited
+  - never a bare order number.
+- "Later, email me the link".
+- Non-qualifying orders are recorded as `skipped`, with the reason.
 - Seasonal reminder: cron `/api/cron/send-reminders`, using `gift.reminder_*` and `theme_categories.reminder_enabled`.
 - `scripts/register-shopify-webhook.ts`: written but **not run**.
-- **Done when** tests show that with the switches off nothing is sent, with them on exactly one offer is sent per order, and replayed webhooks are ignored.
+- **Done when** tests show that:
+  - with the switches off, nothing is sent
+  - with them on, exactly one offer is sent per qualifying order
+  - replayed webhooks are ignored
+  - the offer-link endpoint rejects a missing, forged or expired session token and an old order.
 
 ### Part 10: Settings
 - `AdminShell` and every Settings page in `SPEC.md` §13 (Setup, Greeting cards, Redeem, System).
@@ -180,7 +201,7 @@ Each part lists what to build and what has to be true before it's committed.
 
 ### Part 11: Insights
 - `/settings/insights` (KPIs with period comparison, cards per day, funnel, top themes, live feed).
-- `/settings/customers` search and the merged timeline (activity_log + live Shopify + live Imagen).
+- `/settings/customers` search (sent in the request body) and `/settings/customers/[id]` with the opaque `vault_members.id`. Looking someone up creates their row with `created_via = 'admin_lookup'`. Then the merged timeline (activity_log + live Shopify + live Imagen).
 - `/settings/cards`:
   - filters and CSV export
   - card detail with timeline; resend, hide link and download
@@ -195,7 +216,7 @@ Each part lists what to build and what has to be true before it's committed.
 - Replay masking checked.
 - `scripts/posthog-setup.ts` creates the dashboards and funnels in `docs/analytics.md` § 5. Run it only if `POSTHOG_PERSONAL_API_KEY` is set.
 - **Done when**:
-  - a test asserts every page fires its `page_view_*`
+  - a test asserts every customer page fires its `page_view_*` and every Settings page fires `settings_viewed`
   - a check fails the build on any event name not in the list
   - no message text appears in any captured event (there's a test for this).
 
@@ -204,6 +225,7 @@ Each part lists what to build and what has to be true before it's committed.
 - Walk the security list in `CLAUDE.md`, item by item, and record the results in `BUILD_LOG.md`.
 - Search the client bundle for secret prefixes.
 - Lighthouse on `/`, `/create` and `/orders` (mobile): performance ≥ 85, accessibility ≥ 95.
+- Apply the migrations and `supabase/seed.sql` to production (`magic-vault`), with every switch off.
 - Deploy a Vercel preview.
 - Screenshot every route at 390 px into `docs/build-screens/` (fixture data only).
 - **Done when** `BUILD_LOG.md` ends with:

@@ -31,7 +31,7 @@ These are the approved mockups. File names still say "Vault" (the internal code 
 | **Settings (super users)** | | |
 | `Settings` | General & variables | `/settings` |
 | `AdminInsights` | Dashboard | `/settings/insights` |
-| `AdminCustomer` | Customer activity timeline | `/settings/customers`, `/settings/customers/[email]` |
+| `AdminCustomer` | Customer activity timeline | `/settings/customers`, `/settings/customers/[id]` (opaque id, never the email) |
 | `AdminCards` | All cards | `/settings/cards` (`?card=`) |
 | `AdminThemes` | Theme library | `/settings/themes` |
 | `AdminTemplate` | Template editor | `/settings/themes/[themeId]/versions/[versionId]` |

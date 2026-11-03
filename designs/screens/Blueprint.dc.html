@@ -94,8 +94,8 @@ class Component extends DCLogic {
     };
     const tables = [
       { s: 'fresh', name: 'settings + super_users', note: 'new, edited in Settings', cols: ['settings: key, value (json), type', 'settings_history: who, old → new, when', 'super_users: email, added_by', '(seed: gavin@, gideon@storyboards.io)', 'vault_members: email, last_seen_at'] },
-      { s: 'fresh', name: 'themes', note: 'new', cols: ['id, name, slug', 'category: Holidays | New Year | Birthdays | General', 'available_from / to', 'sort_order', 'status: live | scheduled | draft'] },
-      { s: 'fresh', name: 'theme_versions', note: 'new', cols: ['id, theme_id, name', 'background_url (JPEG/PNG)', 'overlay_url (PNG, optional)', 'layout_json (photo + text zones)', 'suggestions[], is_new, status'] },
+      { s: 'fresh', name: 'themes', note: 'new', cols: ['id, name, slug', 'category: Holidays | New Year | Birthdays | General', 'available_from / to, repeats_yearly', 'sort_order', 'status: draft | live | archived'] },
+      { s: 'fresh', name: 'theme_versions', note: 'new', cols: ['id, theme_id, name', 'background_path (JPEG/PNG)', 'overlay_path (PNG, optional)', 'layout (photo + text zones)', 'suggestions[], is_new, status'] },
       { s: 'existing', name: 'Existing data, read only', note: 'no new connections', cols: ['dailyreport.analytics_events_mirror: email → imagegen_session_id', 'imagegen.sessions + images: every portrait', 'imagegen.revenue_events: image → Shopify order', 'Shopify r_orders app: orders by email', 'imagegen.themes: theme name'] },
       { s: 'fresh', name: 'cards', note: 'new, kept forever', cols: ['id, public_id, share_slug', 'sender_email, from_name, to_name', 'recipient_email, message', 'version_id, imagen_image_id', 'portrait_path (copy), jpeg_path', 'delivery, scheduled_for, status'] },
       { s: 'fresh', name: 'activity_log + deliveries', note: 'new, kept forever', cols: ['activity_log: email, event, source, ref_id, props, at', 'sources: My MP · Shopify · Imagen · email', 'card_deliveries: card, type, sent/opened', 'staff views of a card are logged too', 'cards + JPEGs never auto-deleted'] }
@@ -105,7 +105,7 @@ class Component extends DCLogic {
       { title: 'One flow: Create a card', body: 'Sign-in is a 6-digit email code inside the flow; order emails carry a signed link that skips it. The email finds Shopify orders and every Imagen session.' },
       { title: 'Ordered vs not', body: 'Read live, never copied: an image is "ordered" when it appears in a Shopify line item. Unordered ones show an "Order as wall art" button.' },
       { title: 'Gift unlocks on order', body: 'Free cards unlock with the first Shopify order; creators see them locked as an incentive.' },
-      { title: 'Server-side render', body: 'A Vercel function draws the JPEG from the version’s layout_json and saves it to Supabase Storage.' },
+      { title: 'Server-side render', body: 'A Vercel function draws the JPEG from the version’s layout and saves it to Supabase Storage.' },
       { title: 'Redeem moves in', body: 'Orders, downloads and mug choice live behind sign-in. Mug choice is saved to the Shopify order (custom.mug_choice + mug:ready tag) and locks once printed.' }
     ];
     return { flow, tables, rules };
