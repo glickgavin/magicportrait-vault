@@ -9,7 +9,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 | 0 | Preflight | done |
 | 1 | App shell | done |
 | 2 | Database and settings | done |
-| 3 | Data sources | pending |
+| 3 | Data sources | done (Test buttons UI lands with Settings, Part 10) |
 | 4 | Sign-in and account | pending |
 | 5 | Home and My portraits | pending |
 | 6 | Card builder and renderer | pending |
@@ -53,6 +53,14 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - `scripts/db-apply-remote.ts` applied the migration and `seed.sql` to **magic-vault** (3 Nov). Re-running is a no-op. Result: all six launch switches false, 0 live theme versions.
 - Tests: registry validation, seed sync and idempotency, and integration tests on the local stack (history, append-only guard, anonymisation, outbox dedupe, rate limit, super-user check, RLS denies the browser key).
 
+## Part 3: Data sources
+
+- `lib/sources/`: `ShopifySource`, `MirrorSource`, `ImagenSource` interfaces; live clients (`shopify-live.ts` with the exact §5 queries, line-item paging, throttle retry; `pg-live.ts` with the §2.4 and §3.6 SQL through `postgres`, `prepare: false`, read-only role) and fixtures (`fixtures.ts`, `fixtures-data.ts`: six made-up people, generated cartoon portraits in `public/fixtures/portraits`). Fixture Shopify records every write instead of sending it.
+- `lib/redeem/order.ts`: the pure port of `parseRedeemOrder`, `lineTileId`, dedupe, "counts as ordered", "is a customer" and the free-gift unlock rule.
+- `getVaultProfile(email)` (`lib/vault/profile.ts` + pure `profile-core.ts`): orders, mirror sessions (cached in `vault_members` for `vault.lookup_cache_minutes`) plus `_imagegen_session_id` from order lines, recommendation children, the `ordered` flag per §3.6 (revenue events or order lines; cancelled/refunded excluded; other-email orders count), name, initials, customer / creator / nobody state.
+- `lib/sources/health.ts`: `testSource()` for shopify (scopes), imagen, mirror and a cold/warm lookup timing (target < 1.5 s warm), recording only counts and timings in `data_source_checks`. The Settings › Data sources page with its "Test" buttons is built in Part 10 (it needs the super-user guard from Part 4).
+- Tests: every row of the order rules, and profiles for a customer, a creator, a cancelled-only buyer, nobody, and an image ordered in one session but not another.
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -74,4 +82,4 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 
 ## Open questions
 
-(none yet)
+- Fixture portraits are local files (`/fixtures/portraits/…`); in fixtures mode the app treats those paths as an allowed image source. Live mode only fetches from `redeem.allowed_image_hosts`.

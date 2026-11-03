@@ -187,19 +187,7 @@ export const REGISTRY = {
 
 export type Registry = typeof REGISTRY;
 export type SettingKey = keyof Registry;
-export type SettingValue<K extends SettingKey> = Registry[K]["default"] extends infer D
-  ? D extends boolean
-    ? boolean
-    : D extends number
-      ? number
-      : D extends string
-        ? Registry[K] extends { options: readonly (infer O)[] }
-          ? O
-          : string
-        : D extends readonly string[]
-          ? string[]
-          : D
-  : never;
+export type SettingValue<K extends SettingKey> = Registry[K] extends SettingDef<infer T> ? (T extends boolean ? boolean : T extends number ? number : T) : never;
 
 export function isSettingKey(key: string): key is SettingKey {
   return Object.prototype.hasOwnProperty.call(REGISTRY, key);
