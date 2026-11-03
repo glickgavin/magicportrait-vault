@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Order detail, mug and downloads</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#B8059F}a:hover{color:#8E047B}
+</style>
+</helmet>
+<div style="width: 390px; height: 1600px; box-sizing: border-box; overflow: hidden; background: #F3F1E7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: rgba(0,0,0,0.8); display: flex; flex-direction: column">
+<header style="position: relative; height: 56px; flex: none; border-bottom: 1px solid rgba(0,0,0,0.08)">
+<a href="Menu.dc.html" aria-label="Open menu" style="position: absolute; top: 6px; left: 10px; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></a>
+<img src="/_blob/6ca1ce174b637e11bfd9bef1055ab7fa" alt="Magic Portraits AI by StoryBoards" style="position: absolute; top: 13px; left: 50%; transform: translateX(-50%); height: 30px">
+<a href="Account.dc.html" aria-label="Your account" style="position: absolute; top: 6px; right: 58px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; text-decoration: none"><span style="width: 34px; height: 34px; border-radius: 999px; background: linear-gradient(135deg, #FF8F3F, #F24BDF 55%, #DD07C4); color: #FFFFFF; font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #F3F1E7, 0 0 0 3.5px rgba(221,7,196,0.35)">SL</span></a>
+<button type="button" aria-label="Cart" style="position: absolute; top: 6px; right: 10px; width: 44px; height: 44px; border-radius: 12px; border: 0; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg></button>
+</header>
+<div style="padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; gap: 12px">
+<a href="Orders.dc.html" aria-label="Back to orders" style="flex: none; width: 44px; height: 44px; border-radius: 12px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+<span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 22px; font-weight: 800">Order #[ORDER-1]</span><span style="font-size: 13px; color: rgba(0,0,0,0.6)">28 Oct 2026 · 6 tiles + free mug</span></span>
+<span style="flex: none; padding: 4px 10px; border-radius: 999px; background: #FDE7FA; color: #8E047B; font-size: 12px; font-weight: 700">Being made</span>
+</div>
+<section aria-labelledby="mug-h" style="background: #FFFFFF; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<h2 id="mug-h" style="margin: 0; font-size: 18px; font-weight: 800">Your free mug</h2>
+<span style="font-size: 12px; color: rgba(0,0,0,0.6)">Change it until printing</span>
+</div>
+<div style="display: flex; align-items: center; gap: 16px">
+<div aria-hidden="true" style="flex: none; position: relative; width: 120px; height: 104px">
+<div style="position: absolute; left: 0; top: 4px; width: 92px; height: 96px; border-radius: 10px 10px 16px 16px; background: #FFFFFF; border: 1.5px solid rgba(0,0,0,0.12); box-shadow: 0 6px 14px rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: center"><span style="width: 64px; height: 64px; border-radius: 8px; background: {{mugTone}}; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="M21 15l-5-5L5 21"></path></svg></span></div>
+<div style="position: absolute; left: 86px; top: 28px; width: 30px; height: 44px; border: 7px solid #FFFFFF; border-left: 0; border-radius: 0 22px 22px 0; box-shadow: 1px 0 0 1.5px rgba(0,0,0,0.1)"></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 14px; font-weight: 700">{{mugTitle}}</span>
+<span style="font-size: 13px; line-height: 1.45; color: rgba(0,0,0,0.6)">Pick one portrait from this order to print on your mug.</span>
+</div>
+</div>
+<div role="radiogroup" aria-label="Mug photo" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="6">
+<button type="button" role="radio" aria-checked="{{t.on}}" aria-label="{{t.label}}" onClick="{{t.pick}}" style="position: relative; aspect-ratio: 1; padding: 0; border-radius: 14px; background: {{t.tone}}; cursor: pointer; display: flex; align-items: center; justify-content: center; border: 3px solid {{t.border}}">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+<sc-if value="{{t.on}}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 999px; background: linear-gradient(90deg, #FF8F3F, #DD07C4); display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span></sc-if>
+</button>
+</sc-for>
+</div>
+<sc-if value="{{dirty}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{save}}" style="min-height: 52px; border-radius: 12px; border: 0; background: linear-gradient(89deg, #FF8F3F -4.82%, #F24BDF 52.24%, #DD07C4 102.1%); box-shadow: 0 2px 0 0 rgba(0,0,0,0.07), 0 -2px 0 0 rgba(0,0,0,0.12) inset; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer">Save mug photo</button>
+</sc-if>
+<sc-if value="{{saved}}" hint-placeholder-val="{{ false }}">
+<p role="status" style="margin: 0; display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 12px; background: #E3F2EA; color: #1F5F3D; font-size: 14px; font-weight: 700"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F5F3D" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Saved. This is the photo we'll print.</p>
+</sc-if>
+</section>
+<section aria-labelledby="dl-h" style="background: #FFFFFF; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 16px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<h2 id="dl-h" style="margin: 0; font-size: 18px; font-weight: 800">Your downloads</h2>
+<span style="font-size: 12px; color: rgba(0,0,0,0.6)">Full-size JPEG</span>
+</div>
+<sc-for list="{{downloads}}" as="d" hint-placeholder-count="4">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="flex: none; width: 52px; height: 52px; border-radius: 10px; background: {{d.tone}}"></span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 700">{{d.label}}</span><span style="font-size: 12px; color: rgba(0,0,0,0.6)">{{d.file}}</span></span>
+<button type="button" aria-label="Download {{d.label}}" style="flex: none; width: 44px; height: 44px; border-radius: 12px; border: 0; background: rgba(0,0,0,0.05); cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg></button>
+</div>
+</sc-for>
+<button type="button" style="min-height: 48px; border-radius: 12px; border: 0; background: #2B2B2B; color: #FFFFFF; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>Download all (.zip)</button>
+</section>
+<a href="M1Theme.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 20px; background: #FFFFFF; color: rgba(0,0,0,0.8); text-decoration: none">
+<span style="flex: none; width: 44px; height: 44px; border-radius: 12px; background: #FDE7FA; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B8059F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"></path></svg></span>
+<span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 800">Create a greeting card</span><span style="font-size: 13px; color: rgba(0,0,0,0.6)">Use these portraits on a free card</span></span>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>
+</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1600}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { saved: 't1', picked: 't1', justSaved: false };
+  }
+  renderVals() {
+    const tones = ['#E9DCCB', '#DCD3E8', '#D5E3DA', '#D6E4F0', '#F0DCDC', '#EDE3C8'];
+    const themes = ['Royalty', 'Royalty', 'Bath & Spa', 'Bath & Spa', 'Kitchen Tales', 'Kitchen Tales'];
+    const s = this.state;
+    const tiles = tones.map((tone, i) => {
+      const id = 't' + (i + 1);
+      const on = s.picked === id;
+      return { tone, on, border: on ? '#DD07C4' : 'transparent', label: 'Portrait ' + (i + 1) + ', ' + themes[i], pick: () => this.setState({ picked: id, justSaved: false }) };
+    });
+    const idx = Number(s.picked.slice(1)) - 1;
+    return {
+      tiles,
+      mugTone: tones[idx],
+      mugTitle: s.picked === s.saved ? 'Portrait ' + (idx + 1) + ' is on your mug' : 'Portrait ' + (idx + 1) + ' selected',
+      dirty: s.picked !== s.saved,
+      saved: s.justSaved,
+      save: () => this.setState({ saved: s.picked, justSaved: true }),
+      downloads: tones.slice(0, 4).map((tone, i) => ({ tone, label: 'Portrait ' + (i + 1), file: 'magic-portrait-' + themes[i].toLowerCase().replace(/[^a-z]+/g, '-') + '-' + (i + 1) + '.jpg' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

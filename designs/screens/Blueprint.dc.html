@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>System blueprint</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=DM+Serif+Display&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#B8059F}a:hover{color:#8E047B}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1080px; box-sizing: border-box; padding: 44px 48px; background: #FFFFFF; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #2B2B2B; display: flex; flex-direction: column; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<p style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; color: #B8059F">NEW REPO · GITHUB → VERCEL · SUPABASE</p>
+<h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 34px; font-weight: 800">My Magic Portraits: greeting card blueprint</h1>
+</div>
+<section style="display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 16px">Flow</h2>
+<div style="display: flex; align-items: stretch; gap: 6px">
+<sc-for list="{{flow}}" as="f" hint-placeholder-count="8">
+<div style="display: flex; align-items: center; gap: 6px">
+<div style="width: 146px; height: 118px; box-sizing: border-box; padding: 12px; border-radius: 12px; border: 1px solid {{f.border}}; background: {{f.bg}}; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: {{f.tagColor}}">{{f.tag}}</span>
+<span style="font-size: 14px; font-weight: 600; line-height: 1.25">{{f.title}}</span>
+<span style="font-size: 12px; color: #5C5A70; line-height: 1.35">{{f.desc}}</span>
+</div>
+<sc-if value="{{f.arrow}}" hint-placeholder-val="{{ true }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A879C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; gap: 18px; font-size: 12px; color: #5C5A70">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #F3F1E7; border: 1px solid #CFCBDD"></span>Existing system</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #FDE7FA; border: 1px solid #F7A8EC"></span>Customer-facing (new)</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #FFF6DE; border: 1px solid #E5C77A"></span>Backend (new)</span>
+</div>
+</section>
+<div style="display: flex; gap: 32px; flex: 1; min-height: 0">
+<section style="flex: 2; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 16px">Data model</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px">
+<sc-for list="{{tables}}" as="t" hint-placeholder-count="6">
+<div style="border: 1px solid {{t.border}}; border-radius: 12px; overflow: hidden">
+<div style="padding: 10px 14px; background: {{t.bg}}; display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<span style="font-family: ui-monospace, Menlo, monospace; font-size: 14px; font-weight: 600">{{t.name}}</span>
+<span style="font-size: 11px; color: #5C5A70">{{t.note}}</span>
+</div>
+<ul style="list-style: none; margin: 0; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 4px">
+<sc-for list="{{t.cols}}" as="c" hint-placeholder-count="5">
+<li style="font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: #45435A">{{c}}</li>
+</sc-for>
+</ul>
+</div>
+</sc-for>
+</div>
+</section>
+<section style="flex: 1; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 16px">Rules to build in</h2>
+<ol style="margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 1.45">
+<sc-for list="{{rules}}" as="r" hint-placeholder-count="6">
+<li><strong>{{r.title}}.</strong> <span style="color: #45435A">{{r.body}}</span></li>
+</sc-for>
+</ol>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const K = {
+      existing: { bg: '#F3F1E7', border: '#CFCBDD', tagColor: '#5C5A70', tag: 'EXISTING' },
+      ui: { bg: '#FDE7FA', border: '#F7A8EC', tagColor: '#8E047B', tag: 'CUSTOMER' },
+      api: { bg: '#FFF6DE', border: '#E5C77A', tagColor: '#6B4A00', tag: 'BACKEND' }
+    };
+    const raw = [
+      { k: 'existing', title: 'Shopify order paid', desc: 'orders/paid webhook to Vercel' },
+      { k: 'api', title: 'Match by email', desc: 'Shopify orders + Imagen sessions' },
+      { k: 'ui', title: 'Create a card', desc: 'Email, pop-up or site menu' },
+      { k: 'ui', title: 'Pick theme', desc: 'Live versions in season' },
+      { k: 'existing', title: 'Pick portrait', desc: 'Every Imagen image, ordered ones flagged' },
+      { k: 'ui', title: 'Message & recipient', desc: 'To, from, text, email' },
+      { k: 'api', title: 'Render JPEG', desc: 'Vercel function → Supabase Storage' },
+      { k: 'api', title: 'Deliver', desc: 'Email, download, share link' }
+    ];
+    const flow = raw.map((f, i) => ({ ...K[f.k], ...f, tag: K[f.k].tag, arrow: i < raw.length - 1 }));
+    const T = {
+      existing: { bg: '#F3F1E7', border: '#CFCBDD' },
+      fresh: { bg: '#FDE7FA', border: '#F7A8EC' }
+    };
+    const tables = [
+      { s: 'fresh', name: 'settings + super_users', note: 'new, edited in Settings', cols: ['settings: key, value (json), type', 'settings_history: who, old → new, when', 'super_users: email, added_by', '(seed: gavin@, gideon@storyboards.io)', 'vault_members: email, last_seen_at'] },
+      { s: 'fresh', name: 'themes', note: 'new', cols: ['id, name, slug', 'category: Holidays | New Year | Birthdays | General', 'available_from / to', 'sort_order', 'status: live | scheduled | draft'] },
+      { s: 'fresh', name: 'theme_versions', note: 'new', cols: ['id, theme_id, name', 'background_url (JPEG/PNG)', 'overlay_url (PNG, optional)', 'layout_json (photo + text zones)', 'suggestions[], is_new, status'] },
+      { s: 'existing', name: 'Existing data, read only', note: 'no new connections', cols: ['dailyreport.analytics_events_mirror: email → imagegen_session_id', 'imagegen.sessions + images: every portrait', 'imagegen.revenue_events: image → Shopify order', 'Shopify r_orders app: orders by email', 'imagegen.themes: theme name'] },
+      { s: 'fresh', name: 'cards', note: 'new, kept forever', cols: ['id, public_id, share_slug', 'sender_email, from_name, to_name', 'recipient_email, message', 'version_id, imagen_image_id', 'portrait_path (copy), jpeg_path', 'delivery, scheduled_for, status'] },
+      { s: 'fresh', name: 'activity_log + deliveries', note: 'new, kept forever', cols: ['activity_log: email, event, source, ref_id, props, at', 'sources: My MP · Shopify · Imagen · email', 'card_deliveries: card, type, sent/opened', 'staff views of a card are logged too', 'cards + JPEGs never auto-deleted'] }
+    ].map((t) => ({ ...t, bg: T[t.s].bg, border: T[t.s].border }));
+    const rules = [
+      { title: 'Stack', body: 'New GitHub repo on Vercel; new Supabase project. Same brand tokens, header, menu and footer as Magic Portraits.' },
+      { title: 'One flow: Create a card', body: 'Sign-in is a 6-digit email code inside the flow; order emails carry a signed link that skips it. The email finds Shopify orders and every Imagen session.' },
+      { title: 'Ordered vs not', body: 'Read live, never copied: an image is "ordered" when it appears in a Shopify line item. Unordered ones show an "Order as wall art" button.' },
+      { title: 'Gift unlocks on order', body: 'Free cards unlock with the first Shopify order; creators see them locked as an incentive.' },
+      { title: 'Server-side render', body: 'A Vercel function draws the JPEG from the version’s layout_json and saves it to Supabase Storage.' },
+      { title: 'Redeem moves in', body: 'Orders, downloads and mug choice live behind sign-in. Mug choice is saved to the Shopify order (custom.mug_choice + mug:ready tag) and locks once printed.' }
+    ];
+    return { flow, tables, rules };
+  }
+}
+</script>
+</body>
+</html>

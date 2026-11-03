@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Creating your card</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=DM+Serif+Display&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#B8059F}a:hover{color:#8E047B}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F3F1E7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: rgba(0,0,0,0.8); display: flex; flex-direction: column">
+<header style="position: relative; height: 56px; flex: none; border-bottom: 1px solid rgba(0,0,0,0.08)">
+<a href="Menu.dc.html" aria-label="Open menu" style="position: absolute; top: 6px; left: 10px; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></a>
+<img src="/_blob/6ca1ce174b637e11bfd9bef1055ab7fa" alt="Magic Portraits AI by StoryBoards" style="position: absolute; top: 13px; left: 50%; transform: translateX(-50%); height: 30px">
+<a href="Account.dc.html" aria-label="Your account" style="position: absolute; top: 6px; right: 58px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; text-decoration: none"><span style="width: 34px; height: 34px; border-radius: 999px; background: linear-gradient(135deg, #FF8F3F, #F24BDF 55%, #DD07C4); color: #FFFFFF; font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #F3F1E7, 0 0 0 3.5px rgba(221,7,196,0.35)">SL</span></a>
+<button type="button" aria-label="Cart" style="position: absolute; top: 6px; right: 10px; width: 44px; height: 44px; border-radius: 12px; border: 0; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg></button>
+</header>
+<div style="flex: 1; padding: 28px 24px; display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center">
+<div style="position: relative; width: 240px; height: 336px; border-radius: 12px; overflow: hidden; box-shadow: 0 14px 32px rgba(0,0,0,0.18)">
+<div style="width: 300px; height: 420px; transform: scale(0.8); transform-origin: 0 0; opacity: 0.55"><dc-import name="CardPreview" variant="xmas-snow" to-name="Grandma Rose" from-name="Sam" message="Merry Christmas! Biscuit put on his royal robes just for you. Love you lots." photo-label="Biscuit, Royalty" hint-size="300px,420px"></dc-import></div>
+<div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+<span style="width: 64px; height: 64px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 6px 16px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="#DD07C4" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"></path><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg></span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h1 style="margin: 0; font-size: 24px; font-weight: 800">Creating your card…</h1>
+<p style="margin: 0; font-size: 14px; color: rgba(0,0,0,0.6)">This takes a few seconds. Keep this screen open.</p>
+</div>
+<div role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="70" aria-label="Creating card" style="width: 100%; height: 8px; border-radius: 999px; background: rgba(0,0,0,0.08)"><div style="width: 70%; height: 8px; border-radius: 999px; background: linear-gradient(89deg, #FF8F3F -4.82%, #F24BDF 52.24%, #DD07C4 102.1%)"></div></div>
+<ul style="list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: left; font-size: 14px">
+<li style="display: flex; align-items: center; gap: 10px"><span style="width: 22px; height: 22px; border-radius: 999px; background: #E3F2EA; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1F6B45" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>Placing your portrait</li>
+<li style="display: flex; align-items: center; gap: 10px"><span style="width: 22px; height: 22px; border-radius: 999px; background: #E3F2EA; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1F6B45" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></span>Adding your message</li>
+<li style="display: flex; align-items: center; gap: 10px; font-weight: 700"><span style="width: 22px; height: 22px; border-radius: 999px; border: 2px solid #DD07C4; box-sizing: border-box"></span>Making your high-quality JPEG</li>
+</ul>
+<a href="M5Ready.dc.html" style="margin-top: auto; font-size: 13px; font-weight: 600">(Prototype: continue to result)</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

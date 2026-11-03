@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, template editor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=DM+Serif+Display&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#B8059F}a:hover{color:#8E047B}
+</style>
+</helmet>
+<div style="min-height: 1040px; display: flex; flex-wrap: wrap; background: #F3F1E7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #2B2B2B">
+<nav aria-label="Admin" style="flex: 1 1 220px; max-width: 100%; background: #2B2B2B; color: #FFFFFF; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 10px 16px">
+<span style="font-size: 18px; font-weight: 800">Settings</span>
+<span style="padding: 3px 8px; border-radius: 999px; background: linear-gradient(90deg, #FF8F3F, #DD07C4); font-size: 11px; font-weight: 700">Super user</span>
+</div>
+<p style="margin: 4px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">INSIGHTS</p>
+<a href="AdminInsights.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Dashboard</a>
+<a href="AdminCustomer.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Customers</a>
+<a href="AdminCards.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">All cards</a>
+<p style="margin: 14px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">SETUP</p>
+<a href="Settings.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">General &amp; variables</a>
+<p style="margin: 14px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #9E9AB5">GREETING CARDS</p>
+<a href="AdminThemes.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #C9C6D9; text-decoration: none; font-size: 14px">Theme library</a>
+<a href="#" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; background: #4A4A4A; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 600">Template editor</a>
+<p style="margin: 14px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">REDEEM</p>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Downloads &amp; mugs</a>
+<p style="margin: 14px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">SYSTEM</p>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Emails</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Tracking (PostHog)</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Data sources</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Super users</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Activity log</a>
+</nav>
+<main style="flex: 999 1 640px; min-width: 0; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<p style="margin: 0; font-size: 13px; color: #5C5A70"><a href="AdminThemes.dc.html">Theme library</a> / Holidays / Christmas</p>
+<h1 style="margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px">Snowfall</h1>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #E8E2D8; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Test render JPEG</button>
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 0; background: #B8059F; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Publish version</button>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+<section style="flex: 999 1 460px; min-width: 0; background: #FFFFFF; border: 1px solid #E8E2D8; border-radius: 14px; padding: 28px; display: flex; flex-direction: column; align-items: center; gap: 14px; background-image: radial-gradient(#E8E2D8 1px, transparent 1px); background-size: 16px 16px">
+<div style="position: relative; width: 390px; height: 546px; box-shadow: 0 12px 32px rgba(27,26,46,0.16)">
+<div style="width: 390px; height: 546px; overflow: hidden"><div style="width: 300px; height: 420px; transform: scale(1.3); transform-origin: 0 0"><dc-import name="CardPreview" variant="xmas-snow" to-name="[Recipient name]" from-name="[Sender name]" message="[Customer message, up to 220 characters]" photo-label="[Customer portrait]" hint-size="300px,420px"></dc-import></div></div>
+<div style="position: absolute; left: 30px; top: 26px; width: 330px; height: 76px; border: 1.5px dashed #E07AD3; border-radius: 4px"><span style="position: absolute; top: -11px; left: 8px; padding: 2px 6px; border-radius: 4px; background: #FFFFFF; color: #8E047B; font-size: 11px; font-weight: 600">Headline (fixed)</span></div>
+<div style="position: absolute; left: 78px; top: 106px; width: 234px; height: 224px; border: 2px solid #B8059F; border-radius: 4px; background: rgba(221,7,196,0.06)"><span style="position: absolute; top: -12px; left: 8px; padding: 2px 6px; border-radius: 4px; background: #B8059F; color: #FFFFFF; font-size: 11px; font-weight: 600">Photo zone</span>
+<span style="position: absolute; right: -6px; bottom: -6px; width: 10px; height: 10px; background: #FFFFFF; border: 2px solid #B8059F"></span><span style="position: absolute; left: -6px; top: -6px; width: 10px; height: 10px; background: #FFFFFF; border: 2px solid #B8059F"></span></div>
+<div style="position: absolute; left: 30px; top: 342px; width: 330px; height: 140px; border: 1.5px dashed #E07AD3; border-radius: 4px"><span style="position: absolute; top: -11px; left: 8px; padding: 2px 6px; border-radius: 4px; background: #FFFFFF; color: #8E047B; font-size: 11px; font-weight: 600">To / message / from</span></div>
+</div>
+<p style="margin: 0; font-size: 13px; color: #45435A; background: #FFFFFF; padding: 4px 10px; border-radius: 6px">Drag zones to position. Output 1500 × 2100 px.</p>
+</section>
+<aside style="flex: 1 1 300px; background: #FFFFFF; border: 1px solid #E8E2D8; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px">Version</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="vname" style="font-size: 12px; font-weight: 600; color: #45435A">Name</label><input id="vname" type="text" value="Snowfall" style="min-height: 40px; padding: 0 10px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="vstatus" style="font-size: 12px; font-weight: 600; color: #45435A">Status</label><select id="vstatus" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px; background: #FFFFFF"><option>Live</option><option>Draft</option><option>Archived</option></select></div>
+</div>
+<label style="display: flex; gap: 10px; align-items: center; font-size: 14px"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #B8059F">Show "New" badge</label>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 15px">Artwork</h2>
+<div style="display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px dashed #CFCBDD; border-radius: 10px">
+<div style="width: 40px; height: 56px; border-radius: 4px; background: #F2F6F9; border: 1px solid #E8E2D8"></div>
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 13px; font-weight: 600">Background</span><span style="font-size: 12px; color: #5C5A70">christmas-snowfall-background.jpg · JPEG · 1500 × 2100 · 1.1 MB</span></div>
+<button type="button" style="margin-left: auto; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #E8E2D8; background: #FFFFFF; font: inherit; font-size: 13px; cursor: pointer">Replace</button>
+</div>
+<div style="display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px dashed #CFCBDD; border-radius: 10px">
+<div style="width: 40px; height: 56px; border-radius: 4px; border: 1px solid #E8E2D8; background-color: #FFFFFF; background-image: linear-gradient(45deg, #ECE9E4 25%, transparent 25%), linear-gradient(-45deg, #ECE9E4 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ECE9E4 75%), linear-gradient(-45deg, transparent 75%, #ECE9E4 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0"></div>
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-size: 13px; font-weight: 600">Overlay (optional)</span><span style="font-size: 12px; color: #5C5A70">christmas-snowfall-overlay.png · PNG, transparent · 1500 × 2100</span></div>
+<button type="button" style="margin-left: auto; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #E8E2D8; background: #FFFFFF; font: inherit; font-size: 13px; cursor: pointer">Replace</button>
+</div>
+<p style="margin: 0; font-size: 12px; color: #5C5A70">Files are checked on upload: size 1500 × 2100, sRGB, under 2 MB, overlay has transparency.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px">Photo zone</h2>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="zx" style="font-size: 12px; font-weight: 600; color: #45435A">X</label><input id="zx" type="text" value="310" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px; width: 100%; box-sizing: border-box"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="zy" style="font-size: 12px; font-weight: 600; color: #45435A">Y</label><input id="zy" type="text" value="410" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px; width: 100%; box-sizing: border-box"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="zw" style="font-size: 12px; font-weight: 600; color: #45435A">W</label><input id="zw" type="text" value="880" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px; width: 100%; box-sizing: border-box"></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="zh" style="font-size: 12px; font-weight: 600; color: #45435A">H</label><input id="zh" type="text" value="840" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px; width: 100%; box-sizing: border-box"></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="shape" style="font-size: 12px; font-weight: 600; color: #45435A">Shape</label><select id="shape" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px; background: #FFFFFF"><option>Rectangle</option><option>Rounded</option><option>Circle</option><option>Arch</option></select></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="frame" style="font-size: 12px; font-weight: 600; color: #45435A">Frame</label><select id="frame" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px; background: #FFFFFF"><option>White, 30 px</option><option>Gold, 20 px</option><option>None</option></select></div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px">Text</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="font" style="font-size: 12px; font-weight: 600; color: #45435A">Message font</label><select id="font" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px; background: #FFFFFF"><option>Inter</option><option>DM Serif Display</option></select></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="max" style="font-size: 12px; font-weight: 600; color: #45435A">Max characters</label><input id="max" type="text" value="220" style="min-height: 40px; padding: 0 8px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 14px"></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="sugg" style="font-size: 12px; font-weight: 600; color: #45435A">Message ideas shown to customers</label><textarea id="sugg" rows="3" style="padding: 8px 10px; border-radius: 8px; border: 1px solid #CFCBDD; font: inherit; font-size: 13px; line-height: 1.4; resize: vertical">Wishing you a wonderful Christmas, full of love and laughter.
+Thank you for everything this year.</textarea></div>
+</div>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

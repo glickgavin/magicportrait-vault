@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings, super users only</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#B8059F}a:hover{color:#8E047B}
+</style>
+</helmet>
+<div style="min-height: 1400px; display: flex; flex-wrap: wrap; background: #F3F1E7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: rgba(0,0,0,0.8)">
+<nav aria-label="Settings" style="flex: 1 1 230px; max-width: 100%; background: #2B2B2B; color: #FFFFFF; padding: 20px 14px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 10px 16px">
+<span style="font-size: 18px; font-weight: 800">Settings</span>
+<span style="padding: 3px 8px; border-radius: 999px; background: linear-gradient(90deg, #FF8F3F, #DD07C4); font-size: 11px; font-weight: 700">Super user</span>
+</div>
+<p style="margin: 4px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">INSIGHTS</p>
+<a href="AdminInsights.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Dashboard</a>
+<a href="AdminCustomer.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Customers</a>
+<a href="AdminCards.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">All cards</a>
+<p style="margin: 14px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">SETUP</p>
+<a href="Settings.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; background: #4A4A4A; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700">General &amp; variables</a>
+<p style="margin: 14px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">GREETING CARDS</p>
+<a href="AdminThemes.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Theme library</a>
+<a href="AdminTemplate.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Template editor</a>
+<p style="margin: 14px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">REDEEM</p>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Downloads &amp; mugs</a>
+<p style="margin: 14px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #B5B0AA">SYSTEM</p>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Emails</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Tracking (PostHog)</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Data sources</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Super users</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #E2DED8; text-decoration: none; font-size: 14px">Activity log</a>
+<div style="margin-top: auto; padding: 16px 10px 0; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #4A4A4A">
+<a href="VaultHome.dc.html" style="color: #E2DED8; font-size: 13px; font-weight: 600; text-decoration: none">← Back to My Magic Portraits</a>
+<span style="display: flex; align-items: center; gap: 10px"><span style="width: 32px; height: 32px; border-radius: 999px; background: linear-gradient(135deg, #FF8F3F, #F24BDF 55%, #DD07C4); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center">GG</span><span style="font-size: 12px; color: #E2DED8">gavin@storyboards.io</span></span>
+</div>
+</nav>
+<main style="flex: 999 1 640px; min-width: 0; padding: 28px 28px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 800">General &amp; variables</h1>
+<p style="margin: 0; font-size: 14px; color: rgba(0,0,0,0.6)">Master data used across the app instead of hard-coded values. Every change is logged.</p>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<label for="vsearch" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search settings</label>
+<input id="vsearch" type="search" placeholder="Search settings" style="min-height: 44px; width: 220px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #FFFFFF; font: inherit; font-size: 14px">
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 0; background: linear-gradient(89deg, #FF8F3F -4.82%, #F24BDF 52.24%, #DD07C4 102.1%); color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">Add variable</button>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+<div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+<section style="background: #FFFFFF; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 800">Gift cards</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 12px; background: #FAF8F5"><span style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 700">Cards live</span><span style="font-size: 12px; color: rgba(0,0,0,0.6)">cards.enabled</span></span><button type="button" role="switch" aria-checked="true" aria-label="Cards live" style="flex: none; width: 48px; height: 28px; border-radius: 999px; border: 0; background: #DD07C4; padding: 3px; display: flex; justify-content: flex-end; cursor: pointer"><span style="width: 22px; height: 22px; border-radius: 999px; background: #FFFFFF"></span></button></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="s-unlock" style="font-size: 13px; font-weight: 700">Who can create cards</label><select id="s-unlock" style="min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #FFFFFF; font: inherit; font-size: 14px"><option>Customers with an order</option><option>Everyone with a portrait</option></select></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="s-limit" style="font-size: 13px; font-weight: 700">Cards per customer</label><select id="s-limit" style="min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #FFFFFF; font: inherit; font-size: 14px"><option>Unlimited</option><option>10 per month</option></select></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="s-price" style="font-size: 13px; font-weight: 700">Price</label><select id="s-price" style="min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #FFFFFF; font: inherit; font-size: 14px"><option>Free (gift)</option><option>Paid</option></select></div>
+</div>
+</section>
+<section style="background: #FFFFFF; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 800">Redeem: downloads &amp; mugs</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 12px; background: #FAF8F5"><span style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 700">Downloads on</span><span style="font-size: 12px; color: rgba(0,0,0,0.6)">redeem.downloads_enabled</span></span><button type="button" role="switch" aria-checked="true" aria-label="Downloads on" style="flex: none; width: 48px; height: 28px; border-radius: 999px; border: 0; background: #DD07C4; padding: 3px; display: flex; justify-content: flex-end; cursor: pointer"><span style="width: 22px; height: 22px; border-radius: 999px; background: #FFFFFF"></span></button></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 12px; background: #FAF8F5"><span style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 700">Free mug offer</span><span style="font-size: 12px; color: rgba(0,0,0,0.6)">redeem.mug_offer_active</span></span><button type="button" role="switch" aria-checked="true" aria-label="Free mug offer" style="flex: none; width: 48px; height: 28px; border-radius: 999px; border: 0; background: #DD07C4; padding: 3px; display: flex; justify-content: flex-end; cursor: pointer"><span style="width: 22px; height: 22px; border-radius: 999px; background: #FFFFFF"></span></button></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><label for="s-mugdead" style="font-size: 13px; font-weight: 700">Mug choice allowed until</label><select id="s-mugdead" style="min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #FFFFFF; font: inherit; font-size: 14px"><option>The order is printed</option><option>[N] days after the order</option></select></div>
+</div>
+</section>
+<section style="background: #FFFFFF; border-radius: 20px; overflow: hidden">
+<div style="padding: 18px 20px 10px; display: flex; justify-content: space-between; align-items: baseline"><h2 style="margin: 0; font-size: 17px; font-weight: 800">Variables</h2><span style="font-size: 12px; color: rgba(0,0,0,0.6)">Secrets and API keys stay in Vercel, never here</span></div>
+<div style="overflow-x: auto">
+<table style="width: 100%; min-width: 600px; border-collapse: collapse; font-size: 13px">
+<thead><tr style="text-align: left; font-size: 11px; letter-spacing: 0.06em; color: rgba(0,0,0,0.6)"><th style="padding: 10px 20px; border-bottom: 1px solid #EFE9E0; font-weight: 700">KEY</th><th style="padding: 10px 12px; border-bottom: 1px solid #EFE9E0; font-weight: 700">VALUE</th><th style="padding: 10px 12px; border-bottom: 1px solid #EFE9E0; font-weight: 700">TYPE</th><th style="padding: 10px 20px; border-bottom: 1px solid #EFE9E0; font-weight: 700">UPDATED</th></tr></thead>
+<tbody>
+<sc-for list="{{vars}}" as="v" hint-placeholder-count="7">
+<tr><td style="padding: 11px 20px; border-bottom: 1px solid #F5F1EA; font-family: ui-monospace, Menlo, monospace; font-size: 12px">{{v.key}}</td><td style="padding: 11px 12px; border-bottom: 1px solid #F5F1EA; font-weight: 600">{{v.value}}</td><td style="padding: 11px 12px; border-bottom: 1px solid #F5F1EA; color: rgba(0,0,0,0.6)">{{v.type}}</td><td style="padding: 11px 20px; border-bottom: 1px solid #F5F1EA; color: rgba(0,0,0,0.6)">{{v.updated}}</td></tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<aside style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 20px">
+<section style="background: #FFFFFF; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 800">Super users</h2>
+<p style="margin: 0; font-size: 13px; color: rgba(0,0,0,0.6)">Only these accounts see Settings.</p>
+<sc-for list="{{supers}}" as="s" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 10px; min-height: 44px"><span style="flex: none; width: 32px; height: 32px; border-radius: 999px; background: linear-gradient(135deg, #FF8F3F, #F24BDF 55%, #DD07C4); color: #FFFFFF; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center">{{s.initials}}</span><span style="flex: 1; font-size: 14px; font-weight: 600">{{s.email}}</span><span style="font-size: 12px; color: rgba(0,0,0,0.6)">{{s.note}}</span></div>
+</sc-for>
+<div style="display: flex; gap: 8px"><label for="s-newsuper" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Email of new super user</label><input id="s-newsuper" type="email" placeholder="name@storyboards.io" style="flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); font: inherit; font-size: 14px"><button type="button" style="min-height: 44px; padding: 0 14px; border-radius: 10px; border: 0; background: #2B2B2B; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">Add</button></div>
+</section>
+<section style="background: #FFFFFF; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between; align-items: baseline"><h2 style="margin: 0; font-size: 17px; font-weight: 800">Data sources</h2><button type="button" style="min-height: 36px; padding: 0 4px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 700; color: #B8059F; cursor: pointer">Test all</button></div>
+<sc-for list="{{sources}}" as="d" hint-placeholder-count="5">
+<div style="display: flex; align-items: center; gap: 10px; min-height: 40px"><span style="flex: none; width: 10px; height: 10px; border-radius: 999px; background: {{d.dot}}"></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 600">{{d.name}}</span><span style="font-size: 12px; color: rgba(0,0,0,0.6)">{{d.detail}}</span></span><span style="font-size: 12px; font-weight: 700; color: {{d.fg}}">{{d.status}}</span></div>
+</sc-for>
+</section>
+<section style="background: #FFFFFF; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 800">Recent changes</h2>
+<sc-for list="{{log}}" as="l" hint-placeholder-count="3">
+<p style="margin: 0; font-size: 13px; line-height: 1.45"><strong>{{l.who}}</strong> {{l.what}} <span style="color: rgba(0,0,0,0.6)">· {{l.when}}</span></p>
+</sc-for>
+<a href="#" style="font-size: 13px; font-weight: 700">Full activity log</a>
+</section>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      vars: [
+        { key: 'brand.support_email', value: 'support@[your-domain]', type: 'Text', updated: 'Gavin · 2 Nov' },
+        { key: 'cards.message_max_chars', value: '220', type: 'Number', updated: 'Gideon · 1 Nov' },
+        { key: 'cards.size_px', value: '1500 × 2100', type: 'Text', updated: 'Gavin · 1 Nov' },
+        { key: 'cards.email_sender_name', value: 'Magic Portraits', type: 'Text', updated: 'Gavin · 1 Nov' },
+        { key: 'auth.code_valid_minutes', value: '10', type: 'Number', updated: 'Gavin · 1 Nov' },
+        { key: 'vault.first_order_offer', value: '[OFFER]', type: 'Text', updated: 'Gideon · 31 Oct' },
+        { key: 'themes.in_season_days_before', value: '45', type: 'Number', updated: 'Gavin · 31 Oct' },
+        { key: 'redeem.download_products', value: '3 Shopify products + hires add-on', type: 'List', updated: 'Gavin · 3 Nov' },
+        { key: 'redeem.mug_variant_id', value: '46177764769988', type: 'Shopify ID', updated: 'Gavin · 3 Nov' },
+        { key: 'redeem.mug_metafield', value: 'custom.mug_choice', type: 'Text', updated: 'Gavin · 3 Nov' },
+        { key: 'redeem.mug_ready_tag', value: 'mug:ready', type: 'Text', updated: 'Gavin · 3 Nov' }
+      ],
+      supers: [
+        { initials: 'GG', email: 'gavin@storyboards.io', note: 'You' },
+        { initials: 'G', email: 'gideon@storyboards.io', note: '' }
+      ],
+      sources: [
+        { name: 'Shopify', detail: 'r_orders app · store.magicportraits.ai', status: 'Connected', dot: '#2E9E62', fg: '#1F6B45' },
+        { name: 'Imagen', detail: 'imagegen-prod · sessions, images, orders', status: 'Connected', dot: '#2E9E62', fg: '#1F6B45' },
+        { name: 'Events mirror', detail: 'shopify-dailyreport · email → session', status: 'Synced 6 min ago', dot: '#2E9E62', fg: '#1F6B45' },
+        { name: 'PostHog', detail: 'Project 540098', status: 'Connected', dot: '#2E9E62', fg: '#1F6B45' },
+        { name: 'Email sender', detail: 'Resend · domain not verified yet', status: 'Set up', dot: '#D98A1C', fg: '#8A5300' }
+      ],
+      log: [
+        { who: 'Gavin', what: 'set cards.message_max_chars to 220', when: '2 Nov' },
+        { who: 'Gideon', what: 'published Christmas · Snowfall', when: '1 Nov' },
+        { who: 'Gavin', what: 'turned on Free mug offer', when: '31 Oct' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

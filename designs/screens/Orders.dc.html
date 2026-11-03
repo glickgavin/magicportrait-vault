@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orders, downloads and mugs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#B8059F}a:hover{color:#8E047B}
+</style>
+</helmet>
+<div style="width: 390px; height: 1100px; box-sizing: border-box; overflow: hidden; background: #F3F1E7; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: rgba(0,0,0,0.8); display: flex; flex-direction: column">
+<header style="position: relative; height: 56px; flex: none; border-bottom: 1px solid rgba(0,0,0,0.08)">
+<a href="Menu.dc.html" aria-label="Open menu" style="position: absolute; top: 6px; left: 10px; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></a>
+<img src="/_blob/6ca1ce174b637e11bfd9bef1055ab7fa" alt="Magic Portraits AI by StoryBoards" style="position: absolute; top: 13px; left: 50%; transform: translateX(-50%); height: 30px">
+<a href="Account.dc.html" aria-label="Your account" style="position: absolute; top: 6px; right: 58px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; text-decoration: none"><span style="width: 34px; height: 34px; border-radius: 999px; background: linear-gradient(135deg, #FF8F3F, #F24BDF 55%, #DD07C4); color: #FFFFFF; font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #F3F1E7, 0 0 0 3.5px rgba(221,7,196,0.35)">SL</span></a>
+<button type="button" aria-label="Cart" style="position: absolute; top: 6px; right: 10px; width: 44px; height: 44px; border-radius: 12px; border: 0; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg></button>
+</header>
+<div style="padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 26px; font-weight: 800">Orders, downloads &amp; mugs</h1>
+<p style="margin: 0; font-size: 14px; color: rgba(0,0,0,0.6)">Every order on sam@example.com</p>
+</div>
+<a href="OrderDetail.dc.html" style="display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 20px; background: linear-gradient(89deg, #FF8F3F -4.82%, #F24BDF 52.24%, #DD07C4 102.1%); color: #FFFFFF; text-decoration: none">
+<span style="flex: none; width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.22); display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path><path d="M6 2v2M10 2v2M14 2v2"></path></svg></span>
+<span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">Choose your free mug photo</span><span style="font-size: 13px; opacity: 0.9">Order #[ORDER-1] · before it's printed</span></span>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>
+</a>
+<sc-for list="{{orders}}" as="o" hint-placeholder-count="3">
+<a href="OrderDetail.dc.html" style="display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 20px; background: #FFFFFF; box-shadow: 0 4px 12px rgba(0,0,0,0.08); color: rgba(0,0,0,0.8); text-decoration: none">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 800">Order {{o.name}}</span><span style="font-size: 13px; color: rgba(0,0,0,0.6)">{{o.date}} · {{o.items}}</span></span>
+<span style="flex: none; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: {{o.statusBg}}; color: {{o.statusFg}}">{{o.status}}</span>
+</div>
+<div style="display: flex; gap: 6px">
+<sc-for list="{{o.thumbs}}" as="t" hint-placeholder-count="4">
+<span style="width: 56px; height: 56px; border-radius: 10px; background: {{t}}"></span>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{o.chips}}" as="c" hint-placeholder-count="2">
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; background: {{c.bg}}; color: {{c.fg}}">{{c.label}}</span>
+</sc-for>
+</div>
+</a>
+</sc-for>
+<p style="margin: 0; text-align: center; font-size: 13px; color: rgba(0,0,0,0.6)">Missing an order? It may be on another email. <a href="SignIn.dc.html" style="font-weight: 700">Switch account</a></p>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pink = { bg: '#FDE7FA', fg: '#8E047B' };
+    const green = { bg: '#E3F2EA', fg: '#1F5F3D' };
+    const grey = { bg: 'rgba(0,0,0,0.06)', fg: 'rgba(0,0,0,0.75)' };
+    const orders = [
+      { name: '#[ORDER-1]', date: '28 Oct 2026', items: '6 tiles + free mug', status: 'Being made', s: pink,
+        thumbs: ['#E9DCCB', '#DCD3E8', '#D5E3DA', '#D6E4F0'],
+        chips: [{ label: 'Free mug · choose photo', ...pink }, { label: '6 downloads ready', ...green }] },
+      { name: '#[ORDER-2]', date: '14 Jun 2026', items: 'Masterpiece', status: 'Delivered', s: green,
+        thumbs: ['#D6E4F0', '#F0DCDC'],
+        chips: [{ label: '2 downloads ready', ...green }] },
+      { name: '#[ORDER-3]', date: '2 Feb 2026', items: '4 tiles + free mug', status: 'Delivered', s: green,
+        thumbs: ['#EDE3C8', '#E9DCCB', '#D5E3DA', '#DCD3E8'],
+        chips: [{ label: 'Mug printed', ...grey }] }
+    ];
+    return { orders: orders.map((o) => ({ ...o, statusBg: o.s.bg, statusFg: o.s.fg })) };
+  }
+}
+</script>
+</body>
+</html>
