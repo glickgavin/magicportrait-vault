@@ -269,10 +269,12 @@ Each part lists what to build and what has to be true before it's committed.
 3. Point the live site's `/redeem` at `https://my.magicportraits.ai/redeem` (keep the query string), and add the MY MAGIC PORTRAITS links to its menu. This is a change in the Lovable project.
 4. Add the thank-you pop-up (`GiftSheet`) to the Shopify thank-you page, calling `/api/gift/offer-link`.
 5. **Klaviyo flows** (marketing).
-   - Build them in Klaviyo on the metrics My Magic Portraits now sends:
-     - "Free gift: make your card" (`free_gift_unlocked`, exit on `card_created`; copy the `Main` design)
-     - "Seasonal card reminder" (`gift_reminder_due`)
-     - "Choose your mug photo" (`mug_photo_needed`, exit on `redeem_mug_saved`).
+   - First send one test event of each kind from the preview to a staff profile, so the metrics exist.
+   - Add `magicportraits.ai` as a Klaviyo sending domain (DNS in Cloudflare), or send as "Magic Portraits" <hi@storyboards.io> for now.
+   - Build the flows, named like the account's other flows:
+     - "MP Free Gift - Make Your Card" (`free_gift_unlocked`, exit on `card_created`; copy the `Main` design)
+     - "MP Seasonal Card Reminder" (`gift_reminder_due`)
+     - "MP Choose Your Mug Photo" (`mug_photo_needed`, exit on `redeem_mug_saved`).
    - Then set `klaviyo.enabled` on.
 6. Add a line to the privacy policy: greeting cards and their messages are stored, and may be viewed by staff for support.
 7. In Settings, turn on `cards.enabled`, then `gift.popup_enabled` and `gift.offer_email_enabled`. Watch Settings › Insights and the PostHog card funnel for the first day.

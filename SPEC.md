@@ -405,11 +405,19 @@ The live site already sends a few funnel events to Klaviyo from its server (`tra
   - recipient names or emails
   - message text
   - card images (they show the message).
-- **Flows to build in Klaviyo** (marketing does this, outside the repo; a launch step):
-  - "Free gift: make your card" (trigger `free_gift_unlocked`, exit on `card_created`)
-  - "Seasonal card reminder" (`gift_reminder_due`)
-  - "Choose your mug photo" (`mug_photo_needed`, exit on `redeem_mug_saved`)
-  - optional "Your card was opened" (`card_recipient_email_opened`).
+- **Flows to build in Klaviyo** (a launch step outside the repo; named like the account's other flows, `MP <Name> (YYYY-MM)`):
+  - "MP Free Gift - Make Your Card" (trigger `free_gift_unlocked`, exit on `card_created`)
+  - "MP Seasonal Card Reminder" (`gift_reminder_due`)
+  - "MP Choose Your Mug Photo" (`mug_photo_needed`, exit on `redeem_mug_saved`)
+  - optional "MP Your Card Was Opened" (`card_recipient_email_opened`).
+  
+  Klaviyo creates a metric when its first event arrives, so the flows are built after the app sends one test event of each.
+- **What the Klaviyo account showed (3 Nov):**
+  - No post-purchase email currently goes out from Klaviyo: both "Purchase Thank You" flows trigger on order events that stopped in August. The free gift flow won't double up with anything.
+  - Klaviyo can only send from `storyboards.io` today (Q10).
+  - The existing "Gift Card Flow" is VIP store credit, which is unrelated.
+  
+  Details: `docs/data.md` §10.
 - **Settings › Emails** shows, per lifecycle email, the channel (Klaviyo or Resend) and whether the Klaviyo flow has received events in the last 7 days. **Settings › Data sources** has a Klaviyo card with "Test".
 
 ## 14. Analytics and the activity log
@@ -534,7 +542,7 @@ This pass reviewed all 28 screens against the decisions above.
 | Q7 | Does the free gift unlock with any order, or only some products? | Any paid order (`gift.unlock_rule`) |
 | Q8 | Later: should My Magic Portraits absorb the VIP Portal (store credit), so there's one sign-in? | Not in v1 |
 | Q9 | The six product thumbnails in the site menu: can someone export them from the live site? (They are binary files and couldn't be copied.) | Placeholder tiles, with the image URLs set in `links.menu_thumbnails` |
-| Q10 | Sender addresses: `hello@magicportraits.ai` for offers and `cards@magicportraits.ai` for cards? | As proposed, once the domain is verified in Resend |
+| Q10 | Sender addresses: `hello@magicportraits.ai` for offers (Klaviyo) and `cards@magicportraits.ai` for cards (Resend)? Klaviyo has no `magicportraits.ai` sending domain yet; only `sending.storyboards.io`. | Add `magicportraits.ai` as a sending domain in both Klaviyo and Resend (DNS in Cloudflare). Until then, Klaviyo flows send as "Magic Portraits" <hi@storyboards.io>. |
 | Q11 | Klaviyo stores the one-tap link (30-day expiry) as an event property so its email can carry it. Is that acceptable, or should Klaviyo emails link to the sign-in page instead? | Include the link (`klaviyo.include_signin_link`) |
 | Q12 | Is the free gift offer a marketing email (needs consent) or a transactional one? This decides whether the Klaviyo flow can go to everyone who orders. | Treat it as marketing: Klaviyo's consent rules apply. The thank-you pop-up and "Create a card" in the menu cover everyone else. |
 
@@ -551,4 +559,5 @@ These came up while reading the live code and databases. They affect customers t
 4. **Mug choice changes after printing.** Nothing stops changes after printing starts: 9 changes landed after the mug went to print. No check that the order even has a mug.
 5. **"Download all" is broken** for current products: 500 of 520 attempts failed.
 6. **RLS disabled** on `paypal_subscription_ledger`, `daily_discounts` (shopify-dailyreport) and `dashboard_users` (imagegen-prod).
-7. **Imagen API key** in the live site's browser code (`src/lib/imagegen.ts`), and `user_sessions` readable and writable without sign-in.
+7. **Klaviyo post-purchase flows are dead.** "Purchase Thank You - checkout." and "Purchase Thank You" are live but trigger on API order events that stopped in August, so customers get no thank-you email from Klaviyo. Repoint them to Shopify `Placed Order`, or retire them.
+8. **Imagen API key** in the live site's browser code (`src/lib/imagegen.ts`), and `user_sessions` readable and writable without sign-in.

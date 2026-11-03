@@ -1188,6 +1188,21 @@ On a data-deletion request, call `POST https://a.klaviyo.com/api/data-privacy-de
 - `events:write`, `profiles:write`, `data-privacy:write`
 - `metrics:read` and `flows:read`, for the Settings check that a flow has received events.
 
-**UNVERIFIED**
+**Checked in the Klaviyo account (connector, read only, 3 Nov 2026)**
+- **Account:** `LD5CnH`, "Storyboards Inc", time zone US/Pacific.
+  - Default sender: `hi@storyboards.io` ("Storyboards").
+  - The only sending domain is `sending.storyboards.io` (marketing, active). **There is no `magicportraits.ai` sending domain in Klaviyo yet**, so flows can't send as `@magicportraits.ai` until one is added (SPEC Q10).
+- **Live order events:**
+  - Shopify integration `Placed Order` (metric `Wjhmq4`): about 1,470 in Aug, 1,050 in Sep, 1,070 in Oct.
+  - The site's own `order_placed` (`TuxDHG`): 1,098 / 745 / 784.
+- **Dead order events:** API `Placed Order` (`Rt6UrM`) and API `Purchase` (`LCxaFy`) have had **zero events since August**.
+  - The two live flows "Purchase Thank You - checkout." (`VN2KbH`) and "Purchase Thank You" (`SPQs3Q`) trigger on them, so they send nothing.
+  - In the last 90 days, the only flows that sent email were the two "MP Welcome - Masterpiece" flows, "Magic Welcome Flow" and "Magic Cart Abandonment".
+  - **So no post-purchase email currently goes out from Klaviyo**, and the free gift flow won't double up with one.
+- **"Gift Card Flow - Nov 20, 2024"** (`YdcVRd`, live) triggers on `Credit Gift Received`, which is VIP store credit. This is unrelated, and it's one more reason not to call our cards "gift cards".
+- **"VIP portal email login"** (`TrvVqS`, live) already sends a sign-in email from a Klaviyo flow, so a sign-in link in a Klaviyo email has a precedent here.
+- **Flow naming:** recent flows use `MP <Name> (YYYY-MM)`, e.g. "MP Welcome - Masterpiece v2 (2026-10)". Name ours the same way.
+- None of our event names exist yet as metrics, so there are no collisions. A metric appears in Klaviyo when its first event arrives, so the flows can only be built after the app has sent one test event of each.
+
+**Still UNVERIFIED**
 - The revision date to pin: the live site uses `2024-02-15` (server) and `2024-10-15` (client). Test the newest stable revision in Part 0 and save it in `klaviyo.api_revision`.
-- Whether the shop's Klaviyo–Shopify integration already sends `Placed Order`. If it does, the "Free gift" flow could trigger on that instead. We still send `free_gift_unlocked`, because it carries the one-tap link and the portrait preview.
