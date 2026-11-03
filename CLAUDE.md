@@ -17,7 +17,7 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 ## Stack
 - **Next.js** (latest stable, App Router, TypeScript `strict`), pnpm, deployed on **Vercel** (team Storyboards).
 - **Tailwind + shadcn/ui**, matching the live site (`reference/live-site/`).
-- **Supabase** (the app's own new project, `magic-vault`): Postgres, Auth (email OTP), Storage. Use `@supabase/ssr` for auth cookies.
+- **Supabase** (the app's own project, `magic-vault`, ref `koudexolfdvzmrglzhaz`; the only one, live): Postgres, Auth (email OTP), Storage. Use `@supabase/ssr` for auth cookies; the browser key is the publishable key.
 - **External reads:** Imagen and the events mirror through the read-only `vault_reader` Postgres role (`IMAGEGEN_DATABASE_URL`, `MIRROR_DATABASE_URL`; `postgres` driver via the Supabase pooler); Shopify Admin GraphQL with the r_orders app token.
 - **Card render:** `@napi-rs/canvas` (fonts registered from `assets/fonts/`). Use `sharp` for upload checks and thumbnails.
 - **Email:** React Email + Resend for everything that must arrive at once or goes to non-customers. Supabase Auth sends its codes through Resend SMTP.
@@ -58,7 +58,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
   
   Never write to Imagen, the events mirror or the live site's databases.
 - Every external source sits behind an interface in `lib/sources/` with a `fixtures` implementation. Tests and local dev use fixtures (`DATA_SOURCE=fixtures`); fixtures contain made-up people only.
-- Our own database: tests, previews and local dev use the **dev** project (`magic-vault-dev`). Production (`magic-vault`) gets migrations and the production seed only.
+- Our own database: there is one Supabase project, `magic-vault`, and it is live. Tests and e2e use the **local Supabase stack** (`supabase start`, Docker) in the build session. `magic-vault` gets migrations and `supabase/seed.sql` only, through `scripts/db-apply-remote.ts` and the Management API; never test data. Vercel previews also use `magic-vault`, with every switch off.
 
 **No hard-coding**
 - Anything a super user might change lives in `settings`, declared once in `lib/settings/registry.ts` with type, default and validation. This covers ids, limits, copy toggles, product lists, links and timings.
@@ -96,5 +96,6 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 **Working**
 - Before each commit, all of these pass: `pnpm typecheck && pnpm lint && pnpm test`. The e2e suite runs at the end of each part that adds a screen.
 - One commit per finished part (`feat(part-N): …`), pushed. Keep `BUILD_LOG.md` up to date: done, stubbed, decisions, open questions.
+- The build runs in a Claude Code cloud session with no app secrets. The Supabase Management API token is a network secret that's attached outside the session: call `https://api.supabase.com` without an auth header and never try to read the token. Postgres sources (Imagen, events mirror) aren't reachable from the session; they're checked after deploy in Settings › Data sources.
 - If something needed is missing (a secret, a permission, a design decision), don't stop the build. Put it behind its interface, use the fixture, write it in `BUILD_LOG.md` under "Blocked", and carry on.
 - Never print secrets, never commit `.env*` (except `.env.example`), and never put real customer data in code, tests, fixtures, screenshots or logs.

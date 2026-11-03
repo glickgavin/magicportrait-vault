@@ -13,7 +13,9 @@ This is the reference for every external read and write the vault (`my.magicport
 | `MIRROR_DATABASE_URL` | Postgres connection (pooler, transaction mode) to `kztxlpfrullqzphkvkiv` ("shopify-dailyreport") as the read-only role `vault_reader`: the events mirror and mug fulfilment jobs |
 | `IMAGEGEN_DATABASE_URL` | the same for `ngyunrirwrjudbgaijek` ("imagegen-prod"): sessions, images, revenue events, themes, recommendations |
 
-**Decision (3 Nov 2026):** the app reads both projects only through the read-only `vault_reader` role (set up in `BUILD.md` › Before you start, step 3). It does **not** use their service-role keys, which can write. Run the SQL versions of the queries below; ignore the PostgREST variants. Imagen images are in the public `images` bucket, so no Storage key is needed.
+**Decision (3 Nov 2026):** the app reads both projects only through the read-only `vault_reader` role (created on both projects on 3 Nov: `select` on the tables named here only, a `vault_reader_select` policy per table, `default_transaction_read_only = on`, `statement_timeout = 15s`, connection limit 20; Gavin sets its passwords, `BUILD.md` step 2). It does **not** use their service-role keys, which can write.
+
+**Known gap on both projects:** the `pg_net` extension grants `PUBLIC` (so every login role, `vault_reader` included) usage on schema `net` and all privileges on `net.http_request_queue` and `net._http_response`. A login could queue outbound HTTP requests from the database. `vault_reader`'s read-only default blocks this unless a client deliberately turns it off, and its password lives only in Vercel. Fully closing it means revoking those `PUBLIC` grants on each project, which affects every role: check nothing relies on them first (SPEC §21). Run the SQL versions of the queries below; ignore the PostgREST variants. Imagen images are in the public `images` bucket, so no Storage key is needed.
 
 | `SHOPIFY_STORE_DOMAIN` | `<shop>.myshopify.com`. **UNVERIFIED value**: the live code reads it from env and it was not visible |
 | `SHOPIFY_ADMIN_ACCESS_TOKEN` | Admin API token of the existing custom app "r_orders" |
@@ -453,7 +455,7 @@ imagegen.from('images')
 | `sessions` | `anon_can_read_session_status` (anon, SELECT, **`true`**) · `dashboard_admin_read` |
 | `revenue_events`, `themes`, `session_recommendations` | `dashboard_admin_read` only. The anon key **cannot** read them |
 
-- The app reads with the read-only `vault_reader` role, which gets its own select policy on each table it needs (`BUILD.md`, step 3).
+- The app reads with the read-only `vault_reader` role, which gets its own select policy on each table it needs (created 3 Nov; `BUILD.md` step 2 sets the password).
 - `themes` and `revenue_events` are not readable with the anon key.
 - `images` and `sessions` being world-readable is a live-site risk (section 8, item 12).
 - `public.dashboard_users` has RLS **disabled**. The vault does not use it, but the project's security advisor flags it.
@@ -1117,7 +1119,7 @@ Use the names in `analytics.md`. The legacy names and properties in 4.7 are for 
 2. **Deployed edge functions = repo HEAD.** Reading project `afqxjwizbmpzmvzzkzdb` was not permitted. The event data supports the code as read.
 3. **Mug lock cut-off.** Where does the mug pipeline run? (No edge functions were found in `kztxlpfrullqzphkvkiv`.) After which state does it stop applying a new `custom.mug_choice`? Does it filter on `source`? What do `manual_approval` values mean for the customer? The proposed default is in 6.6.
 4. **`lower(email)` expression index on the mirror** (2.4). It needs the project owner's approval; it was not created. Without it, 876 emails (2.3%) stored only in mixed case are missed unless the typed spelling matches.
-5. ~~Read-only database role.~~ **Decided:** the read-only `vault_reader` role (`BUILD.md` step 3); no service-role keys.
+5. ~~Read-only database role.~~ **Decided:** the read-only `vault_reader` role (created 3 Nov); no service-role keys.
 6. **Include recommendation child sessions?** They are not in the mirror. The default here is yes.
 7. **Optional browser-session expansion** (2.5). Its size is unknown, and it carries a shared-device risk.
 8. **Shopify `email:` search.** Is it case-insensitive? Should it be combined with a `customer_id:` search?

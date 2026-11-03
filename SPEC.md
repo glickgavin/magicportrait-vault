@@ -503,7 +503,7 @@ This pass reviewed all 28 screens against the decisions above.
   - the reminder and resend-link emails
   - Email preferences
   - page-view names for every page.
-- Tests run against a separate dev database (`magic-vault-dev`) with live sample themes. Production is never touched by tests, and sign-in tests need no Docker.
+- There is one Supabase project, `magic-vault` (live). Tests run against a local Supabase stack inside the build session, with live sample themes; `magic-vault` only ever gets migrations and the production seed.
 
 **Added after review (3 Nov)**
 - **First time is one screen** (`FirstCard`, `FirstHome`, §8.0). The card is already made; the person types a name and taps Create.
@@ -562,3 +562,4 @@ These came up while reading the live code and databases. They affect customers t
 6. **RLS disabled** on `paypal_subscription_ledger`, `daily_discounts` (shopify-dailyreport) and `dashboard_users` (imagegen-prod).
 7. **Klaviyo post-purchase flows are dead.** "Purchase Thank You - checkout." and "Purchase Thank You" are live but trigger on API order events that stopped in August, so customers get no thank-you email from Klaviyo. Repoint them to Shopify `Placed Order`, or retire them.
 8. **Imagen API key** in the live site's browser code (`src/lib/imagegen.ts`), and `user_sessions` readable and writable without sign-in.
+9. **`pg_net` is open to every database login** on imagegen-prod and shopify-dailyreport: `PUBLIC` has usage on schema `net` and full rights on its request queue, so any login role can make the database send HTTP requests. Revoke those `PUBLIC` grants after checking nothing relies on them (`docs/data.md` › Environment variables).

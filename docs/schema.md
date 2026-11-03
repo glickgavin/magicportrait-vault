@@ -246,5 +246,5 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 
 - The four categories, and themes Christmas, Happy Holidays, New Year, Birthday, Thank you, With love and Congratulations. Each has one version with a plain placeholder background (a generated solid colour plus a headline) and a default layout. The 10 versions in the designs (`CardPreview` variants) are the target set; real artwork comes from the designers (`ThemeSpec`).
 - **Two seed files:**
-  - `supabase/seed.sql` (production): every version is **draft**, and every `cards.enabled` and `gift.*` switch is off.
-  - `supabase/seed.dev.sql` (dev project, previews and tests): one **live** version per category, `cards.enabled = true`, and fixture people. The e2e tests have something to pick.
+  - `supabase/seed.sql` (the live project, `magic-vault`): every version is **draft**, and every `cards.enabled` and `gift.*` switch is off. It is idempotent (`on conflict do nothing`), so re-running it never overwrites what a super user changed.
+  - `supabase/seed.test.sql` (the local test stack only, never `magic-vault`): one **live** version per category, `cards.enabled = true`, and fixture people. The e2e tests have something to pick.
