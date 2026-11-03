@@ -1,5 +1,11 @@
-// Unit tests always use fixtures and never real services.
+// Unit tests always use fixtures and the local Supabase stack, never real services.
+import { appTestEnv } from "../scripts/local-env.mjs";
+
+const local = appTestEnv(3100);
+for (const [k, v] of Object.entries(local)) {
+  if (k === "APP_URL") process.env[k] = v;
+  else process.env[k] ??= v;
+}
 process.env.DATA_SOURCE = "fixtures";
-process.env.EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || "fixtures";
-process.env.GIFT_LINK_SECRET = process.env.GIFT_LINK_SECRET || "test-gift-link-secret-that-is-at-least-32-bytes-long";
-process.env.CRON_SECRET = process.env.CRON_SECRET || "test-cron-secret";
+process.env.EMAIL_PROVIDER = "fixtures";
+process.env.KLAVIYO_PROVIDER = "fixtures";

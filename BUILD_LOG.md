@@ -8,7 +8,7 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 |---|---|---|
 | 0 | Preflight | done |
 | 1 | App shell | done |
-| 2 | Database and settings | pending |
+| 2 | Database and settings | done |
 | 3 | Data sources | pending |
 | 4 | Sign-in and account | pending |
 | 5 | Home and My portraits | pending |
@@ -43,6 +43,16 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - PostHog provider (`/ingest` rewrite, cross-subdomain cookie, inputs masked, `.ph-no-capture` blocks the card preview, `before_send` strips tokens and query strings on `/g/` and `/c/`). `lib/track-client.ts` for the browser; server `lib/track.ts` comes with the database in Part 2.
 - e2e: shell at 360, 390 and 1280 px, axe clean, menu opens and closes, 404 page.
 
+## Part 2: Database and settings
+
+- Migration `20261103000001_core.sql`: every table in `docs/schema.md`, plus `processed_webhooks` (webhook idempotency) and `data_source_checks` (Settings › Data sources). Email checks, indexes (trigram for admin search), `updated_at` triggers, `settings_history` trigger, `is_super_user()`, `hit_rate_limit()`, `prune_rate_limits()`, `record_activity()` (activity row + Klaviyo outbox row in one transaction, deduped), `anonymise_activity()` (the only allowed activity_log mutation; the guard blocks update/delete/truncate otherwise), buckets `theme-assets` (public), `portraits`, `cards`.
+- RLS on every table with no policies; `anon`/`authenticated` have no grants on tables or functions. The Supabase security advisor shows only the expected "RLS enabled, no policies" notices.
+- `lib/settings/registry.ts` declares all 98 keys (type, section, default, Zod validation). `getSetting`/`getSettings` (15 s cache, invalid values fall back to the default), `setSetting` (validation, read-only keys refused, history via trigger), `listSettings`, `settingHistory`.
+- `supabase/seed.sql` and `seed.test.sql` are **generated** (`pnpm db:seed:gen`) from the registry and `lib/seed-data.ts`; a test fails if they drift.
+- `lib/track.ts`: server `track()` → PostHog (posthog-node) and, for business events, `activity_log` via `record_activity`, with an optional outbox row. Unknown names throw in dev/test; message text and recipient fields are stripped.
+- `scripts/db-apply-remote.ts` applied the migration and `seed.sql` to **magic-vault** (3 Nov). Re-running is a no-op. Result: all six launch switches false, 0 live theme versions.
+- Tests: registry validation, seed sync and idempotency, and integration tests on the local stack (history, append-only guard, anonymisation, outbox dedupe, rate limit, super-user check, RLS denies the browser key).
+
 ## Decisions
 
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
@@ -52,6 +62,11 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Contrast:** the live footer's muted text (black at 50%) and the menu's magenta lead label and faint numerals fail WCAG AA on the cream background. We use black at 60% for footer links, `#B8059F` for "Make something", and black at 50% for the 01–06 numerals. Everything else matches the live site.
 - **Menu product rows** follow the `Menu` mockup (compact rows with thumbnail tiles) rather than the live site's large editorial list, since the mockup adds the MY MAGIC PORTRAITS group above it. Thumbnails are placeholder tiles until `links.menu_thumbnails` is set (SPEC Q9).
 - **Brand icons** (Instagram, Facebook, WhatsApp) are inline SVGs: the current `lucide-react` no longer ships brand marks.
+
+- **`cards.first_card_default_version`** default is `with-love-love` (full `theme-version` slug) rather than `general-love`, because the seed themes are named after the occasion (With love › Hearts). `docs/schema.md` updated.
+- **Seed artwork** is the 10 looks from the `CardPreview` mockup across 7 themes, as placeholder images shipped in `public/theme-placeholders` (`builtin:` paths), since `magic-vault` only receives SQL. Themes are `live`, versions `draft` in the live seed.
+- **Extra settings** beyond the docs, so nothing is hard-coded: rate limits (`auth.code_rate_limit_per_hour`, `auth.code_ip_rate_limit_per_hour`, `auth.verify_rate_limit_per_hour`, `vault.lookup_rate_limit_per_hour`, `redeem.download_rate_limit_per_hour`, `gift.offer_link_rate_limit_per_hour`), `cards.schedule_max_days`, `cards.signed_url_seconds`, `email.from_system`, `links.vip_login_url`, `vault.first_order_offer_code`, `tracking.*`, `klaviyo.max_attempts`. A `klaviyo` settings section was added to the allowed list.
+- **Local env**: `scripts/local-env.mjs` reads the running stack's keys (`supabase status`) for tests, e2e and `.env.local`, so no keys are committed. `scripts/dev-up.sh` restarts Docker and the stack after a session restart.
 
 ## Blocked
 

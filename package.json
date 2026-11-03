@@ -18,7 +18,8 @@
     "e2e": "playwright test",
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
-    "db:apply-remote": "node --experimental-strip-types scripts/db-apply-remote.ts"
+    "db:apply-remote": "NODE_USE_ENV_PROXY=1 node --experimental-strip-types --no-warnings scripts/db-apply-remote.ts",
+    "db:seed:gen": "node --experimental-strip-types --no-warnings scripts/gen-seed.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.1.0",

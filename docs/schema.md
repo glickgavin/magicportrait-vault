@@ -21,7 +21,7 @@ Master data and variables, edited in Settings. Secrets never go here.
 | key | text pk | dotted, e.g. `cards.message_max_chars` |
 | value | jsonb not null | |
 | type | text not null | `text` · `number` · `boolean` · `choice` · `list` · `json` · `shopify_id` · `date` |
-| section | text not null | `cards` · `gift` · `redeem` · `auth` · `vault` · `themes` · `brand` · `email` · `links` · `tracking` |
+| section | text not null | `cards` · `gift` · `redeem` · `auth` · `vault` · `themes` · `brand` · `email` · `links` · `tracking` · `klaviyo` |
 | label | text not null | shown in Settings |
 | description | text | |
 | options | jsonb | allowed values for `choice` |
@@ -167,6 +167,12 @@ A data-deletion request deletes the person's rows here too, and calls Klaviyo's 
 ### data_requests
 `id uuid pk`, `email`, `type` (`export` · `delete`), `requested_by`, `status`, `completed_at`, `notes`.
 
+### processed_webhooks
+`source` (`shopify` · `agentmail`), `webhook_id` (`X-Shopify-Webhook-Id` or `svix-id`), `topic`, `created_at`; primary key `(source, webhook_id)`. Makes webhook handlers idempotent.
+
+### data_source_checks
+`source text pk`, `ok`, `checked_at`, `last_ok_at`, `ms`, `detail jsonb` (counts and timings only), `checked_by`. Powers the status cards in Settings › Data sources.
+
 ## Storage buckets
 
 | bucket | public | contents |
@@ -220,7 +226,7 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `gift.link_valid_days` | 30 |
 | `gift.offer_email_delay_minutes` | 0 |
 | `cards.first_card_mode` | one_screen (or full_builder) |
-| `cards.first_card_default_version` | `general-love` (used when nothing is in season) |
+| `cards.first_card_default_version` | `with-love-love` (full `theme-version` slug; used when nothing is in season) |
 | `redeem.mug_reminder_after_days` | 2 |
 | `gift.popup_email_later_enabled` | false (turn on once the Klaviyo offer flow exists) |
 | `klaviyo.enabled` | false (on once the key is set and the flows exist) |
@@ -244,6 +250,7 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `links.start_portrait_url` | (from `docs/data.md`) |
 | `links.menu_thumbnails` | [] (six image URLs for the menu's product list; placeholders until set, SPEC Q9) |
 
+- Placeholder artwork ships with the app (`public/theme-placeholders`, referenced as `builtin:<file>`), because the live project only gets SQL. Real artwork uploaded in the template editor goes to the `theme-assets` bucket.
 - The four categories, and themes Christmas, Happy Holidays, New Year, Birthday, Thank you, With love and Congratulations. Each has one version with a plain placeholder background (a generated solid colour plus a headline) and a default layout. The 10 versions in the designs (`CardPreview` variants) are the target set; real artwork comes from the designers (`ThemeSpec`).
 - **Two seed files:**
   - `supabase/seed.sql` (the live project, `magic-vault`): every version is **draft**, and every `cards.enabled` and `gift.*` switch is off. It is idempotent (`on conflict do nothing`), so re-running it never overwrites what a super user changed.

@@ -1,10 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore -- plain ESM helper
 import { appTestEnv } from "./scripts/local-env.mjs";
 
 const PORT = 3100;
-const env = appTestEnv(PORT) as Record<string, string>;
+const env = appTestEnv(PORT);
 for (const [k, v] of Object.entries(env)) process.env[k] ??= v;
 
 export default defineConfig({
