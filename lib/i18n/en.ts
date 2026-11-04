@@ -96,6 +96,8 @@ export const en = {
     resent: "We sent a new code.",
     changeEmail: "Change email",
     badEmail: "Please enter a valid email.",
+    testNote: "Test sign-in is on (previews only). Signs in as this email without a code.",
+    testButton: "Test sign-in (no code)",
     badCode: "That code didn't work. Check it and try again, or resend a new one.",
     linkExpired: "That link has expired. Enter your email and we'll send you a code instead.",
     orderEmailNote: "Came from your order email? Its button signs you in, no code needed.",

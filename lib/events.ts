@@ -26,6 +26,7 @@ export const EVENTS = {
   vault_code_verified: ui,
   vault_code_failed: ui,
   vault_signed_in: bizKlaviyo,
+  vault_test_signin: biz,
   vault_lookup_succeeded: biz,
   vault_lookup_empty: biz,
 

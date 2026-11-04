@@ -13,6 +13,7 @@ export const metadata = { title: "General & variables" };
 
 const CARD_KEYS = ["cards.enabled", "cards.who_can_create", "cards.per_customer", "cards.price"];
 const REDEEM_KEYS = ["redeem.downloads_enabled", "redeem.mug_offer_active", "redeem.mug_lock_mode"];
+const TEST_KEYS = ["auth.test_signin_enabled"];
 
 export default async function GeneralSettings() {
   const user = await requireSuperUser();
@@ -28,6 +29,7 @@ export default async function GeneralSettings() {
           {[
             ["Greeting cards", pick(CARD_KEYS)],
             ["Redeem: downloads & mugs", pick(REDEEM_KEYS)],
+            ["Testing (previews only, never on my.magicportraits.ai)", pick(TEST_KEYS)],
           ].map(([title, list]) => (
             <section key={title as string} className="rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
               <h2 className="text-[19px] font-extrabold">{title as string}</h2>

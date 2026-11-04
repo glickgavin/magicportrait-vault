@@ -165,6 +165,9 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 
 ## Decisions
 
+- **Failing sources degrade, not crash (4 Nov):** the first preview showed an error page because Shopify answered 401 (Preview's `SHOPIFY_ADMIN_ACCESS_TOKEN` / `SHOPIFY_STORE_DOMAIN`). `getVaultProfile` now catches each source (Shopify, mirror, Imagen), logs a masked error, returns a partial profile with `unavailable`, skips the member-cache write, and `/` and `/portraits` show a notice instead of the empty state.
+- **Test sign-in (4 Nov, requested by Gavin):** `auth.test_signin_enabled` (default off, Settings › General › Testing) adds a "Test sign-in (no code)" button to /signin that signs in as any typed email. It is hard-blocked in code when `VERCEL_ENV=production`, because settings are shared between previews and production. Rate-limited per IP; logged as `vault_test_signin` (activity_log only, never Klaviyo). Turn it off and remove it before launch.
+
 - **TypeScript 5.9** rather than 7.x (native preview), because Next 16's type plugin targets 5.x.
 - **Playwright pinned to 1.63.0** to match the Chromium preinstalled at `/opt/pw-browsers`.
 - **Local seeds:** `supabase/config.toml` runs `seed.sql` then `seed.test.sql` on `db reset`, so the test stack gets the production seed plus the test overlay (live versions, `cards.enabled` on, fixture people). `magic-vault` only ever gets `seed.sql`.

@@ -5,6 +5,7 @@ import { TrackPageView } from "@/components/TrackPageView";
 import { getSessionUser, safeNext } from "@/lib/auth/session";
 import { getSetting } from "@/lib/settings";
 import { t } from "@/lib/i18n";
+import { testSignInAllowed } from "@/lib/auth/test-signin";
 
 export type SignInPurpose = "gift" | "redeem" | "default";
 
@@ -13,7 +14,7 @@ export async function SignInScreen({ purpose, order, next, expired, legacyRedeem
   const target = safeNext(next ?? (order ? `/orders/${order}` : purpose === "redeem" ? "/orders" : purpose === "gift" ? "/create" : "/"));
   const user = await getSessionUser();
   if (user) redirect(target);
-  const minutes = await getSetting("auth.code_valid_minutes");
+  const [minutes, testSignIn] = await Promise.all([getSetting("auth.code_valid_minutes"), testSignInAllowed()]);
   const title = purpose === "redeem" ? (order ? t("signin.titleRedeem", { order: `#${order}` }) : t("signin.titleRedeemNoOrder")) : purpose === "gift" ? t("signin.titleGift") : t("signin.titleDefault");
   const sub = purpose === "redeem" ? t("signin.subRedeem") : purpose === "gift" ? t("signin.subGift") : t("signin.subDefault");
   return (
@@ -23,7 +24,7 @@ export async function SignInScreen({ purpose, order, next, expired, legacyRedeem
       <h1 className="mt-6 text-center text-[28px] font-extrabold leading-tight tracking-tight">{title}</h1>
       <p className="mt-2 text-center text-[16px] leading-snug text-ink-2">{sub}</p>
       <div className="mt-5">
-        <SignInForm purpose={purpose} next={target} expired={Boolean(expired)} codeMinutes={minutes} />
+        <SignInForm purpose={purpose} next={target} expired={Boolean(expired)} codeMinutes={minutes} testSignIn={testSignIn} />
       </div>
       <p className="mt-10 text-center text-[14px] text-ink-2">{t("signin.orderEmailNote")}</p>
     </div>

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { makeLink, signInWithCode, signInWithLink } from "./auth";
 import { expectNoAxeViolations } from "./helpers";
+import { setSetting } from "./db";
 
 test.describe("sign-in and account", () => {
   test("signs in with a 6-digit code, shows initials, opens the account menu, signs out", async ({ page }) => {
@@ -85,5 +86,20 @@ test.describe("sign-in and account", () => {
     expect(a).toBe(b);
     expect(a).toContain("We couldn't find that order on this email");
     expect(a).not.toContain("sam");
+  });
+});
+
+test.describe("test sign-in (previews only)", () => {
+  test.afterEach(async () => setSetting("auth.test_signin_enabled", false));
+
+  test("hidden by default; when on, signs in as any email without a code", async ({ page }) => {
+    await page.goto("/signin");
+    await expect(page.getByTestId("test-signin")).toHaveCount(0);
+    await setSetting("auth.test_signin_enabled", true);
+    await page.goto("/signin");
+    await page.getByLabel(/email/i).first().fill("sam@example.com");
+    await page.getByTestId("test-signin").click();
+    await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
+    await expect(page.getByTestId("avatar-button")).toBeVisible();
   });
 });

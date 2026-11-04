@@ -139,6 +139,10 @@ export const REGISTRY = {
   "auth.code_rate_limit_per_hour": num("auth", 6, { label: "Code requests per email per hour", min: 1, max: 1000000 }),
   "auth.code_ip_rate_limit_per_hour": num("auth", 30, { label: "Code requests per IP per hour", min: 1, max: 1000000 }),
   "auth.verify_rate_limit_per_hour": num("auth", 20, { label: "Code checks per email per hour", min: 1, max: 1000000 }),
+  "auth.test_signin_enabled": bool("auth", false, {
+    label: "Test sign-in (no code, previews only)",
+    description: "On: the sign-in page lets anyone who can open a preview sign in as any email without a code. Never works on the production site, whatever this says. Turn off when testing is done.",
+  }),
   "auth.link_ip_rate_limit_per_hour": num("auth", 60, { label: "One-tap link opens per IP per hour", min: 1, max: 1000000 }),
 
   // ---------- vault: data-source plumbing ----------

@@ -7,7 +7,7 @@ import { identifyClient, trackClient } from "@/lib/track-client";
 
 type Purpose = "gift" | "redeem" | "default";
 
-export function SignInForm({ purpose, next, expired, codeMinutes }: { purpose: Purpose; next: string; expired: boolean; codeMinutes: number }) {
+export function SignInForm({ purpose, next, expired, codeMinutes, testSignIn = false }: { purpose: Purpose; next: string; expired: boolean; codeMinutes: number; testSignIn?: boolean }) {
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -74,6 +74,29 @@ export function SignInForm({ purpose, next, expired, codeMinutes }: { purpose: P
     }
   }
 
+  /** Preview-only: signs in as the typed email without a code (the server re-checks it's allowed). */
+  async function testSignInNow() {
+    setError(null);
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setError(t("signin.badEmail"));
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await fetch("/api/auth/test-signin", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, next }) });
+      const body = (await r.json().catch(() => ({}))) as { next?: string };
+      if (r.ok) {
+        window.location.assign(body.next || "/");
+        return;
+      }
+      setError(r.status === 429 ? t("errors.rateLimited") : t("errors.generic"));
+    } catch {
+      setError(t("errors.generic"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="rounded-[20px] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
       {step === "email" ? (
@@ -108,6 +131,14 @@ export function SignInForm({ purpose, next, expired, codeMinutes }: { purpose: P
           <Button type="submit" size="lg" className="mt-4 w-full" disabled={busy}>
             {busy ? t("signin.sending") : purpose === "redeem" ? t("signin.sendCode") : t("signin.findPortraits")}
           </Button>
+          {testSignIn && (
+            <div className="mt-4 rounded-[12px] border border-dashed border-magenta/50 p-3 text-center">
+              <p className="text-[13px] text-ink-2">{t("signin.testNote")}</p>
+              <Button type="button" variant="secondary" className="mt-2 w-full" disabled={busy} onClick={() => void testSignInNow()} data-testid="test-signin">
+                {t("signin.testButton")}
+              </Button>
+            </div>
+          )}
         </form>
       ) : (
         <form
