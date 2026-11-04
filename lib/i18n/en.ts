@@ -68,6 +68,8 @@ export const en = {
     errorTitle: "Something went wrong",
     errorBody: "Please try again. If it keeps happening, chat with us.",
     tryAgain: "Try again",
+    partialTitle: "Some of your portraits and orders can't be shown right now",
+    partialBody: "We're having trouble reaching them. Please try again in a few minutes.",
     generic: "Something went wrong. Please try again.",
     rateLimited: "Too many tries. Please wait a few minutes and try again.",
   },

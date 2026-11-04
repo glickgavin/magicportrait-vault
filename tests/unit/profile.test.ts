@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getVaultProfile } from "@/lib/vault/profile";
 import { pickFirstCardPortrait } from "@/lib/vault/profile-core";
 import { fxImageId } from "@/lib/sources/fixtures-data";
@@ -74,5 +74,32 @@ describe("getVaultProfile on fixtures", () => {
     const charlie = await getVaultProfile("charlie@example.com", { refresh: true });
     const pick = pickFirstCardPortrait(charlie)!;
     expect(pick.portrait.createdAt).toBe(charlie.sessions.flatMap((s) => s.portraits).map((x) => x.createdAt).sort().reverse()[0]);
+  });
+});
+
+describe("getVaultProfile with a failing source", () => {
+  it("returns a partial profile instead of throwing, and doesn't touch the member cache", async () => {
+    const sources = await import("@/lib/sources");
+    const real = await sources.getSources();
+    const spy = vi.spyOn(sources, "getSources").mockResolvedValue({
+      ...real,
+      shopify: { ...real.shopify, ordersByEmail: async () => { throw new Error("shopify_http_401"); } },
+    } as Awaited<ReturnType<typeof sources.getSources>>);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const p = await getVaultProfile("partial-" + Date.now() + "@example.com", { refresh: true });
+      expect(p.unavailable).toEqual(["shopify"]);
+      expect(p.orders).toEqual([]);
+      expect(p.memberId).toBeNull();
+      expect(err.mock.calls.flat().join(" ")).not.toMatch(/partial-\d+@example\.com/);
+    } finally {
+      spy.mockRestore();
+      err.mockRestore();
+    }
+  });
+
+  it("is empty when every source works", async () => {
+    const p = await getVaultProfile("sam@example.com", { refresh: true });
+    expect(p.unavailable).toEqual([]);
   });
 });

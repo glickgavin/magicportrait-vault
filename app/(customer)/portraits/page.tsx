@@ -8,6 +8,7 @@ import { PortraitFilter, type Filter } from "@/components/vault/PortraitFilter";
 import { TrackPageView } from "@/components/TrackPageView";
 import { TrackedLink } from "@/components/TrackedLink";
 import { EmptyHome } from "@/components/screens/home/EmptyHome";
+import { PartialNotice } from "@/components/screens/home/PartialNotice";
 import { t } from "@/lib/i18n";
 import { fmtDate } from "@/lib/format";
 
@@ -20,12 +21,15 @@ export default async function PortraitsPage({ searchParams }: { searchParams: Pr
   const filter: Filter = sp.filter === "ordered" || sp.filter === "not_ordered" ? sp.filter : "all";
   const data = await loadHome(user.email);
   const { profile } = data;
+  const partial = profile.unavailable.length > 0;
+  if (profile.state === "nobody" && partial) return <PartialNotice />;
   if (profile.state === "nobody") return <EmptyHome startPortraitUrl={data.startPortraitUrl} mirrorSince={data.mirrorSince} />;
   const groups = profile.sessions.filter((g) => (filter === "ordered" ? g.portraits.some((p) => p.ordered) : filter === "not_ordered" ? g.portraits.some((p) => !p.ordered) : true));
   const oldest = profile.sessions.map((s) => s.createdAt).sort()[0];
   const nothingOlder = !oldest || oldest.slice(0, 10) >= data.mirrorSince;
   return (
     <div className="mx-auto max-w-[640px]" data-testid="portraits-page">
+      {partial && <PartialNotice />}
       <TrackPageView event="page_view_vault_portraits" props={{ session_count: profile.sessions.length, portrait_count: profile.portraitCount, ordered_count: profile.orderedCount }} />
       {profile.hasFreeGift && <HomeTabs active="portraits" />}
       <h1 className="mt-5 text-[28px] font-extrabold tracking-tight">{t("portraits.title")}</h1>

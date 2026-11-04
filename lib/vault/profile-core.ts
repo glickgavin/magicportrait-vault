@@ -57,6 +57,8 @@ export type VaultProfile = {
   orderedCount: number;
   state: "customer" | "creator" | "nobody";
   lookupMs: number;
+  /** Sources that failed during this lookup; the profile is partial when non-empty. */
+  unavailable: ("shopify" | "mirror" | "imagen")[];
 };
 
 export type BuildInput = {
@@ -174,6 +176,7 @@ export function buildProfile(input: BuildInput): VaultProfile {
     orderedCount,
     state: isCustomer ? "customer" : portraitCount > 0 ? "creator" : "nobody",
     lookupMs: 0,
+    unavailable: [],
   };
 }
 
