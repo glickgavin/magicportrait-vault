@@ -35,6 +35,13 @@ export const layoutSchema = z.object({
     shape: z.enum(["rect", "rounded", "circle", "arch"]).default("rounded"),
     radius: z.number().min(0).optional(),
     frame: z.object({ color, width: z.number().min(0).max(200) }).optional(),
+    /**
+     * "adapt": x/y/w/h is the maximum photo area; the portrait is fitted inside it at its own shape,
+     * centred, uncropped, and the frame follows the fitted box. "cover": the box is fixed and the
+     * portrait is cover-cropped into it (for art that draws the frame itself). Unset: "cover" when the
+     * frame is drawn by the background art (frame.width 0), otherwise "adapt".
+     */
+    fit: z.enum(["adapt", "cover"]).optional(),
   }),
   text: z.object({ to: textZone, message: textZone, from: textZone }),
   footer: z.object({ y: z.number(), size: z.number().positive(), color }).optional(),
@@ -158,6 +165,41 @@ export function photoSourceRect(imgW: number, imgH: number, zoneW: number, zoneH
   return { sx: cx - sw / 2, sy: cy - sh / 2, sw, sh };
 }
 
+export type PhotoFit = "adapt" | "cover";
+
+/** The fit a version uses: its `photo.fit`, else "cover" when the art draws the frame (frame.width 0), else "adapt". */
+export function photoFit(p: Layout["photo"]): PhotoFit {
+  if (p.fit) return p.fit;
+  return p.frame && p.frame.width === 0 ? "cover" : "adapt";
+}
+
+/**
+ * The photo box actually drawn. With "adapt", the portrait is fitted inside the maximum photo area at
+ * its own aspect ratio, centred, and rect/rounded/arch shrink to it. Circles stay circles
+ * (cover-cropped), and "cover" keeps the box as designed. Without a portrait, the box is as designed.
+ */
+export function fittedPhoto(p: Layout["photo"], imgW?: number | null, imgH?: number | null): Layout["photo"] {
+  if (!imgW || !imgH || p.shape === "circle" || photoFit(p) === "cover") return p;
+  const fw = p.frame?.width ?? 0;
+  const innerW = Math.max(1, p.w - fw * 2);
+  const innerH = Math.max(1, p.h - fw * 2);
+  const a = imgW / imgH;
+  let w = innerW;
+  let h = innerW / a;
+  if (h > innerH) {
+    h = innerH;
+    w = innerH * a;
+  }
+  const boxW = w + fw * 2;
+  const boxH = h + fw * 2;
+  return { ...p, x: p.x + (p.w - boxW) / 2, y: p.y + (p.h - boxH) / 2, w: boxW, h: boxH };
+}
+
+/** Arch top radius: a semicircle across the width, capped at half the height so wide boxes keep a gentle arch. */
+export function archRadius(w: number, h: number): number {
+  return Math.max(0, Math.min(w / 2, h / 2));
+}
+
 /** Path for the photo zone shape, as a list of drawing commands both renderers understand. */
 export type PathCmd = ["M", number, number] | ["L", number, number] | ["A", number, number, number, number, number] | ["Q", number, number, number, number] | ["Z"];
 
@@ -171,8 +213,9 @@ export function shapePath(p: Layout["photo"], inset = 0): PathCmd[] {
     return [["A", x + w / 2, y + h / 2, r, 0, Math.PI * 2], ["Z"]];
   }
   if (p.shape === "arch") {
-    const r = w / 2;
-    return [["M", x, y + h], ["L", x, y + r], ["A", x + r, y + r, r, Math.PI, Math.PI * 2], ["L", x + w, y + h], ["Z"]];
+    const r = archRadius(w, h);
+    // Two quarter arcs joined by a straight top; with r = w/2 that's the classic semicircle.
+    return [["M", x, y + h], ["L", x, y + r], ["A", x + r, y + r, r, Math.PI, Math.PI * 1.5], ["L", x + w - r, y], ["A", x + w - r, y + r, r, Math.PI * 1.5, Math.PI * 2], ["L", x + w, y + h], ["Z"]];
   }
   const r = p.shape === "rounded" ? Math.max(0, Math.min((p.radius ?? 36) - inset, w / 2, h / 2)) : 0;
   return [
@@ -212,7 +255,12 @@ export function tracePath(ctx: Ctx2D, cmds: PathCmd[]) {
 /** CSS clip-path / border-radius for the preview's photo zone. */
 export function cssShape(p: Layout["photo"]): { borderRadius?: string; clipPath?: string } {
   if (p.shape === "circle") return { borderRadius: "50%" };
-  if (p.shape === "arch") return { borderRadius: `${(50).toFixed(0)}% ${(50).toFixed(0)}% 0 0 / ${((p.w / 2 / p.h) * 100).toFixed(2)}% ${((p.w / 2 / p.h) * 100).toFixed(2)}% 0 0` };
+  if (p.shape === "arch") {
+    const r = archRadius(p.w, p.h);
+    const rx = ((r / p.w) * 100).toFixed(2);
+    const ry = ((r / p.h) * 100).toFixed(2);
+    return { borderRadius: `${rx}% ${rx}% 0 0 / ${ry}% ${ry}% 0 0` };
+  }
   if (p.shape === "rounded") return { borderRadius: `${(((p.radius ?? 36) / p.w) * 100).toFixed(3)}% / ${(((p.radius ?? 36) / p.h) * 100).toFixed(3)}%` };
   return {};
 }
