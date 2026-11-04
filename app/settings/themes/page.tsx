@@ -4,7 +4,7 @@ import { loadThemeTables } from "@/lib/db/themes";
 import { themeAssetUrl } from "@/lib/render/assets";
 import { settingRows } from "@/lib/admin/data";
 import { SettingField } from "@/components/admin/SettingField";
-import { CategoryControls, NewThemeForm, NewVersionForm, ThemeStatus, VersionOrder } from "@/components/admin/ThemeControls";
+import { CategoryControls, NewThemeForm, NewVersionForm, ThemeLiveToggle, ThemeStatus, VersionOrder } from "@/components/admin/ThemeControls";
 import { TrackPageView } from "@/components/TrackPageView";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function ThemeLibrary({ searchParams }: { searchParams: Pro
       <TrackPageView event="settings_viewed" props={{ section: "themes" }} />
       <div>
         <h1 className="text-[30px] font-extrabold tracking-tight">Theme library</h1>
-        <p className="text-[15px] text-ink-2">Customers see live versions of live themes inside their dates. Publish a version from the template editor.</p>
+        <p className="text-[15px] text-ink-2">Customers see live versions of live themes inside their dates. Use a theme’s Live switch to publish all its versions at once, or publish one version from the template editor.</p>
       </div>
       <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
         <div className="flex min-w-0 flex-col gap-5">
@@ -50,6 +50,9 @@ export default async function ThemeLibrary({ searchParams }: { searchParams: Pro
                     </h2>
                     <p className="text-[13px] text-ink-2">{t.available_from ? `Shown ${mmdd(t.available_from)} → ${mmdd(t.available_to)} every year` : "Always available"}</p>
                   </div>
+                  <ThemeLiveToggle id={t.id} name={t.name} themeLive={t.status === "live"} liveCount={vs.filter((v) => v.status === "live").length} draftCount={vs.filter((v) => v.status === "draft").length} />
+                </div>
+                <div className="mt-2">
                   <ThemeStatus id={t.id} status={t.status} from={mmdd(t.available_from)} to={mmdd(t.available_to)} name={t.name} />
                 </div>
                 <ul className="mt-3 grid gap-2">

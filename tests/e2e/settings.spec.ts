@@ -158,4 +158,32 @@ test.describe("settings (super users)", () => {
     await page.getByRole("button", { name: "Search" }).click();
     await expect(page.getByTestId("customer-results")).toContainText("charlie@example.com");
   });
+
+  test("theme library: the Live switch publishes every draft version, and turns the theme off", async ({ page }) => {
+    const db = admin();
+    const src = (await db.from("theme_versions").select("background_path, overlay_path, layout, message_ideas").eq("status", "live").limit(1).single()).data!;
+    const cat = (await db.from("theme_categories").select("id").limit(1).single()).data!.id as string;
+    const theme = (await db.from("themes").insert({ slug: `e2e-switch-${Date.now()}`, name: "E2E switch", category_id: cat, status: "draft" }).select("id").single()).data!.id as string;
+    await db.from("theme_versions").insert([
+      { theme_id: theme, slug: "one", name: "One", status: "draft", ...src },
+      { theme_id: theme, slug: "two", name: "Two", status: "draft", ...src },
+    ]);
+    try {
+      await signInWithLink(page, "super@example.com", "/settings/themes");
+      const sw = page.getByTestId(`theme-live-${theme}`);
+      await expect(sw).toHaveAttribute("aria-checked", "false");
+      await expect(page.locator(`#live-desc-${theme}`)).toHaveText("0 of 2 live");
+      await sw.click();
+      await expect(sw).toHaveAttribute("aria-checked", "true", { timeout: 30_000 });
+      await expect(page.locator(`#live-desc-${theme}`)).toHaveText("2 of 2 live");
+      const vs = (await db.from("theme_versions").select("status").eq("theme_id", theme)).data!;
+      expect(vs.every((v) => v.status === "live")).toBe(true);
+      page.once("dialog", (d) => void d.accept());
+      await sw.click();
+      await expect(sw).toHaveAttribute("aria-checked", "false");
+      expect((await db.from("themes").select("status").eq("id", theme).single()).data!.status).toBe("draft");
+    } finally {
+      await db.from("themes").delete().eq("id", theme);
+    }
+  });
 });

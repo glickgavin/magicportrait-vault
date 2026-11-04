@@ -23,3 +23,26 @@ export async function publishVersion(id: string): Promise<VersionRow> {
   await putObject("theme-assets", key, await canvas.encode("jpeg", 82), "image/jpeg");
   return must(await db().from("theme_versions").update({ thumbnail_path: key, status: "live", published_at: new Date().toISOString() }).eq("id", id).select("*").single(), "publish") as VersionRow;
 }
+
+/**
+ * The theme library's per-theme switch. On: the theme goes live and every draft version is published
+ * (thumbnail rendered, as in the template editor). Off: the theme goes to draft, so customers stop
+ * seeing it; its versions keep their status, so switching back on is instant. Archived versions are left alone.
+ */
+export async function setThemeLive(themeId: string, live: boolean): Promise<{ slug: string; published: VersionRow[]; failed: string[] }> {
+  const t = must(await db().from("themes").select("id, slug, status").eq("id", themeId).single(), "theme") as { id: string; slug: string; status: string };
+  const published: VersionRow[] = [];
+  const failed: string[] = [];
+  if (live) {
+    const drafts = (must(await db().from("theme_versions").select("id, slug").eq("theme_id", themeId).eq("status", "draft"), "versions") ?? []) as { id: string; slug: string }[];
+    for (const d of drafts) {
+      try {
+        published.push(await publishVersion(d.id));
+      } catch {
+        failed.push(d.slug);
+      }
+    }
+  }
+  must(await db().from("themes").update({ status: live ? "live" : "draft" }).eq("id", themeId).select("id").single(), "theme status");
+  return { slug: t.slug, published, failed };
+}
