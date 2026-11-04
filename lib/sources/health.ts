@@ -3,6 +3,7 @@ import { db } from "@/lib/db/client";
 import { getSources } from "@/lib/sources";
 import { track } from "@/lib/track";
 import { getVaultProfile } from "@/lib/vault/profile";
+import { shopifyAuthFromEnv } from "@/lib/sources/shopify-auth";
 
 export const SOURCE_NAMES = ["shopify", "imagen", "mirror", "lookup", "klaviyo", "agentmail", "posthog"] as const;
 export type SourceName = (typeof SOURCE_NAMES)[number];
@@ -18,6 +19,19 @@ export function registerSourceCheck(name: SourceName, fn: () => Promise<Record<s
 
 const REQUIRED_SCOPES = ["read_orders", "read_all_orders", "write_orders", "read_customers"];
 
+/** Which Shopify env vars are set (names → yes/no) and the auth mode they select. Never values. */
+function shopifyEnvShape(): Record<string, string | boolean> {
+  const has = (k: string) => Boolean(process.env[k]?.trim());
+  const domain = process.env.SHOPIFY_STORE_DOMAIN?.trim() ?? "";
+  return {
+    auth: shopifyAuthFromEnv()?.mode ?? "not_configured",
+    has_client_id: has("SHOPIFY_CLIENT_ID"),
+    has_client_secret: has("SHOPIFY_CLIENT_SECRET"),
+    has_admin_token: has("SHOPIFY_ADMIN_ACCESS_TOKEN"),
+    domain_is_myshopify: /^[a-z0-9-]+\.myshopify\.com$/.test(domain),
+  };
+}
+
 /** One harmless read per source. Records only counts and timings, never personal data. */
 export async function testSource(name: SourceName, by: string): Promise<CheckResult> {
   const started = Date.now();
@@ -28,7 +42,7 @@ export async function testSource(name: SourceName, by: string): Promise<CheckRes
     if (name === "shopify") {
       const r = await shopify.ping();
       const missing = REQUIRED_SCOPES.filter((s) => !r.scopes.includes(s));
-      detail = { mode: shopify.kind, ...(r.auth ? { auth: r.auth } : {}), shop: r.shop, scopes: r.scopes.filter((s) => REQUIRED_SCOPES.includes(s)), missing_scopes: missing };
+      detail = { mode: shopify.kind, ...shopifyEnvShape(), ...(r.auth ? { auth: r.auth } : {}), shop: r.shop, scopes: r.scopes.filter((s) => REQUIRED_SCOPES.includes(s)), missing_scopes: missing };
       ok = missing.length === 0;
     } else if (name === "imagen") {
       const r = await imagen.ping();
@@ -59,6 +73,7 @@ export async function testSource(name: SourceName, by: string): Promise<CheckRes
   } catch (e) {
     const msg = (e as Error).message || "error";
     detail = { error: msg.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[email]").slice(0, 200) };
+    if (name === "shopify") Object.assign(detail, shopifyEnvShape());
     if (name === "shopify" && /^shopify_token_http_/.test(msg))
       detail.hint = "Shopify refused the client credentials: check SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET and that SHOPIFY_STORE_DOMAIN is the .myshopify.com domain the app is installed on.";
     else if (name === "shopify" && msg === "shopify_http_401")
