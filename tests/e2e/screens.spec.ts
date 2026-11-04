@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { admin, signInWithLink } from "./auth";
-import { deleteCardsOf, liveVersionId } from "./db";
+import { deleteCardsOf, liveVersionId, setSetting } from "./db";
 
 // Screenshots of every route at 390 px into docs/build-screens/ (fixture data only).
 // Run: SCREENSHOTS=1 pnpm e2e --project=mobile tests/e2e/screens.spec.ts
@@ -12,6 +12,7 @@ const only = process.env.SCREENS?.split(",");
 
 async function makeCard(page: Page, to: string, delivery: "self" | "email", scheduled = false) {
   const { versionId } = await liveVersionId("christmas-snowfall");
+  if (scheduled) await setSetting("cards.scheduling_enabled", true);
   const r = await page.request.post("/api/cards", {
     data: {
       versionId,
@@ -27,6 +28,7 @@ async function makeCard(page: Page, to: string, delivery: "self" | "email", sche
   });
   const { id, publicId } = (await r.json()) as { id: string; publicId: string };
   await page.request.post(`/api/cards/${id}/render`, { data: {} });
+  if (scheduled) await setSetting("cards.scheduling_enabled", false);
   return { id, publicId };
 }
 
@@ -69,6 +71,7 @@ test("customer screens", async ({ page, request }) => {
   await shot(page, "12-create-portrait", `/create/portrait?v=${versionId}&image=5e550002-0002-4000-8000-000000000001`);
   await shot(page, "13-create-message", `/create/message?v=${versionId}&image=5e550002-0002-4000-8000-000000000001`);
   await shot(page, "14-card-ready", `/cards/${ready.publicId}`);
+  await shot(page, "14b-card-ready-unsent", `/cards/${shared.publicId}`);
   await shot(page, "15-my-cards", "/cards");
   await shot(page, "16-portraits-rose", "/portraits");
   const slug = (await admin().from("cards").select("share_slug").eq("public_id", shared.publicId).single()).data!.share_slug as string;

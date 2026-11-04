@@ -113,10 +113,12 @@ test.describe("analytics", () => {
     }
     await page.getByLabel("To", { exact: true }).fill(TO);
     await page.getByLabel("Message", { exact: true }).fill(MESSAGE);
-    await page.getByRole("radio", { name: /Email it for me/ }).check();
-    await page.getByLabel("Their email").fill(RECIPIENT);
     await page.getByTestId("create-card").click();
     await page.waitForURL(/\/cards\/C-/, { timeout: 30_000 });
+    // Sent from the ready screen (create first, then send).
+    await page.getByLabel("Their email address").fill(RECIPIENT);
+    await page.getByTestId("send-card").click();
+    await expect(page.getByTestId("send-box")).toContainText("Sent to");
     await page.getByTestId("copy-link").click();
     // Session replay never sees the card (it shows the message)
     await expect(page.locator("img.ph-no-capture")).toHaveCount(1);

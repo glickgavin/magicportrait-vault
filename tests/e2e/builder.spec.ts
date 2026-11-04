@@ -48,7 +48,7 @@ test.describe("card builder", () => {
     await expectNoAxeViolations(page);
   });
 
-  test("FirstCard: change design, photo, try another idea; email it adds one field", async ({ page }) => {
+  test("FirstCard: change design, photo, change message; create first, then Send from the ready screen", async ({ page }) => {
     await deleteCardsOf("sam@example.com");
     await signInWithLink(page, "sam@example.com", "/create");
     await clearDraft(page);
@@ -63,55 +63,104 @@ test.describe("card builder", () => {
     await page.getByRole("button", { name: "Change photo" }).click();
     await page.getByRole("dialog").getByRole("radio").nth(2).click();
     const msg = await page.getByLabel("Message").inputValue();
-    await page.getByRole("button", { name: "Try another" }).click();
+    await page.getByRole("button", { name: "Change message" }).click();
     await expect(page.getByLabel("Message")).not.toHaveValue(msg);
+    // No delivery choice before the card exists (4 Nov review).
+    await expect(page.getByRole("radio", { name: /Email it for me/ })).toHaveCount(0);
+    await expect(page.getByLabel("Who is it for?")).toHaveAttribute("placeholder", "Name");
     await page.getByLabel("Who is it for?").fill("Uncle Joe");
-    await page.getByRole("radio", { name: /Email it for me/ }).check();
-    await expect(page.getByRole("button", { name: /Create and send/ })).toBeDisabled();
-    await expect(page.getByText("Pick a date")).toHaveCount(0); // no scheduling on the first card
-    await page.getByLabel("Their email").fill("joe@example.com");
-    await page.getByRole("button", { name: /Create and send/ }).click();
+    await page.getByTestId("create-card").click();
     await page.waitForURL(/\/cards\/C-/, { timeout: 30_000 });
-    const [card] = await cardsOf("sam@example.com");
-    expect(card).toMatchObject({ to_name: "Uncle Joe", delivery: "email", recipient_email: "joe@example.com" });
-    expect(card.card_deliveries.some((d) => d.type === "email")).toBe(true);
+    await expect(page.getByRole("heading", { name: "Your card is ready" })).toBeVisible();
+    await expect(page.getByTestId("download-card")).toBeVisible();
+    // Desktop browsers here have no share sheet: Share becomes Copy link; no app buttons.
+    await expect(page.getByTestId("copy-link")).toBeVisible();
+    await expect(page.getByRole("link", { name: "WhatsApp" })).toHaveCount(0);
+    await expectNoAxeViolations(page);
+    let [card] = await cardsOf("sam@example.com");
+    expect(card).toMatchObject({ to_name: "Uncle Joe", delivery: "self", recipient_email: null, status: "ready" });
+    await page.getByLabel("Their email address").fill("joe@example.com");
+    await page.getByTestId("send-card").click();
+    await expect(page.getByTestId("send-box")).toContainText("Sent to j***@example.com");
+    [card] = await cardsOf("sam@example.com");
+    expect(card).toMatchObject({ delivery: "email", recipient_email: "joe@example.com", status: "emailed" });
+    expect(card.card_deliveries.filter((d) => d.type === "email")).toHaveLength(1);
+    await page.getByTestId("resend").click();
+    await expect(page.getByTestId("send-box")).toContainText("Sent again");
+    // One recipient per card: the server refuses a second address.
+    const other = await page.request.post(`/api/cards/${card.id}/send`, { data: { email: "someone@example.com" } });
+    expect(other.status()).toBe(409);
   });
 
-  test("someone with cards: /g link lands on step 1; full builder with email delivery scheduled", async ({ page }) => {
+  test("someone with cards: /g link lands on step 1 of 3; Change message; no scheduling unless switched on", async ({ page }) => {
     await deleteCardsOf("rose@example.com");
     await insertCard("rose@example.com");
     await page.goto(await makeLink("rose@example.com", { purpose: "gift_offer" }));
     await clearDraft(page);
     await page.reload();
     await expect(page.getByTestId("step-theme")).toBeVisible();
+    await expect(page.getByTestId("step-bar")).toContainText("Step 1 of 3");
     await expect(page.getByRole("heading", { name: "What's the occasion?" })).toBeVisible();
     await expectNoAxeViolations(page);
     await page.getByRole("tab", { name: /Birthdays/ }).click();
     await page.getByRole("radio", { name: /Birthday · Confetti/ }).click();
     await page.getByTestId("next").click();
     await expect(page.getByTestId("step-portrait")).toBeVisible();
+    await expect(page.getByTestId("step-bar")).toContainText("Step 2 of 3");
+    // One grid (no date groups), whole portraits, pinned compact preview.
+    await expect(page.getByTestId("portrait-grid").getByRole("radio").first()).toBeVisible();
+    await expect(page.getByTestId("portrait-preview")).toBeVisible();
     await expectNoAxeViolations(page);
-    await page.getByRole("radio").nth(1).click();
+    await page.getByTestId("portrait-grid").getByRole("radio").nth(1).click();
     await page.getByRole("button", { name: "Adjust the photo" }).click();
     await page.getByLabel("Zoom").fill("1.5");
+    // The step bar stays pinned while the grid scrolls.
+    await page.mouse.wheel(0, 600);
+    await expect(page.getByTestId("step-bar")).toBeInViewport();
     await page.getByTestId("next").click();
     await expect(page.getByTestId("step-message")).toBeVisible();
+    await expect(page.getByTestId("step-bar")).toContainText("Step 3 of 3");
     await expect(page.getByLabel("From", { exact: true })).toHaveValue("Rose");
+    await expect(page.getByLabel("To", { exact: true })).toHaveAttribute("placeholder", "Name");
     await expectNoAxeViolations(page);
     await page.getByLabel("To", { exact: true }).fill("Grandpa");
-    await page.getByRole("button", { name: "Idea 2" }).click();
-    await page.getByRole("radio", { name: /Email it for me/ }).check();
-    await page.getByLabel("Their email").fill("grandpa@example.com");
-    await page.getByRole("radio", { name: "Pick a date" }).check();
-    const at = new Date(Date.now() + 3 * 86_400_000);
-    const local = new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-    await page.getByLabel("Date and time").fill(local);
+    const msg = await page.getByLabel("Message").inputValue();
+    await page.getByTestId("change-message").click();
+    await expect(page.getByLabel("Message")).not.toHaveValue(msg);
+    await expect(page.getByRole("radio", { name: /Email it for me/ })).toHaveCount(0);
+    await expect(page.getByTestId("create-card")).toHaveText(/Create my card/);
     await page.getByTestId("create-card").click();
     await page.waitForURL(/\/cards\/C-/, { timeout: 30_000 });
-    await expect(page.getByTestId("delivery-status")).toContainText("Sends");
     const [card] = await cardsOf("rose@example.com");
-    expect(card).toMatchObject({ to_name: "Grandpa", status: "scheduled", delivery: "email", flow: "full" });
-    expect(card.scheduled_for).toBeTruthy();
+    expect(card).toMatchObject({ to_name: "Grandpa", status: "ready", delivery: "self", flow: "full" });
+  });
+
+  test("cards.scheduling_enabled brings back Send now or pick a date", async ({ page }) => {
+    await setSetting("cards.scheduling_enabled", true);
+    try {
+      await signInWithLink(page, "rose@example.com", "/create?step=theme");
+      await clearDraft(page);
+      await page.reload();
+      await page.getByRole("tab", { name: /Birthdays/ }).click();
+      await page.getByRole("radio", { name: /Birthday · Confetti/ }).click();
+      await page.getByTestId("next").click();
+      await page.getByTestId("portrait-grid").getByRole("radio").first().click();
+      await page.getByTestId("next").click();
+      await page.getByLabel("To", { exact: true }).fill("Grandpa");
+      await page.getByRole("radio", { name: /Email it for me/ }).check();
+      await page.getByLabel("Their email").fill("grandpa@example.com");
+      await page.getByRole("radio", { name: "Pick a date" }).check();
+      const at = new Date(Date.now() + 3 * 86_400_000);
+      const local = new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+      await page.getByLabel("Date and time").fill(local);
+      await page.getByTestId("create-card").click();
+      await page.waitForURL(/\/cards\/C-/, { timeout: 30_000 });
+      await expect(page.getByTestId("delivery-status")).toContainText("Sends");
+      const [card] = await cardsOf("rose@example.com");
+      expect(card).toMatchObject({ status: "scheduled", delivery: "email" });
+    } finally {
+      await setSetting("cards.scheduling_enabled", false);
+    }
   });
 
   test("public card page, hidden link, and /try with UTM tags", async ({ page, request }) => {

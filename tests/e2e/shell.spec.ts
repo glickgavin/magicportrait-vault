@@ -6,7 +6,7 @@ test.describe("app shell", () => {
     test(`header, menu and footer at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/");
-      // Header: hamburger, logo, sign-in spot, bag
+      // Header: hamburger, logo, sign-in spot at the right (no cart since the 4 Nov review)
       await expect(page.getByTestId("menu-button")).toBeVisible();
       const logo = page.locator("header img[alt='Magic Portraits AI']");
       await expect(logo).toBeVisible();
@@ -17,7 +17,7 @@ test.describe("app shell", () => {
       // The sign-in spot never overlaps the logo
       const s = await signIn.boundingBox();
       expect(box!.x + box!.width).toBeLessThanOrEqual(s!.x + 1);
-      await expect(page.getByRole("link", { name: "Your order" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Your order" })).toHaveCount(0);
       // Footer
       await expect(page.getByRole("contentinfo")).toContainText("Products:");
       await expect(page.getByRole("contentinfo")).toContainText("Privacy Policy");

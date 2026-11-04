@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { EMPTY_DRAFT, type Draft } from "./types";
 
 // v2: the 3-step builder (4 Nov review); older drafts carried a delivery choice made before the card existed.
-const KEY = "vault.card.draft.v2";
+export const DRAFT_KEY = "vault.card.draft.v2";
+const KEY = DRAFT_KEY;
 
 function read(): Draft {
   try {

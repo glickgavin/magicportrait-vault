@@ -63,7 +63,8 @@ The live site's footer, unchanged: Chat With Us · VIP Login · About Us, Follow
 - `Header`, `MenuSheet`, `Footer`, `Avatar` / `AccountMenu`
 - `PrimaryButton` (gradient), `SecondaryButton` (white with border), `Chip` / `Tab` (gradient when active), `Badge` (ORDERED, NEW, status)
 - `CardPreview`: the live card at any size, drawn from the same layout JSON the server renderer uses, so the preview matches the JPEG. The design's `CardPreview` board shows the 10 target looks.
-- `PortraitGrid` (grouped by session, radio-group selection), `ThemeTile`, `StepHeader` ("Step 2 of 4"), `StickyFooterBar` (Next / Create)
+- `PortraitGrid` (one grid, newest first, 3 across on a phone; each portrait whole at its own shape in an equal cell; radio-group selection), `ThemeTile`, `StepHeader` ("Step 2 of 3", pinned under the header at `top: 56px`, tight padding, a plain arrow back button with a 44 px tap target and a visible focus ring, no container), the compact pinned preview on the Portrait step (pinned only when the screen is at least 700 px tall), `StickyFooterBar` (Next / Create)
+- `ReadyActions` (Ready screen): email box with **Send** beside it (then "Sent to j***@… · Resend"), **Share** (the share sheet; **Copy link** where there is none) and **Download** side by side. No app buttons.
 - Admin: `AdminShell` (sidebar groups INSIGHTS · SETUP · GREETING CARDS · REDEEM · SYSTEM), `KpiTile`, `DataTable` (search, filters, paging, CSV), `Timeline`, `StatusPill`
 
 ## Behaviour
