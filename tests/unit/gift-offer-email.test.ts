@@ -52,7 +52,7 @@ describe("free gift offer email via AgentMail", () => {
     const mails = mailsTo(o.email);
     expect(mails).toHaveLength(1);
     const m = mails[0];
-    expect(m.subject).toBe("Your free greeting card is ready");
+    expect(m.subject).toBe("A free gift with your order #6001");
     expect(m.html).toMatch(/\/g\/[A-Za-z0-9_-]{43}/);
     const row = await offer(o.id);
     expect(m.html).toContain(`/gift/unsubscribe?o=${row.id}`);
@@ -106,5 +106,14 @@ describe("free gift offer email via AgentMail", () => {
     expect((await sendDueOffers()).sent).toBe(1);
     expect(mailsTo(o.email)).toHaveLength(0);
     expect((await offer(o.id)).email_status).toBeNull();
+  });
+});
+
+describe("offer email subject", () => {
+  it("fills in {order}, and drops it cleanly when there's no order number", async () => {
+    const { giftOfferSubject } = await import("@/emails/gift-offer");
+    expect(giftOfferSubject("A free gift with your order {order}", "#1001")).toBe("A free gift with your order #1001");
+    expect(giftOfferSubject("A free gift with your order {order}", null)).toBe("A free gift with your order");
+    expect(giftOfferSubject("Your free card is ready", "#1001")).toBe("Your free card is ready");
   });
 });

@@ -78,7 +78,7 @@ export function SettingsTable({ rows, sections }: { rows: TableRow[]; sections?:
           )}
         </form>
       )}
-      <div className="mt-3 overflow-x-auto">
+      <div className="mt-3 overflow-x-auto" tabIndex={0} role="region" aria-label="Settings table">
         <table className="w-full min-w-[720px] text-left text-[14px]">
           <thead>
             <tr className="border-b border-line text-[12px] uppercase tracking-wide text-ink-2">

@@ -3,13 +3,14 @@
 exports[`email templates > card-delivery renders (snapshot) 1`] = `"Sam sent you a Christmas card"`;
 
 exports[`email templates > card-delivery renders (snapshot) 2`] = `
-"SAM SENT YOU A CARD
+"💌  A CARD FOR YOU
+
+
+SAM SENT YOU A CARD
 
 Dear Grandma Rose, here's something to make you smile.
 
-https://my.magicportraits.ai/c/example
-
-Save the card https://my.magicportraits.ai/c/example
+https://my.magicportraits.ai/c/exampleSave the card ✦ https://my.magicportraits.ai/c/example
 
 Open full size https://my.magicportraits.ai/c/example
 
@@ -19,45 +20,67 @@ Turn your own pet into a work of art with Magic Portraits.
 
 Try Magic Portraits https://my.magicportraits.ai/c/example/try?via=email
 
-You got this because Sam made you a card with My Magic Portraits. Don't email me cards https://my.magicportraits.ai/c/example/unsubscribe?d=example
+You got this because Sam made you a card with My Magic Portraits.
 
-Magic Portraits · magicportraits.ai"
+StoryBoards
+
+Chat with us https://magicportraits.ai · Don't email me cards https://my.magicportraits.ai/c/example/unsubscribe?d=example · Privacy Policy https://magicportraits.ai/privacy"
 `;
 
 exports[`email templates > card-scheduled renders (snapshot) 1`] = `"Your card to Grandma Rose is scheduled"`;
 
 exports[`email templates > card-scheduled renders (snapshot) 2`] = `
-"YOUR CARD IS SCHEDULED
+"🗓️  SCHEDULED
+
+
+YOUR CARD IS SCHEDULED
 
 We'll email it to Grandma Rose on 31 Dec at 18:00 (UTC). You can change or cancel it until then.
 
 See My cards https://my.magicportraits.ai/cards
 
-Magic Portraits · magicportraits.ai"
+StoryBoards
+
+Chat with us https://magicportraits.ai · Privacy Policy https://magicportraits.ai/privacy"
 `;
 
-exports[`email templates > gift-offer renders (snapshot) 1`] = `"Your free greeting card is ready"`;
+exports[`email templates > gift-offer renders (snapshot) 1`] = `"A free gift with your order #1001"`;
 
 exports[`email templates > gift-offer renders (snapshot) 2`] = `
-"SAM, YOUR FREE CARD IS READY
+"🎁  FREE GIFT UNLOCKED
 
-Thank you for your order. As a gift, make a greeting card with your portrait and send it to someone you love. It's free.
 
-https://my.magicportraits.ai/g/example
+TURN YOUR PORTRAIT INTO A GREETING CARD
 
-Make my free card https://my.magicportraits.ai/g/example
+Hi Sam, thanks for your order. Pick a theme, add your portrait and a message. We send it, or you share it. Free, as many as you like.
 
-The button signs you in, no password needed. It works for 30 days.
+https://my.magicportraits.ai/g/exampleCreate my card ✦ https://my.magicportraits.ai/g/example
 
-You got this because of your Magic Portraits order #1001. Don't email me offers https://my.magicportraits.ai/gift/unsubscribe?o=example
+This button is personal to you: no sign-in needed. It works for 30 days.
 
-Magic Portraits · magicportraits.ai"
+1
+
+Pick a theme. Birthday, Christmas, New Year and more.
+
+2
+
+Add your portrait from any past order.
+
+3
+
+Write and send. Email it, download it or share it.
+
+You got this because of your Magic Portraits order #1001.
+
+StoryBoards
+
+Chat with us https://magicportraits.ai · Email preferences https://my.magicportraits.ai/gift/unsubscribe?o=example · Privacy Policy https://magicportraits.ai/privacy"
 `;
 
 exports[`email templates > signin-code renders (snapshot) 1`] = `"Your My Magic Portraits code"`;
 
 exports[`email templates > signin-code renders (snapshot) 2`] = `
-"My Magic Portraits
+"🔒  MY MAGIC PORTRAITS
 
 
 YOUR SIGN-IN CODE
@@ -68,13 +91,18 @@ Enter this code to sign in. It works for 10 minutes.
 
 If you didn't ask for this, you can ignore this email. Someone may have typed your email by mistake.
 
-Magic Portraits · magicportraits.ai"
+StoryBoards
+
+Chat with us https://magicportraits.ai · Privacy Policy https://magicportraits.ai/privacy"
 `;
 
 exports[`email templates > signin-link renders (snapshot) 1`] = `"Your link to My Magic Portraits"`;
 
 exports[`email templates > signin-link renders (snapshot) 2`] = `
-"HI SAM, HERE'S YOUR LINK
+"✨  MY MAGIC PORTRAITS
+
+
+HI SAM, HERE'S YOUR LINK
 
 Tap below to open My Magic Portraits: your portraits, greeting cards, orders and downloads. No password or code needed.
 
@@ -82,5 +110,7 @@ Open My Magic Portraits https://my.magicportraits.ai/g/example
 
 The link works for 30 days. Please don't forward this email: the link signs you in.
 
-Magic Portraits · magicportraits.ai"
+StoryBoards
+
+Chat with us https://magicportraits.ai · Privacy Policy https://magicportraits.ai/privacy"
 `;

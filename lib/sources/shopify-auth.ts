@@ -29,9 +29,18 @@ export function shopifyAuthFromEnv(): ShopifyAuth | null {
   return token ? { mode: "static_token", token } : null;
 }
 
-/** The app's client secret: verifies webhooks (HMAC) and checkout-extension session tokens. */
+/** The app's client secret: verifies checkout-extension session tokens. */
 export function shopifyAppSecret(): string | undefined {
-  return env.optional("SHOPIFY_CLIENT_SECRET") ?? env.optional("SHOPIFY_WEBHOOK_SECRET");
+  return env.optional("SHOPIFY_CLIENT_SECRET");
+}
+
+/**
+ * Secrets an orders/paid webhook may be signed with: the app's client secret (webhooks the r_orders
+ * app registers) and the store's notification key (webhooks made in Shopify Admin › Settings ›
+ * Notifications › Webhooks, shown there as "Your webhooks will be signed with …").
+ */
+export function shopifyWebhookSecrets(): string[] {
+  return [env.optional("SHOPIFY_CLIENT_SECRET"), env.optional("SHOPIFY_WEBHOOK_SECRET")].filter((s): s is string => Boolean(s));
 }
 
 type Cached = { token: string; refreshAt: number };

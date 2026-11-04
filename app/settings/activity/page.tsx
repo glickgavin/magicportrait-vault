@@ -34,7 +34,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: SP 
           Filter
         </button>
       </form>
-      <div className="mt-4 overflow-x-auto rounded-[20px] bg-white p-3 shadow-sm">
+      <div className="mt-4 overflow-x-auto rounded-[20px] bg-white p-3 shadow-sm" tabIndex={0} role="region" aria-label="Activity log table">
         <table className="w-full min-w-[900px] text-left text-[13px]">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase text-ink-2">

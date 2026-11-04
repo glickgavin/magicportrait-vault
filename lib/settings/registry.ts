@@ -88,7 +88,7 @@ export const REGISTRY = {
     label: "Offer email sent by",
     description: "agentmail: this app sends it from the cards inbox and tracks sent, delivered, bounced and clicked. klaviyo: a Klaviyo flow on free_gift_unlocked sends it (don't use both).",
   }),
-  "gift.offer_email_subject": text("gift", "Your free greeting card is ready", { label: "Offer email subject", allowEmpty: false, max: 120 }),
+  "gift.offer_email_subject": text("gift", "A free gift with your order {order}", { label: "Offer email subject", description: "{order} becomes the order number, e.g. #1001.", allowEmpty: false, max: 120 }),
   "gift.popup_enabled": bool("gift", false, { label: "Thank-you pop-up link" }),
   "gift.popup_email_later_enabled": bool("gift", false, { label: "“Later, email me the link”", description: "Turn on once the Klaviyo offer flow exists." }),
   "gift.popup_window_minutes": num("gift", 60, { label: "Pop-up link window (minutes after payment)", min: 5, max: 1440 }),
@@ -177,6 +177,10 @@ export const REGISTRY = {
   // ---------- email ----------
   "email.from_cards": text("email", "{from} via Magic Portraits <cards@magicportraitspartners.com>", { label: "Card sender", description: "The address must be the AgentMail inbox.", allowEmpty: false }),
   "email.from_system": text("email", "My Magic Portraits <cards@magicportraitspartners.com>", { label: "System sender (codes, links, confirmations)", allowEmpty: false }),
+  "email.footer_company": text("email", "StoryBoards", { label: "Email footer: company", allowEmpty: false, max: 80 }),
+  "email.footer_address": text("email", "", { label: "Email footer: company address", description: "Shown after the company name. Empty hides it.", max: 200 }),
+  "email.chat_url": url("email", "https://magicportraits.ai", { label: "Email footer: “Chat with us” link" }),
+  "email.privacy_url": url("email", "https://magicportraits.ai/privacy", { label: "Email footer: Privacy Policy link" }),
   "email.reply_to": text("email", "support@magicportraits.ai", { label: "Reply-to", allowEmpty: false }),
 
   // ---------- links ----------

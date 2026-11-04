@@ -59,6 +59,20 @@ describe("orders/paid webhook", () => {
     const body = JSON.stringify(paid());
     expect((await post(body, { "x-shopify-hmac-sha256": "AAAA" })).status).toBe(401);
   });
+  it("also accepts the store's notification key (webhooks made in Shopify Admin), and nothing else", async () => {
+    const storeKey = "test-store-notification-key";
+    process.env.SHOPIFY_WEBHOOK_SECRET = storeKey;
+    try {
+      const o = paid();
+      const body = JSON.stringify(o);
+      const sign = (k: string) => ({ "x-shopify-hmac-sha256": createHmac("sha256", k).update(body).digest("base64"), "x-shopify-webhook-id": `wh-${randomBytes(6).toString("hex")}`, "x-shopify-topic": "orders/paid" });
+      expect((await post(body, sign("some-other-key"))).status).toBe(401);
+      expect((await post(body, sign(storeKey))).status).toBe(200);
+      expect((await db().from("gift_offers").select("id").eq("shopify_order_id", o.id)).data).toHaveLength(1);
+    } finally {
+      delete process.env.SHOPIFY_WEBHOOK_SECRET;
+    }
+  });
   it("records a qualifying order once; replays are ignored", async () => {
     const o = paid();
     const body = JSON.stringify(o);
