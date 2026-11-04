@@ -1,0 +1,49 @@
+"use client";
+
+import { ph, whenPosthog } from "@/lib/ph";
+import { EVENTS, isEventName, scrubProps, type EventName } from "@/lib/events";
+
+function assertKnown(event: string): asserts event is EventName {
+  if (!isEventName(event)) {
+    const msg = `[track] unknown event "${event}" (not in docs/analytics.md)`;
+    if (process.env.NODE_ENV !== "production") throw new Error(msg);
+    console.warn(msg);
+  }
+}
+
+const enabled = () => typeof window !== "undefined" && Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY);
+
+/**
+ * Browser-side tracking. UI events go to PostHog only.
+ * Business events (allow-listed for the browser) go to POST /api/track, which takes the
+ * email from the session and writes PostHog + activity_log on the server.
+ */
+export function trackClient(event: EventName, props?: Record<string, unknown>) {
+  assertKnown(event);
+  const clean = scrubProps(props);
+  // e2e builds only: keep a copy so tests can check page views and that no message text is captured.
+  if (process.env.NEXT_PUBLIC_E2E_EVENTS === "1") ((window as unknown as { __vaultEvents?: unknown[] }).__vaultEvents ??= []).push({ event, props: clean });
+  const def = EVENTS[event];
+  if (def.business) {
+    void fetch("/api/track", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ event, props: clean }),
+      keepalive: true,
+    }).catch(() => undefined);
+    return;
+  }
+  if (enabled()) whenPosthog((p) => p.capture(event, clean));
+}
+
+export function identifyClient(email: string, props?: Record<string, unknown>) {
+  if (enabled()) whenPosthog((p) => p.identify(email.toLowerCase(), scrubProps(props)));
+}
+
+export function resetClient() {
+  ph()?.reset();
+}
+
+export function setSuperProps(props: Record<string, unknown>) {
+  if (enabled()) whenPosthog((p) => p.register(scrubProps(props)));
+}

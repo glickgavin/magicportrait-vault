@@ -65,6 +65,7 @@ Business events that happen in the browser (share, copy link, download, mug tile
 | `vault_code_requested` | Code sent | |
 | `vault_code_verified` / `vault_code_failed` | Code checked | `attempt`, `reason` |
 | `vault_signed_in` | Signed in | `method` (`link` / `code`) |
+| `vault_test_signin` | Signed in with the preview-only test sign-in (`auth.test_signin_enabled`); activity_log only, never Klaviyo | |
 | `vault_lookup_succeeded` / `vault_lookup_empty` | Portraits found or not | `session_count`, `portrait_count`, `orders_count`, `is_customer`, `lookup_ms` |
 
 ### My Magic Portraits area
@@ -229,7 +230,7 @@ PostHog holds the click-level detail and replays. My Magic Portraits also writes
 
 Business events go to both PostHog and `activity_log`:
 - all `card_*` except `card_category_selected`, `card_crop_adjusted`, `card_message_idea_used`, `card_delivery_selected` and `card_step_back`
-- `vault_signed_in`, `vault_signed_out`, `vault_code_requested`, `vault_lookup_*`
+- `vault_signed_in`, `vault_test_signin`, `vault_signed_out`, `vault_code_requested`, `vault_lookup_*`
 - every `redeem_*_completed`, `redeem_*_saved` and `redeem_*_failed`
 - every server event, every Settings event, and `admin_card_viewed`.
 

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/cron/send-scheduled", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/flush-outbox", "schedule": "* * * * *" },
+    { "path": "/api/cron/send-gift-offers", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/send-reminders", "schedule": "17 15 * * *" },
+    { "path": "/api/cron/mug-reminders", "schedule": "23 16 * * *" },
+    { "path": "/api/cron/cleanup", "schedule": "41 4 * * *" }
+  ]
+}

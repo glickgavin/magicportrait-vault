@@ -1,0 +1,127 @@
+import Link from "next/link";
+import { cardsPerDay, funnel, kpis, liveFeed, RANGES, topThemes, type Range } from "@/lib/admin/insights";
+import { getSettings } from "@/lib/settings";
+import { TrackPageView } from "@/components/TrackPageView";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Insights" };
+
+const STEPS: [string, string][] = [
+  ["signed_in", "Signed in"],
+  ["theme_selected", "Picked a design"],
+  ["create_tapped", "Tapped Create"],
+  ["created", "Card made"],
+  ["delivered", "Sent, shared or downloaded"],
+];
+
+export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+  const r = (await searchParams).range;
+  const range: Range = r && r in RANGES ? (r as Range) : "7d";
+  const [tiles, perDay, themes, steps, feed, s] = await Promise.all([kpis(range), cardsPerDay(range), topThemes(range), funnel(range), liveFeed(), getSettings(["tracking.posthog_project_id", "tracking.posthog_ui_host"] as const)]);
+  const max = Math.max(1, ...perDay.map((d) => d.n));
+  const top = Math.max(1, steps.signed_in ?? 0, ...STEPS.map(([k]) => steps[k] ?? 0));
+  return (
+    <div className="flex flex-col gap-5" data-testid="insights">
+      <TrackPageView event="settings_viewed" props={{ section: "insights" }} />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-[30px] font-extrabold tracking-tight">Dashboard</h1>
+          <p className="text-[15px] text-ink-2">All numbers come from our own database.</p>
+        </div>
+        <nav aria-label="Date range" className="flex gap-1 rounded-[12px] bg-white p-1 shadow-sm">
+          {(Object.keys(RANGES) as Range[]).map((k) => (
+            <Link key={k} href={`/settings/insights?range=${k}`} aria-current={k === range ? "page" : undefined} className={`rounded-[10px] px-3 py-1.5 text-[14px] font-semibold ${k === range ? "bg-[#2b2b2b] text-white" : ""}`}>
+              {RANGES[k]}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {tiles.map((k) => (
+          <li key={k.key} className="rounded-[18px] bg-white p-4 shadow-sm" data-testid={`kpi-${k.key}`}>
+            <p className="text-[13px] font-semibold text-ink-2">{k.label}</p>
+            <p className="mt-1 text-[28px] font-extrabold" data-testid="kpi-value">
+              {k.value.toLocaleString("en-GB")}
+            </p>
+            {k.change !== null && (
+              <p className={`text-[13px] font-bold ${k.change > 0 ? "text-[#1f6b35]" : k.change < 0 ? "text-danger" : "text-ink-2"}`}>
+                {k.change > 0 ? "▲" : k.change < 0 ? "▼" : "•"} {Math.abs(k.change)}% vs previous ({k.previous})
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="perday">
+          <h2 id="perday" className="text-[19px] font-extrabold">
+            Cards per day
+          </h2>
+          <div className="mt-4 flex h-[160px] items-end gap-[3px]" role="img" aria-label={`Cards per day: ${perDay.map((d) => `${d.day} ${d.n}`).join(", ")}`}>
+            {perDay.map((d) => (
+              <div key={d.day} className="flex-1 rounded-t-[3px] bg-primary-gradient" style={{ height: `${Math.max(2, (d.n / max) * 100)}%` }} title={`${d.day}: ${d.n}`} />
+            ))}
+          </div>
+          <p className="mt-1 flex justify-between text-[12px] text-ink-2">
+            <span>{perDay[0]?.day}</span>
+            <span>{perDay[perDay.length - 1]?.day}</span>
+          </p>
+        </section>
+        <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="funnel">
+          <div className="flex items-baseline justify-between">
+            <h2 id="funnel" className="text-[19px] font-extrabold">
+              Card funnel (people)
+            </h2>
+            <a className="link text-[13px]" href={`${s["tracking.posthog_ui_host"]}/project/${s["tracking.posthog_project_id"]}/insights`}>
+              Open in PostHog
+            </a>
+          </div>
+          <ol className="mt-3 flex flex-col gap-2">
+            {STEPS.map(([k, label]) => (
+              <li key={k}>
+                <div className="flex justify-between text-[14px]">
+                  <span>{label}</span>
+                  <strong>{steps[k] ?? 0}</strong>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-black/[0.06]">
+                  <div className="h-full rounded-full bg-primary-gradient" style={{ width: `${((steps[k] ?? 0) / top) * 100}%` }} />
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="themes">
+          <h2 id="themes" className="text-[19px] font-extrabold">
+            Top themes
+          </h2>
+          <ol className="mt-3 flex flex-col gap-1 text-[14px]">
+            {themes.map((t) => (
+              <li key={`${t.theme}-${t.version}`} className="flex justify-between border-b border-line py-1.5">
+                <span>
+                  {t.theme} · {t.version}
+                </span>
+                <strong>{t.n}</strong>
+              </li>
+            ))}
+            {!themes.length && <li className="text-ink-2">No cards in this period.</li>}
+          </ol>
+        </section>
+        <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="feed">
+          <h2 id="feed" className="text-[19px] font-extrabold">
+            Live feed
+          </h2>
+          <ol className="mt-3 flex flex-col gap-1 text-[13px]">
+            {feed.map((f) => (
+              <li key={f.id} className="flex justify-between gap-2 border-b border-line py-1">
+                <span className="font-mono">{f.event}</span>
+                <span className="truncate text-ink-2">
+                  {f.ref_type ? `${f.ref_type}:${f.ref_id} · ` : ""}
+                  {new Date(f.occurred_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    </div>
+  );
+}

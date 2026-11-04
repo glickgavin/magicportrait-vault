@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-serif: var(--font-dmserif), "DM Serif Display", Georgia, serif;
+  --font-gothic: var(--font-league), "League Gothic", "Oswald", Impact, sans-serif;
+
+  --color-page: #f3f1e7;
+  --color-sheet: #fbf6ee;
+  --color-ink: rgba(0, 0, 0, 0.8);
+  --color-ink-2: rgba(0, 0, 0, 0.6);
+  --color-ink-3: rgba(0, 0, 0, 0.5);
+  --color-line: rgba(0, 0, 0, 0.1);
+  --color-muted: rgba(0, 0, 0, 0.05);
+  --color-magenta: #dd07c4;
+  --color-pink-link: #b8059f;
+  --color-pink-dark: #8e047b;
+  --color-pink-tint: #fde7fa;
+  --color-success: #1f7a3a;
+  --color-danger: #b42318;
+  --color-sidebar: #2b2b2b;
+
+  --radius-card: 20px;
+  --radius-btn: 12px;
+}
+
+:root {
+  --primary-gradient: linear-gradient(89deg, #ff8f3f -4.82%, #f24bdf 52.24%, #dd07c4 102.1%);
+  --avatar-gradient: linear-gradient(135deg, #ff8f3f, #f24bdf 55%, #dd07c4);
+  --brand-gradient-90: linear-gradient(90deg, #ff8f3f 0%, #f24bdf 50%, #dd07c4 100%);
+  --primary-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.07), 0 -2px 0 0 rgba(0, 0, 0, 0.12) inset;
+  --elev-2: 0 2px 6px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+:focus-visible {
+  outline: 3px solid #b8059f;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .bg-primary-gradient {
+    background-image: var(--primary-gradient);
+  }
+  .bg-avatar-gradient {
+    background-image: var(--avatar-gradient);
+  }
+  .shadow-primary {
+    box-shadow: var(--primary-shadow);
+  }
+  .shadow-elev {
+    box-shadow: var(--elev-2);
+  }
+  .text-gradient {
+    background-image: var(--brand-gradient-90);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-safe {
+    padding-bottom: calc(1rem + var(--safe-bottom));
+  }
+  .link {
+    color: #b8059f;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-weight: 600;
+  }
+  .link:hover {
+    color: #8e047b;
+  }
+}
+
+@keyframes sheet-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes sheet-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.animate-sheet-left {
+  animation: sheet-in-left 0.35s ease-out;
+}
+.animate-sheet-bottom {
+  animation: sheet-in-bottom 0.3s ease-out;
+}
+.animate-fade {
+  animation: fade-in 0.2s ease-out;
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0px, rgba(0, 0, 0, 0.1) 80px, rgba(0, 0, 0, 0.06) 160px);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
