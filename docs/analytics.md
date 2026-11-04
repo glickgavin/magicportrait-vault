@@ -49,7 +49,7 @@ Business events that happen in the browser (share, copy link, download, mug tile
 ### Entry points
 | Event | When | Key properties |
 |---|---|---|
-| `gift_offer_email_sent` (server) | Gift email sent after an order | `order_id`, `order_name` |
+| `gift_offer_email_sent` (server) | Gift offer sent after an order (AgentMail email, or the Klaviyo event when the channel is Klaviyo) | `order_id`, `order_name`, `channel` |
 | `gift_popup_shown` | Thank-you page sheet opens | `order_id` |
 | `gift_popup_cta_tapped` / `gift_popup_dismissed` | Taps on the sheet | `order_id`, `action` |
 | `menu_create_card_tapped` | "Create a card" in the site menu | `signed_in` |
@@ -168,7 +168,9 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 | Event | When | Key properties |
 |---|---|---|
 | `vault_signin_link_used` | A `/g/[token]` link signs someone in | `order_id`, `expired` |
-| `gift_offer_email_opened` | Gift offer link first opened (first use of its `/g/[token]`) | `order_id` |
+| `gift_offer_email_opened` | Gift offer link first opened (first use of its `/g/[token]`): the "clicked" count | `order_id` |
+| `gift_offer_email_failed` | AgentMail refused the offer email | `order_id`, `error` |
+| `gift_offer_email_bounced` | AgentMail reported a bounce or complaint for the offer email | `order_id`, `permanent` |
 | `card_cancelled` | A scheduled card is cancelled | `card_id` |
 | `card_schedule_changed` | A scheduled card's time or content is changed | `card_id`, `changed` (`time` / `content`) |
 | `gift_offer_skipped` | An order didn't qualify for the free gift, or the offer was suppressed | `order_id`, `reason` |
@@ -239,6 +241,6 @@ Everything else (`page_view_*`, taps, filters, UI-only events) goes to PostHog o
 ## 10. Definition of done for the build
 
 - Every customer page fires its `page_view_*` (list below) and its action events with the properties above. Settings pages fire `settings_viewed` with `section` instead.
-- Page views not listed elsewhere: `page_view_vault_order` (order detail; `order_id`, `mug_present`, `downloads_enabled`), `page_view_card_creating` (`card_id`), `page_view_card_unsubscribe` (`card_id`), `page_view_vault_empty` (nobody found). Old redeem links (`/redeem`) fire the live name `page_view_redeem`.
+- Page views not listed elsewhere: `page_view_vault_order` (order detail; `order_id`, `mug_present`, `downloads_enabled`), `page_view_card_creating` (`card_id`), `page_view_card_unsubscribe` (`card_id`), `page_view_offer_unsubscribe` (no props; the offer email's "Don't email me offers" page), `page_view_vault_empty` (nobody found). Old redeem links (`/redeem`) fire the live name `page_view_redeem`.
 - Events checked in PostHog Live events with a test account (in the test-account cohort).
 - No personal message content in any event or replay.

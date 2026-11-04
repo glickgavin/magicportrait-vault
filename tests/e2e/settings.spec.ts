@@ -187,3 +187,18 @@ test.describe("settings (super users)", () => {
     }
   });
 });
+
+test.describe("free gift offer email", () => {
+  test("Don't email me offers: invalid link message, and the page passes axe", async ({ page }) => {
+    await page.goto("/gift/unsubscribe?o=00000000-0000-4000-8000-000000000000");
+    await expect(page.getByTestId("offer-unsubscribe")).toContainText("This link doesn't work any more");
+    await expectNoAxeViolations(page);
+  });
+  test("Settings › Emails shows the offer email settings and numbers", async ({ page }) => {
+    await signInWithLink(page, "super@example.com", "/settings/emails");
+    const s = page.getByTestId("offer-email");
+    await expect(s).toContainText("Free gift offer email");
+    await expect(s).toContainText("Clicked");
+    await expect(s).toContainText("gift.offer_email_channel");
+  });
+});

@@ -10,6 +10,9 @@ import { getSources } from "@/lib/sources";
 import { viewOrder } from "@/lib/redeem/service";
 import { isInSeason, currentWindow } from "@/lib/themes/season";
 import { maskEmail } from "@/lib/utils";
+import { env } from "@/lib/env";
+import { emailSender } from "@/lib/email";
+import { renderEmail } from "@/lib/email/render";
 
 /** The subset of the orders/paid payload we rely on (docs/data.md §5.6). */
 export const orderPaidSchema = z.object({
@@ -105,7 +108,7 @@ async function suggestedDesign(now: Date): Promise<string | null> {
  * With `gift.offer_email_enabled` off nothing is sent and due offers are marked skipped.
  */
 export async function sendDueOffers(now = new Date()): Promise<{ sent: number; skipped: number }> {
-  const s = await getSettings(["gift.offer_email_enabled", "gift.link_valid_days"] as const);
+  const s = await getSettings(["gift.offer_email_enabled", "gift.link_valid_days", "gift.offer_email_channel", "gift.offer_email_subject", "email.from_system", "email.reply_to"] as const);
   const due = must(await db().from("gift_offers").select("id, shopify_order_id, order_name, email, paid_at, portrait_image_url, status").eq("status", "pending").lte("send_after", now.toISOString()).limit(200), "due offers") as OfferRow[];
   let sent = 0;
   let skipped = 0;
@@ -114,6 +117,12 @@ export async function sendDueOffers(now = new Date()): Promise<{ sent: number; s
     if (!s["gift.offer_email_enabled"]) {
       await db().from("gift_offers").update({ status: "skipped", skip_reason: "offer_email_disabled" }).eq("id", o.id).eq("status", "pending");
       await track("gift_offer_skipped", { order_id: o.shopify_order_id, reason: "offer_email_disabled" }, { email: o.email, source: "shopify", actor: "system", ref: { type: "order", id: o.shopify_order_id } });
+      skipped++;
+      continue;
+    }
+    if (s["gift.offer_email_channel"] === "agentmail" && (await isSuppressed(o.email))) {
+      await db().from("gift_offers").update({ status: "skipped", skip_reason: "suppressed" }).eq("id", o.id).eq("status", "pending");
+      await track("gift_offer_skipped", { order_id: o.shopify_order_id, reason: "suppressed" }, { email: o.email, source: "shopify", actor: "system", ref: { type: "order", id: o.shopify_order_id } });
       skipped++;
       continue;
     }
@@ -133,7 +142,16 @@ export async function sendDueOffers(now = new Date()): Promise<{ sent: number; s
         klaviyo: { dedupeKey: `free_gift_unlocked:${o.shopify_order_id}`, extra: { card_link: link.url, link_expires_at: link.expiresAt, portrait_image_url: o.portrait_image_url, suggested_design: design } },
       },
     );
-    await track("gift_offer_email_sent", { order_id: o.shopify_order_id, order_name: o.order_name }, { email: o.email, source: "shopify", actor: "system", ref: { type: "order", id: o.shopify_order_id } });
+    if (s["gift.offer_email_channel"] === "agentmail") {
+      const r = await sendOfferEmail(o, link.url, s);
+      if (!r.ok) {
+        await db().from("gift_offers").update({ status: "failed", email_status: "failed", email_error: r.error }).eq("id", o.id);
+        await track("gift_offer_email_failed", { order_id: o.shopify_order_id, error: r.error }, { email: o.email, source: "shopify", actor: "system", ref: { type: "order", id: o.shopify_order_id } });
+        continue;
+      }
+      await db().from("gift_offers").update({ email_status: "sent", provider_message_id: r.messageId }).eq("id", o.id);
+    }
+    await track("gift_offer_email_sent", { order_id: o.shopify_order_id, order_name: o.order_name, channel: s["gift.offer_email_channel"] }, { email: o.email, source: "shopify", actor: "system", ref: { type: "order", id: o.shopify_order_id } });
     sent++;
   }
   return { sent, skipped };
@@ -240,3 +258,64 @@ export async function sendMugReminders(now = new Date()): Promise<{ queued: numb
 }
 
 export { maskEmail };
+
+async function isSuppressed(email: string): Promise<boolean> {
+  const r = await db().from("email_suppressions").select("scope").eq("email", email).in("scope", ["offer_emails", "all"]).limit(1);
+  return Boolean(r.data?.length);
+}
+
+/** The offer email, sent by this app through AgentMail (gift.offer_email_channel = agentmail). */
+async function sendOfferEmail(
+  o: OfferRow,
+  linkUrl: string,
+  s: { "gift.link_valid_days": number; "gift.offer_email_subject": string; "email.from_system": string; "email.reply_to": string },
+) {
+  const base = env.appUrl;
+  const member = (await db().from("vault_members").select("display_name").eq("email", o.email).maybeSingle()).data as { display_name: string | null } | null;
+  const firstName = member?.display_name?.trim().split(/\s+/)[0] || null;
+  const unsubscribeUrl = `${base}/gift/unsubscribe?o=${o.id}`;
+  const { html, text } = await renderEmail("gift-offer", {
+    appUrl: base,
+    firstName,
+    orderName: o.order_name,
+    portraitImageUrl: o.portrait_image_url,
+    linkUrl,
+    validDays: s["gift.link_valid_days"],
+    unsubscribeUrl,
+  });
+  const res = await emailSender().send({
+    from: s["email.from_system"],
+    to: o.email,
+    replyTo: s["email.reply_to"],
+    subject: s["gift.offer_email_subject"],
+    html,
+    text,
+    headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` },
+    idempotencyKey: `gift-offer-${o.id}`,
+  });
+  if (!res.ok) console.error(`[email] gift offer ${o.shopify_order_id} to ${maskEmail(o.email)} failed: ${res.error}`);
+  return res;
+}
+
+/** "Don't email me offers" (from the offer email footer): looks up the offer by its opaque id. */
+export async function offerForUnsubscribe(offerId: string): Promise<{ email: string; orderId: string } | null> {
+  if (!/^[0-9a-f-]{36}$/.test(offerId)) return null;
+  const r = (await db().from("gift_offers").select("email, shopify_order_id").eq("id", offerId).maybeSingle()).data as { email: string; shopify_order_id: string } | null;
+  return r && !r.email.endsWith("@invalid.local") ? { email: r.email, orderId: r.shopify_order_id } : null;
+}
+
+export async function unsubscribeFromOffers(offerId: string): Promise<boolean> {
+  const o = await offerForUnsubscribe(offerId);
+  if (!o) return false;
+  await db().from("email_suppressions").upsert({ email: o.email, scope: "offer_emails", reason: "unsubscribe" }, { onConflict: "email,scope", ignoreDuplicates: true });
+  await track("gift_offer_skipped", { order_id: o.orderId, reason: "unsubscribed" }, { email: o.email, source: "email", actor: "system", ref: { type: "order", id: o.orderId } });
+  return true;
+}
+
+export async function giftOfferEmailStats(sinceDays: number) {
+  const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+  const r = await db().rpc("gift_offer_email_stats", { since });
+  const row = ((r.data ?? []) as Record<string, number | string>[])[0] ?? {};
+  const n = (k: string) => Number(row[k] ?? 0);
+  return { sent: n("sent"), delivered: n("delivered"), bounced: n("bounced"), failed: n("failed"), clicked: n("clicked"), cardsMade: n("cards_made") };
+}

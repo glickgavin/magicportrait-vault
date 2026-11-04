@@ -400,6 +400,13 @@ export const en = {
       rendering: "Making",
     },
   },
+  offerUnsubscribe: {
+    title: "Don't email me offers",
+    body: "We'll stop emailing you free card offers after your orders. Order and sign-in emails still arrive.",
+    confirm: "Stop offer emails",
+    doneTitle: "Done. No more offer emails",
+    doneBody: "We won't email you free card offers again. You can still make cards any time at My Magic Portraits.",
+  },
   unsubscribe: {
     title: "Don't email me cards",
     body: "We'll stop sending greeting cards to this email address. You can still open any card someone shares with you.",
