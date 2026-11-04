@@ -167,3 +167,62 @@ export function NewVersionForm({ themeId, themeName }: { themeId: string; themeN
     </form>
   );
 }
+
+/**
+ * Per-theme switch in the library. On = theme live and every version live; turning it on publishes
+ * all draft versions (can take a few seconds per version). Off hides the theme from customers.
+ */
+export function ThemeLiveToggle({ id, name, themeLive, liveCount, draftCount }: { id: string; name: string; themeLive: boolean; liveCount: number; draftCount: number }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const on = themeLive && liveCount > 0;
+  const total = liveCount + draftCount;
+  const call = async (live: boolean) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch(`/api/admin/themes/${id}/live`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ live }) });
+      const b = (await r.json().catch(() => ({}))) as { error?: string; warning?: string };
+      setMsg(r.ok ? (b.warning ?? null) : (b.error ?? "Couldn't save"));
+      router.refresh();
+    } catch {
+      setMsg("Couldn't save");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const flip = () => {
+    if (on && !window.confirm(`Turn off ${name}? Customers stop seeing it straight away. Its versions stay as they are.`)) return;
+    void call(!on);
+  };
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-2">
+        <span className="text-[13px] text-ink-2" id={`live-desc-${id}`}>
+          {busy ? (on ? "Turning off…" : `Publishing ${draftCount} version${draftCount === 1 ? "" : "s"}…`) : total === 0 ? "No versions yet" : `${liveCount} of ${total} live`}
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-label={`${name} live`}
+          aria-describedby={`live-desc-${id}`}
+          disabled={busy || total === 0}
+          onClick={flip}
+          data-testid={`theme-live-${id}`}
+          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DD07C4] focus-visible:ring-offset-2 disabled:opacity-50 ${on ? "bg-[#1a7f37]" : "bg-black/25"}`}
+        >
+          <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-[left] ${on ? "left-6" : "left-1"}`} />
+        </button>
+        <span className={`w-8 text-[13px] font-bold ${on ? "text-[#1a7f37]" : "text-ink-2"}`}>{on ? "Live" : "Off"}</span>
+      </div>
+      {on && draftCount > 0 && !busy && (
+        <button type="button" onClick={() => void call(true)} className="text-[13px] font-bold text-[#B0069C] underline">
+          Publish {draftCount} draft{draftCount === 1 ? "" : "s"}
+        </button>
+      )}
+      {msg && <span role="alert" className="max-w-[260px] text-right text-[13px] text-danger">{msg}</span>}
+    </div>
+  );
+}
