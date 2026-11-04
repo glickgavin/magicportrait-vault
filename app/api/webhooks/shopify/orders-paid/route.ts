@@ -1,4 +1,4 @@
-import { env } from "@/lib/env";
+import { shopifyAppSecret } from "@/lib/sources/shopify-auth";
 import { verifyShopifyHmac } from "@/lib/gift/shopify-verify";
 import { orderPaidSchema, recordPaidOrder } from "@/lib/gift/offers";
 import { claimWebhook } from "@/lib/email/webhook";
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** orders/paid: HMAC checked on the raw body before parsing; idempotent on X-Shopify-Webhook-Id and the order id. */
 export async function POST(req: Request) {
-  const secret = env.optional("SHOPIFY_WEBHOOK_SECRET");
+  const secret = shopifyAppSecret();
   if (!secret) return new Response("Not configured", { status: 503 });
   const raw = await req.text();
   if (!verifyShopifyHmac(raw, req.headers.get("x-shopify-hmac-sha256"), secret)) return new Response("Invalid signature", { status: 401 });

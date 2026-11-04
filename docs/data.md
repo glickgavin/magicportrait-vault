@@ -18,10 +18,12 @@ This is the reference for every external read and write the vault (`my.magicport
 **Known gap on both projects:** the `pg_net` extension grants `PUBLIC` (so every login role, `vault_reader` included) usage on schema `net` and all privileges on `net.http_request_queue` and `net._http_response`. A login could queue outbound HTTP requests from the database. `vault_reader`'s read-only default blocks this unless a client deliberately turns it off, and its password lives only in Vercel. Fully closing it means revoking those `PUBLIC` grants on each project, which affects every role: check nothing relies on them first (SPEC §21). Run the SQL versions of the queries below; ignore the PostgREST variants. Imagen images are in the public `images` bucket, so no Storage key is needed.
 
 | `SHOPIFY_STORE_DOMAIN` | `storyboards.myshopify.com` (verified 4 Nov via the Admin API's `shop.myshopifyDomain`; the public domain is store.magicportraits.ai) |
-| `SHOPIFY_ADMIN_ACCESS_TOKEN` | Admin API token of the existing custom app "r_orders" |
-| `SHOPIFY_WEBHOOK_SECRET` | HMAC secret for the `orders/paid` webhook |
+| `SHOPIFY_CLIENT_ID` | Client ID of the r_orders app (a Shopify **Dev Dashboard** app: client id + secret, no permanent token) |
+| `SHOPIFY_CLIENT_SECRET` | Its client secret. Used for the client credentials grant **and** to verify `orders/paid` webhook HMACs and checkout-extension session tokens |
+| `SHOPIFY_ADMIN_ACCESS_TOKEN` | Optional fallback: a permanent `shpat_` Admin token, used only when the client id/secret aren't set |
+| `SHOPIFY_WEBHOOK_SECRET` | Deprecated older name for the client secret, read only when `SHOPIFY_CLIENT_SECRET` isn't set |
 
-The live site authenticates differently. Its redeem functions use `SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET` and `SHOPIFY_STORE_DOMAIN` with a `client_credentials` grant to `https://{domain}/admin/oauth/access_token`, and cache the token for 5 minutes. The vault does not copy this. It uses the r_orders token.
+**Decision (4 Nov 2026):** r_orders is a Dev Dashboard app, so there is no permanent token (a static token was the cause of the preview's `shopify_http_401`). The vault gets its Admin API token the same way the live site's redeem functions do, with the client credentials grant (§5.1), in `lib/sources/shopify-auth.ts`.
 
 ---
 
@@ -680,7 +682,8 @@ The vault's own event names and properties live in `analytics.md`. Should the va
 ### 5.1 Connection
 
 - `POST https://{SHOPIFY_STORE_DOMAIN}/admin/api/{vault.shopify_api_version}/graphql.json` (the version is a setting, not an env var)
-- Headers: `Content-Type: application/json` and `X-Shopify-Access-Token: <SHOPIFY_ADMIN_ACCESS_TOKEN>`. This is the r_orders custom app token, server-side only.
+- Headers: `Content-Type: application/json` and `X-Shopify-Access-Token: <token>`, server-side only.
+- **Token (client credentials grant):** `POST https://{SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token`, form body `grant_type=client_credentials&client_id={SHOPIFY_CLIENT_ID}&client_secret={SHOPIFY_CLIENT_SECRET}` → `{ access_token, scope, expires_in }` (`expires_in` ≈ 86 400 s). The token is cached in memory per instance until 5 minutes before it expires; concurrent requests share one token request. On a GraphQL `401` the client fetches a fresh token and retries **once**. A token failure surfaces as `shopify_token_http_<status>[: <error code>]` (never the response body). If no client id/secret is set, a permanent `SHOPIFY_ADMIN_ACCESS_TOKEN` is used as is (no refresh).
 - Version: `2025-07`, the same as live (setting `vault.shopify_api_version`).
 - Every query below was **validated by running it** against the Shopify MCP's pinned Admin schema, which is newer than 2025-07. Each run used a placeholder email or id and returned no rows.
   - The live code's `customer { email }` **no longer exists** in that schema. The vault uses `customer { defaultEmailAddress { emailAddress } }`. That field also exists in 2025-07 (**UNVERIFIED**, high confidence).
@@ -848,7 +851,7 @@ Variables: `{ "id": "gid://shopify/Order/<id>", "tags": ["mug:ready"] }`. This i
   - `email`, `contact_email`, `customer.id`, `customer.email`
   - `created_at`, `processed_at`, `financial_status`, `cancelled_at`, `test`, `tags`
   - `line_items[]`: `id`, `product_id`, `variant_id`, `title`, `quantity`, `properties[] { name, value }` (same keys as 4.2)
-- **Headers:** verify `X-Shopify-Hmac-Sha256`, the base64 HMAC-SHA256 of the **raw** body with `SHOPIFY_WEBHOOK_SECRET`, before parsing. Use `X-Shopify-Webhook-Id` for idempotency. `X-Shopify-Topic` and `X-Shopify-Shop-Domain` identify the source.
+- **Headers:** verify `X-Shopify-Hmac-Sha256`, the base64 HMAC-SHA256 of the **raw** body with the app's client secret (`SHOPIFY_CLIENT_SECRET`), before parsing. Use `X-Shopify-Webhook-Id` for idempotency. `X-Shopify-Topic` and `X-Shopify-Shop-Domain` identify the source.
 - **Creating the subscription** is not done here because it is a write. It is either done in the custom app's admin settings, or with:
   ```graphql
   mutation VaultCreateOrdersPaidWebhook($sub: WebhookSubscriptionInput!) {

@@ -28,7 +28,7 @@ export async function testSource(name: SourceName, by: string): Promise<CheckRes
     if (name === "shopify") {
       const r = await shopify.ping();
       const missing = REQUIRED_SCOPES.filter((s) => !r.scopes.includes(s));
-      detail = { mode: shopify.kind, scopes: r.scopes.filter((s) => REQUIRED_SCOPES.includes(s)), missing_scopes: missing };
+      detail = { mode: shopify.kind, ...(r.auth ? { auth: r.auth } : {}), shop: r.shop, scopes: r.scopes.filter((s) => REQUIRED_SCOPES.includes(s)), missing_scopes: missing };
       ok = missing.length === 0;
     } else if (name === "imagen") {
       const r = await imagen.ping();
@@ -59,6 +59,10 @@ export async function testSource(name: SourceName, by: string): Promise<CheckRes
   } catch (e) {
     const msg = (e as Error).message || "error";
     detail = { error: msg.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[email]").slice(0, 200) };
+    if (name === "shopify" && /^shopify_token_http_/.test(msg))
+      detail.hint = "Shopify refused the client credentials: check SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET and that SHOPIFY_STORE_DOMAIN is the .myshopify.com domain the app is installed on.";
+    else if (name === "shopify" && msg === "shopify_http_401")
+      detail.hint = "Shopify rejected the token. Set SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET (Dev Dashboard app) and redeploy.";
     // <ref>.supabase.co and db.<ref>.supabase.co aren't reachable from Vercel (API host / IPv6-only).
     if ((name === "imagen" || name === "mirror") && /CONNECT_TIMEOUT .*supabase\.co:5432/.test(msg))
       detail.hint = "Use the Supabase pooler connection string (…pooler.supabase.com, user vault_reader.<ref>), not the direct db host.";

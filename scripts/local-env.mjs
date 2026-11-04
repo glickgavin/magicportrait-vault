@@ -27,7 +27,7 @@ export function appTestEnv(port = 3100) {
     KLAVIYO_PROVIDER: "fixtures",
     GIFT_LINK_SECRET: "local-test-gift-link-secret-0123456789abcdef0123456789",
     CRON_SECRET: "local-test-cron-secret",
-    SHOPIFY_WEBHOOK_SECRET: "local-test-shopify-secret",
+    SHOPIFY_CLIENT_SECRET: "local-test-shopify-secret",
     AGENTMAIL_WEBHOOK_SECRET: "whsec_" + Buffer.from("local-test-agentmail-secret-32bytes!").toString("base64"),
     NEXT_PUBLIC_SUPABASE_URL: sb?.API_URL ?? "",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: sb?.PUBLISHABLE_KEY ?? sb?.ANON_KEY ?? "",

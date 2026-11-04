@@ -9,7 +9,7 @@ import { recordPaidOrder, sendDueOffers, sendMugReminders, type OrderPaid } from
 import { POST as ordersPaid } from "@/app/api/webhooks/shopify/orders-paid/route";
 import { POST as offerLink } from "@/app/api/gift/offer-link/route";
 
-const SECRET = process.env.SHOPIFY_WEBHOOK_SECRET!;
+const SECRET = process.env.SHOPIFY_CLIENT_SECRET!;
 const by = "test@example.com";
 const orderId = () => String(7_000_000_000_000 + Math.floor(Math.random() * 1e9));
 const paid = (over: Partial<OrderPaid> = {}): OrderPaid => ({

@@ -4,7 +4,7 @@ The pop-up lives in a Shopify **checkout UI extension** on the thank-you page (o
 
 **Endpoint:** `POST https://my.magicportraits.ai/api/gift/offer-link`
 
-- Header `Authorization: Bearer <session token>` from the extension's `useSessionToken().get()`. The token is an HS256 JWT signed with the app's API secret (`SHOPIFY_WEBHOOK_SECRET`); the server checks the signature, `exp`/`nbf` and that `dest` is the store's domain.
+- Header `Authorization: Bearer <session token>` from the extension's `useSessionToken().get()`. The token is an HS256 JWT signed with the app's API secret (`SHOPIFY_CLIENT_SECRET`); the server checks the signature, `exp`/`nbf` and that `dest` is the store's domain.
 - Body `{ "orderId": "<order legacy id>" }` (from the extension's order confirmation API). An order number on its own is never accepted.
 - Answers `200 { url, expiresAt }` only for an order paid within `gift.popup_window_minutes` that unlocks the free gift (`gift.unlock_rule`). Everything else is `401` (bad token), `404`/`410` with `{ "error": "unavailable" }` (no detail), or `429`.
 - `gift.popup_enabled` must be on (it starts off).

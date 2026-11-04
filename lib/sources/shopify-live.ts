@@ -1,4 +1,5 @@
 import "server-only";
+import type { ShopifyTokenProvider } from "./shopify-auth";
 import type { FinancialStatus, MetafieldWriteResult, ShopifyLineItem, ShopifyOrder, ShopifySource } from "./types";
 
 /** Queries from docs/data.md §5 (validated against the Admin schema). */
@@ -74,23 +75,26 @@ type RawOrder = {
   lineItems: Conn<RawLine>;
 };
 
-export type ShopifyLiveConfig = { domain: string; token: string; apiVersion: string; pageSize: number; linesPageSize: number };
+export type ShopifyLiveConfig = { domain: string; auth: ShopifyTokenProvider; apiVersion: string; pageSize: number; linesPageSize: number };
 
 export class ShopifyLive implements ShopifySource {
   readonly kind = "live" as const;
   constructor(private cfg: ShopifyLiveConfig) {}
 
-  private async gql<T>(query: string, variables: Record<string, unknown>, attempt = 0): Promise<T> {
+  private async gql<T>(query: string, variables: Record<string, unknown>, attempt = 0, refreshed = false): Promise<T> {
+    const token = await this.cfg.auth.get({ fresh: refreshed });
     const res = await fetch(`https://${this.cfg.domain}/admin/api/${this.cfg.apiVersion}/graphql.json`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-shopify-access-token": this.cfg.token },
+      headers: { "content-type": "application/json", "x-shopify-access-token": token },
       body: JSON.stringify({ query, variables }),
       cache: "no-store",
     });
+    // A client-credentials token can be revoked or rotated early: get a fresh one and retry once.
+    if (res.status === 401 && !refreshed && this.cfg.auth.mode === "client_credentials") return this.gql(query, variables, attempt, true);
     if (res.status === 429 || res.status >= 500) {
       if (attempt < 3) {
         await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
-        return this.gql(query, variables, attempt + 1);
+        return this.gql(query, variables, attempt + 1, refreshed);
       }
     }
     if (!res.ok) throw new Error(`shopify_http_${res.status}`);
@@ -98,7 +102,7 @@ export class ShopifyLive implements ShopifySource {
     if (body.errors?.length) {
       if (body.errors.some((e) => e.extensions?.code === "THROTTLED") && attempt < 4) {
         await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
-        return this.gql(query, variables, attempt + 1);
+        return this.gql(query, variables, attempt + 1, refreshed);
       }
       throw new Error(`shopify_graphql: ${body.errors.map((e) => e.message).join("; ").slice(0, 300)}`);
     }
@@ -192,6 +196,6 @@ export class ShopifyLive implements ShopifySource {
 
   async ping() {
     const d = await this.gql<{ shop: { name: string }; currentAppInstallation: { accessScopes: { handle: string }[] } }>(Q_PING, {});
-    return { shop: d.shop.name, scopes: d.currentAppInstallation.accessScopes.map((s) => s.handle) };
+    return { shop: d.shop.name, scopes: d.currentAppInstallation.accessScopes.map((s) => s.handle), auth: this.cfg.auth.mode };
   }
 }

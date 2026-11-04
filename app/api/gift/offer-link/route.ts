@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { env } from "@/lib/env";
+import { shopifyAppSecret } from "@/lib/sources/shopify-auth";
 import { getSettings } from "@/lib/settings";
 import { clientIp, hashKey, rateLimit } from "@/lib/auth/http";
 import { verifySessionToken } from "@/lib/gift/shopify-verify";
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
   if (!s["gift.popup_enabled"]) return out({ error: "unavailable" }, 404);
   if (!(await rateLimit(`offer-link:${hashKey(await clientIp(req))}`, s["gift.offer_link_rate_limit_per_hour"]))) return out({ error: "rate_limited" }, 429);
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  const secret = env.optional("SHOPIFY_WEBHOOK_SECRET") ?? "";
+  const secret = shopifyAppSecret() ?? "";
   const claims = token ? verifySessionToken(token, secret, { shopDomain: env.optional("SHOPIFY_STORE_DOMAIN") }) : null;
   if (!claims) return out({ error: "unauthorized" }, 401);
   const parsed = schema.safeParse(await req.json().catch(() => null));

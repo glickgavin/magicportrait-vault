@@ -25,12 +25,13 @@ export async function getSources(): Promise<Sources> {
   const s = await getSettings(["vault.shopify_api_version", "vault.order_search_page_size", "redeem.order_line_items_page_size", "vault.mirror_session_property", "vault.mirror_lptemp_property"] as const);
   const { ShopifyLive } = await import("./shopify-live");
   const { MirrorLive, ImagenLive } = await import("./pg-live");
+  const { shopifyAuthFromEnv, shopifyTokenProvider } = await import("./shopify-auth");
   const domain = env.optional("SHOPIFY_STORE_DOMAIN");
-  const token = env.optional("SHOPIFY_ADMIN_ACCESS_TOKEN");
+  const auth = shopifyAuthFromEnv();
   const mirrorUrl = env.optional("MIRROR_DATABASE_URL");
   const imagenUrl = env.optional("IMAGEGEN_DATABASE_URL");
   return {
-    shopify: domain && token ? new ShopifyLive({ domain, token, apiVersion: s["vault.shopify_api_version"], pageSize: s["vault.order_search_page_size"], linesPageSize: s["redeem.order_line_items_page_size"] }) : unconfigured<ShopifySource>("shopify"),
+    shopify: domain && auth ? new ShopifyLive({ domain, auth: shopifyTokenProvider(domain, auth), apiVersion: s["vault.shopify_api_version"], pageSize: s["vault.order_search_page_size"], linesPageSize: s["redeem.order_line_items_page_size"] }) : unconfigured<ShopifySource>("shopify"),
     mirror: mirrorUrl ? new MirrorLive(mirrorUrl, { session: s["vault.mirror_session_property"], lptemp: s["vault.mirror_lptemp_property"] }) : unconfigured<MirrorSource>("mirror"),
     imagen: imagenUrl ? new ImagenLive(imagenUrl) : unconfigured<ImagenSource>("imagen"),
   };

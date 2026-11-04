@@ -34,7 +34,7 @@ The whole app is built in a single Claude Code run. It works through the parts b
    - AgentMail has no open-tracking event: "opened" is counted when the recipient opens the card from the email link (`SPEC.md` D19).
 5. **Shopify (r_orders app).**
    - Confirm the Admin API token has `read_orders`, `read_all_orders` (orders older than 60 days), `write_orders` (the mug choice) and `read_customers`. Add any that are missing.
-   - Vercel: `SHOPIFY_STORE_DOMAIN` (the `.myshopify.com` domain), `SHOPIFY_ADMIN_ACCESS_TOKEN`, `SHOPIFY_WEBHOOK_SECRET` (the app's API secret, which signs webhooks).
+   - Vercel: `SHOPIFY_STORE_DOMAIN` (`storyboards.myshopify.com`), `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET` (the r_orders Dev Dashboard app; the secret also signs webhooks and checkout session tokens).
    - The webhook itself is registered after the build (see After the build).
 6. **Vercel secrets and DNS.** In the `magic-vault` project › Settings › Environment Variables, add these as **Sensitive** for Production and Preview:
    - `GIFT_LINK_SECRET`: make it with `openssl rand -base64 48`

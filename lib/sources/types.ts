@@ -46,7 +46,7 @@ export interface ShopifySource {
   resolveOrderByName(name: string): Promise<{ id: string; name: string } | null>;
   setMugChoice(input: { orderGid: string; namespace: string; key: string; type: string; value: string; compareDigest: string | null }): Promise<MetafieldWriteResult>;
   addTags(orderGid: string, tags: string[]): Promise<MetafieldWriteResult>;
-  ping(): Promise<{ shop: string; scopes: string[] }>;
+  ping(): Promise<{ shop: string; scopes: string[]; auth?: "client_credentials" | "static_token" }>;
 }
 
 export type MirrorSession = {
