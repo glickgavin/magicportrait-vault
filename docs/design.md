@@ -32,8 +32,7 @@ Load them with `next/font/google`. The card renderer needs the same font files o
 - Height 56 px, background `#F3F1E7`.
 - **Left:** hamburger, opens the menu sheet.
 - **Centre:** the Magic Portraits logo, centred (`left: 50%; transform: translateX(-50%)`). It is 36 px tall on the live site, but **30 px tall (`top: 13px`) whenever the initials circle or the Sign-in icon shows**. At 36 px the circle overlaps the logo on phones. Check at 360 px.
-- **Right:** the ShoppingBag icon, linking to the main site's cart.
-- **Avatar:** a 34 px circle with the person's initials, at `right: 58px`, inside a 44 px tap target.
+- **Right:** the avatar (no cart icon: removed in the 4 Nov review). A 34 px circle with the person's initials, at `right: 12px`, inside a 44 px tap target.
   - Avatar gradient background, white 13 px weight 800 initials.
   - Ring: `box-shadow: 0 0 0 2px #F3F1E7, 0 0 0 3.5px rgba(221,7,196,0.35)`.
   - Signed out: a person-outline icon with the label "Sign in".

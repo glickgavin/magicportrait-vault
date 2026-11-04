@@ -15,8 +15,10 @@ export async function SignInScreen({ purpose, order, next, expired, legacyRedeem
   const user = await getSessionUser();
   if (user) redirect(target);
   const [minutes, testSignIn] = await Promise.all([getSetting("auth.code_valid_minutes"), testSignInAllowed()]);
-  const title = purpose === "redeem" ? (order ? t("signin.titleRedeem", { order: `#${order}` }) : t("signin.titleRedeemNoOrder")) : purpose === "gift" ? t("signin.titleGift") : t("signin.titleDefault");
-  const sub = purpose === "redeem" ? t("signin.subRedeem") : purpose === "gift" ? t("signin.subGift") : t("signin.subDefault");
+  // Card wording on /signin, except for people on their way to orders or redeem (4 Nov review).
+  const cardWording = purpose === "gift" || (purpose === "default" && !/^\/(orders|redeem)(\/|\?|$)/.test(target));
+  const title = purpose === "redeem" ? (order ? t("signin.titleRedeem", { order: `#${order}` }) : t("signin.titleRedeemNoOrder")) : cardWording ? t("signin.titleGift") : t("signin.titleDefault");
+  const sub = purpose === "redeem" ? t("signin.subRedeem") : cardWording ? t("signin.subGift") : t("signin.subDefault");
   return (
     <div className="mx-auto max-w-[440px]">
       {legacyRedeem && <TrackPageView event="page_view_redeem" props={{ page_path: "/redeem", order_id_in_url: Boolean(order) }} />}

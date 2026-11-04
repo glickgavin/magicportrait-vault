@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getOwnedCard } from "@/lib/db/cards";
-import { ShareActions } from "@/components/builder/ShareActions";
+import { ReadyActions } from "@/components/builder/ReadyActions";
+import { maskEmail } from "@/lib/utils";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { TrackPageView } from "@/components/TrackPageView";
 import { TrackedLink } from "@/components/TrackedLink";
@@ -14,7 +15,7 @@ import { t } from "@/lib/i18n";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: t("builder.readyTitle") };
 
-/** M5Ready: the card with share, download, copy link and app buttons. */
+/** M5Ready (4 Nov review): "Your card is ready", the card, Send by email, Share (or Copy link), Download, Make another card. */
 export default async function CardReadyPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = await params;
   const user = await requireUser(`/cards/${publicId}`);
@@ -25,22 +26,25 @@ export default async function CardReadyPage({ params }: { params: Promise<{ publ
   return (
     <div className="mx-auto max-w-[460px]" data-testid="card-ready">
       <TrackPageView event="page_view_card_ready" props={{ card_id: card.public_id }} />
-      {card.delivery === "email" && (
-        <p className="mx-auto flex w-fit items-center gap-2 rounded-full bg-[#e3f4e8] px-4 py-1.5 text-[15px] font-bold text-[#1f6b35]" data-ph-mask data-testid="delivery-status">
-          {card.status === "scheduled" ? <Clock className="h-4 w-4" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
-          {card.status === "scheduled" && card.scheduled_for ? (
-            <LocalDateTime iso={card.scheduled_for} prefix={t("builder.sendsAt", { date: "" })} />
-          ) : card.status === "emailed" || card.status === "opened" ? (
-            t("builder.emailedTo", { name: card.to_name })
-          ) : (
-            t("builder.queuedTo", { name: card.to_name })
-          )}
+      <h1 className="text-center text-[26px] font-extrabold">{t("builder.readyTitle")}</h1>
+      {card.status === "scheduled" && card.scheduled_for && (
+        <p className="mx-auto mt-2 flex w-fit items-center gap-2 rounded-full bg-[#e3f4e8] px-4 py-1.5 text-[15px] font-bold text-[#1f6b35]" data-ph-mask data-testid="delivery-status">
+          <Clock className="h-4 w-4" aria-hidden="true" />
+          <LocalDateTime iso={card.scheduled_for} prefix={t("builder.sendsAt", { date: "" })} />
         </p>
       )}
-      <img src={imageUrl} alt={t("builder.cardAlt", { name: card.to_name })} width={1500} height={2100} className="ph-no-capture mx-auto mt-4 w-[78%] rounded-[8px] shadow-[0_12px_40px_rgba(0,0,0,0.18)]" />
-      <h1 className="mt-5 text-center text-[26px] font-extrabold">{t("builder.readyTitle")}</h1>
-      <div className="mt-4">
-        <ShareActions cardId={card.id} publicId={card.public_id} shareUrl={shareUrl} toName={card.to_name} imageUrl={imageUrl} downloadUrl={`${imageUrl}?download=1`} />
+      <img src={imageUrl} alt={t("builder.cardAlt", { name: card.to_name })} width={1500} height={2100} className="ph-no-capture mx-auto mt-4 w-[78%] max-w-[340px] rounded-[8px] shadow-[0_12px_40px_rgba(0,0,0,0.18)]" />
+      <div className="mt-5">
+        <ReadyActions
+          cardId={card.id}
+          publicId={card.public_id}
+          toName={card.to_name}
+          shareUrl={shareUrl}
+          imageUrl={imageUrl}
+          downloadUrl={`${imageUrl}?download=1`}
+          sentTo={card.recipient_email ? maskEmail(card.recipient_email) : null}
+          canSend={["ready", "emailed", "opened", "failed"].includes(card.status)}
+        />
       </div>
       <div className="mt-5 flex items-center justify-between rounded-[18px] bg-white p-4 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
         <div>

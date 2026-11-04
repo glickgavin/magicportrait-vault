@@ -13,6 +13,7 @@ const ERRORS: Record<string, string> = {
   paused: "builder.paused",
   locked: "builder.lockedTitle",
   limit: "builder.limit",
+  rate_limited: "errors.rateLimited",
 };
 
 export async function submitCard(d: Draft, themeSlug: string, opts: { method?: "POST" | "PATCH"; url?: string } = {}): Promise<SubmitResult> {

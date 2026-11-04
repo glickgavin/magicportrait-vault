@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { EMPTY_DRAFT, type Draft } from "./types";
 
-const KEY = "vault.card.draft.v1";
+// v2: the 3-step builder (4 Nov review); older drafts carried a delivery choice made before the card existed.
+const KEY = "vault.card.draft.v2";
 
 function read(): Draft {
   try {

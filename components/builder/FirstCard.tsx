@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CardPreview } from "@/components/CardPreview";
 import { StickyFooterBar } from "./StepHeader";
-import { DeliveryFields } from "./DeliveryFields";
 import { useDraft } from "./useDraft";
 import { submitCard } from "./submit";
 import type { BuilderData } from "./types";
@@ -56,8 +55,7 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
   }, [ready, ideas, ideaIndex, draft.messageTouched, update]);
 
   if (!version) return null;
-  const emailOk = draft.delivery === "self" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.recipientEmail.trim());
-  const canCreate = Boolean(draft.to.trim()) && Boolean(draft.from.trim()) && emailOk && !busy;
+  const canCreate = Boolean(draft.to.trim()) && Boolean(draft.from.trim()) && !busy;
   const max = version.messageMaxChars ?? data.maxChars;
 
   function setVersion(id: string, via: "cycle" | "picker") {
@@ -82,7 +80,8 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
   async function create() {
     setBusy(true);
     setError(null);
-    const r = await submitCard({ ...draft, flow: "first", when: "now", scheduledLocal: "" }, version!.fullSlug);
+    // Created first, sent from the ready screen (4 Nov review).
+    const r = await submitCard({ ...draft, delivery: "self", recipientEmail: "", flow: "first", when: "now", scheduledLocal: "" }, version!.fullSlug);
     if (!r.ok) {
       setError(r.message);
       setBusy(false);
@@ -154,7 +153,7 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
             value={draft.to}
             maxLength={60}
             autoComplete="off"
-            placeholder={t("builder.whoForPlaceholder")}
+            placeholder={t("builder.toPlaceholder")}
             onChange={(e) => update({ to: e.target.value })}
             className="mt-2 h-[52px] w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-4 text-[17px]"
           />
@@ -204,7 +203,6 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
             )}
           </div>
         </div>
-        <DeliveryFields draft={draft} update={update} allowSchedule={false} scheduleMaxDays={data.scheduleMaxDays} />
         {error && (
           <p role="alert" className="text-[15px] font-semibold text-danger">
             {error}
@@ -213,7 +211,7 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
         <StickyFooterBar>
           <div className="w-full">
             <Button type="submit" size="lg" className="w-full" disabled={!canCreate} data-testid="create-card">
-              {draft.delivery === "email" ? t("builder.createAndSend") : t("builder.createMyCard")} <Sparkles className="h-4 w-4" aria-hidden="true" />
+              {t("builder.createMyCard")} <Sparkles className="h-4 w-4" aria-hidden="true" />
             </Button>
             <button
               type="button"

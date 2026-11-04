@@ -76,6 +76,11 @@ export const REGISTRY = {
   "cards.footer_text": text("cards", "Made with Magic Portraits AI", { label: "Card footer line", max: 80 }),
   "cards.first_card_mode": choice("cards", ["one_screen", "full_builder"] as const, "one_screen", { label: "First card", description: "one_screen shows FirstCard to people with no cards (SPEC §8.0)." }),
   "cards.first_card_default_version": text("cards", "with-love-love", { label: "First card default design", description: "theme-version slug (e.g. with-love-love) used when nothing is in season", pattern: /^[a-z0-9-]+$/ }),
+  "cards.scheduling_enabled": bool("cards", false, {
+    label: "Scheduled sending",
+    description: "On: the Message step offers “Send now or pick a date” again. Off (default): cards are created first, then sent from the ready screen at once.",
+  }),
+  "cards.email_sends_per_day": num("cards", 20, { label: "Card emails per person per day", description: "Limits Send on the ready screen (and resends) per signed-in person, so the cards inbox can't be used for spam.", min: 1, max: 1000000 }),
   "cards.schedule_max_days": num("cards", 366, { label: "Furthest a card can be scheduled (days)", min: 1, max: 730 }),
   "cards.signed_url_seconds": num("cards", 600, { label: "Card image link lifetime (s)", min: 60, max: 86400 }),
 

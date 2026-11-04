@@ -13,6 +13,7 @@ import { getObject, loadThemeAsset, putObject } from "@/lib/storage";
 import { renderCardJpeg } from "@/lib/render/render";
 import { track } from "@/lib/track";
 import { emailSchema } from "@/lib/auth/schemas";
+import { underDailySendLimit } from "./send-now";
 import { maskEmail } from "@/lib/utils";
 
 export const ENTRY_POINTS = ["order_email", "thankyou_popup", "reminder_email", "site_menu", "home", "my_cards", "my_portraits", "order_page", "make_another", "use_again"] as const;
@@ -40,7 +41,7 @@ export type CreateCardInput = z.infer<typeof createCardSchema>;
 
 export class CardError extends Error {
   constructor(
-    public code: "paused" | "locked" | "limit" | "no_portraits" | "bad_version" | "bad_portrait" | "too_long" | "bad_schedule" | "render_failed" | "suppressed",
+    public code: "paused" | "locked" | "limit" | "no_portraits" | "bad_version" | "bad_portrait" | "too_long" | "bad_schedule" | "render_failed" | "suppressed" | "rate_limited",
     public status = 400,
     public extra: Record<string, unknown> = {},
   ) {
@@ -112,6 +113,8 @@ export async function createCard(email: string, raw: unknown): Promise<{ card: C
   const max = version.messageMaxChars ?? s["cards.message_max_chars"];
   if (input.message.length > max) throw new CardError("too_long", 400, { max });
 
+  // Email at creation is the scheduling path; it counts towards the same daily send limit as Send.
+  if (input.delivery === "email" && !(await underDailySendLimit(email))) throw new CardError("rate_limited", 429);
   let scheduledFor: string | null = null;
   if (input.delivery === "email" && input.scheduledFor) {
     const at = new Date(input.scheduledFor);

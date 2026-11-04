@@ -19,7 +19,7 @@ export type ClientVersion = {
   photoBg: string;
 };
 
-export type ClientPortrait = { imageId: string; imageUrl: string; ordered: boolean; sessionId: string };
+export type ClientPortrait = { imageId: string; imageUrl: string; ordered: boolean; sessionId: string; width: number | null; height: number | null };
 export type ClientSession = { sessionId: string; themeName: string | null; petName: string | null; createdAt: string; portraits: ClientPortrait[] };
 
 export type BuilderData = {
@@ -30,6 +30,7 @@ export type BuilderData = {
   footerText: string;
   maxChars: number;
   scheduleMaxDays: number;
+  schedulingEnabled: boolean;
   cardsCount: number;
   defaults: { versionId: string | null; imageId: string | null };
 };

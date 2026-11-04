@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { RefreshCw, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -36,12 +36,25 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
   }, [ready, version, portrait, draft.messageTouched, draft.message, ideas, router, update]);
   if (!version || !portrait) return null;
 
-  const canSubmit = draft.to.trim() && draft.from.trim() && draft.message.length <= max && (draft.delivery === "self" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.recipientEmail.trim())) && (draft.when === "now" || draft.delivery === "self" || draft.scheduledLocal);
+  // Without scheduling, cards are created first and sent from the ready screen (4 Nov review).
+  // Editing an already-scheduled card keeps its delivery fields.
+  const showDelivery = data.schedulingEnabled || Boolean(editCardId);
+  const delivery = showDelivery ? draft.delivery : "self";
+  const canSubmit = draft.to.trim() && draft.from.trim() && draft.message.length <= max && (delivery === "self" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.recipientEmail.trim())) && (draft.when === "now" || delivery === "self" || draft.scheduledLocal);
+
+  /** "Change message": the next of the version's ideas, wrapping round. */
+  function nextIdea() {
+    if (!ideas.length) return;
+    const i = ideas.indexOf(draft.message);
+    const next = (i + 1) % ideas.length;
+    update({ message: ideas[next], messageTouched: true });
+    trackClient("card_message_idea_used", { idea: next });
+  }
 
   async function create() {
     setBusy(true);
     setError(null);
-    const r = await submitCard({ ...draft, flow: "full" }, version!.fullSlug, editCardId ? { method: "PATCH", url: `/api/cards/${editCardId}` } : {});
+    const r = await submitCard({ ...draft, delivery, flow: "full" }, version!.fullSlug, editCardId ? { method: "PATCH", url: `/api/cards/${editCardId}` } : {});
     if (!r.ok) {
       setError(r.message);
       setBusy(false);
@@ -86,13 +99,13 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
               <label htmlFor="card-to" className="block text-[15px] font-bold">
                 {t("builder.to")}
               </label>
-              <input id="card-to" value={draft.to} maxLength={60} onChange={(e) => update({ to: e.target.value })} autoComplete="off" className="mt-1 h-12 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 text-[16px]" />
+              <input id="card-to" value={draft.to} maxLength={60} onChange={(e) => update({ to: e.target.value })} autoComplete="off" placeholder={t("builder.toPlaceholder")} className="mt-1 h-12 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 text-[16px]" />
             </div>
             <div>
               <label htmlFor="card-from" className="block text-[15px] font-bold">
                 {t("builder.from")}
               </label>
-              <input id="card-from" value={draft.from} maxLength={60} onChange={(e) => update({ from: e.target.value })} autoComplete="given-name" className="mt-1 h-12 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 text-[16px]" />
+              <input id="card-from" value={draft.from} maxLength={60} onChange={(e) => update({ from: e.target.value })} autoComplete="given-name" placeholder={t("builder.fromPlaceholder")} className="mt-1 h-12 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 text-[16px]" />
             </div>
           </div>
           <div className="mt-3">
@@ -113,26 +126,13 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
               className="mt-1 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 py-2.5 text-[16px] leading-snug"
             />
           </div>
-          {ideas.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={t("builder.ideasLabel")}>
-              {ideas.map((idea, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  title={idea}
-                  onClick={() => {
-                    update({ message: idea, messageTouched: true });
-                    trackClient("card_message_idea_used", { idea: i });
-                  }}
-                  className="rounded-full bg-pink-tint px-4 py-2 text-[14px] font-bold text-pink-dark"
-                >
-                  {t("builder.idea", { n: i + 1 })}
-                </button>
-              ))}
-            </div>
+          {ideas.length > 1 && (
+            <button type="button" onClick={nextIdea} className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-pink-tint px-4 text-[15px] font-bold text-pink-dark" data-testid="change-message">
+              <RefreshCw className="h-4 w-4" aria-hidden="true" /> {t("builder.changeMessage")}
+            </button>
           )}
         </div>
-        <DeliveryFields draft={draft} update={update} allowSchedule scheduleMaxDays={data.scheduleMaxDays} />
+        {showDelivery && <DeliveryFields draft={draft} update={update} allowSchedule scheduleMaxDays={data.scheduleMaxDays} />}
         {error && (
           <p role="alert" className="text-[15px] font-semibold text-danger">
             {error}
@@ -140,7 +140,7 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
         )}
         <StickyFooterBar>
           <Button type="submit" size="lg" className="w-full" disabled={!canSubmit || busy} data-testid="create-card">
-            {editCardId ? t("builder.saveChanges") : t("builder.createMyCard")} <Sparkles className="h-4 w-4" aria-hidden="true" />
+            {editCardId ? t("builder.saveChanges") : delivery === "email" ? t("builder.createAndSend") : t("builder.createMyCard")} <Sparkles className="h-4 w-4" aria-hidden="true" />
           </Button>
         </StickyFooterBar>
       </form>

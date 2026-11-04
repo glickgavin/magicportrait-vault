@@ -55,7 +55,7 @@ export function AccountMenu({ user }: { user: SessionUser }) {
           setOpen(next);
           if (next) trackClient("account_menu_opened", { is_super_user: user.isSuperUser });
         }}
-        className="absolute right-[56px] top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full"
+        className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full"
       >
         <span className="rounded-full" style={{ boxShadow: "0 0 0 2px #F3F1E7, 0 0 0 3.5px rgba(221,7,196,0.35)" }}>
           <Avatar initials={user.initials} size={34} />

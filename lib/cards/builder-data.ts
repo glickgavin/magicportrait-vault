@@ -13,7 +13,7 @@ export type BuilderLoad = { data: BuilderData; access: CardAccess; firstCardMode
 /** Everything the builder screens need, for the signed-in person only (no emails, no other people). */
 export async function loadBuilder(email: string, opts: { imageId?: string | null } = {}): Promise<BuilderLoad> {
   const now = new Date();
-  const s = await getSettings(["themes.in_season_days_before", "cards.first_card_default_version", "cards.footer_text", "cards.message_max_chars", "cards.schedule_max_days", "cards.first_card_mode"] as const);
+  const s = await getSettings(["themes.in_season_days_before", "cards.first_card_default_version", "cards.footer_text", "cards.message_max_chars", "cards.schedule_max_days", "cards.first_card_mode", "cards.scheduling_enabled"] as const);
   const [profile, catalog, cardsCount] = await Promise.all([getVaultProfile(email), getCatalog(now, s["themes.in_season_days_before"]), countCardsBySender(email)]);
   const access = await accessFor(email, profile.hasFreeGift, profile.portraitCount, now);
   const first = pickFirstCardVersion(catalog, s["cards.first_card_default_version"]);
@@ -44,12 +44,13 @@ export async function loadBuilder(email: string, opts: { imageId?: string | null
       themeName: g.themeName,
       petName: g.petName,
       createdAt: g.createdAt,
-      portraits: g.portraits.map((p) => ({ imageId: p.imageId, imageUrl: p.imageUrl, ordered: p.ordered, sessionId: g.sessionId })),
+      portraits: g.portraits.map((p) => ({ imageId: p.imageId, imageUrl: p.imageUrl, ordered: p.ordered, sessionId: g.sessionId, width: p.width, height: p.height })),
     })),
     firstName: profile.firstName ?? "",
     footerText: s["cards.footer_text"],
     maxChars: s["cards.message_max_chars"],
     scheduleMaxDays: s["cards.schedule_max_days"],
+    schedulingEnabled: s["cards.scheduling_enabled"],
     cardsCount,
     defaults: { versionId: first?.id ?? null, imageId: requested ?? pick?.portrait.imageId ?? null },
   };
