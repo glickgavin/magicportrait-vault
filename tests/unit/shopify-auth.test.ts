@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearShopifyTokenCache, shopifyAppSecret, shopifyAuthFromEnv, shopifyTokenProvider } from "@/lib/sources/shopify-auth";
+import { clearShopifyTokenCache, shopifyAppSecret, shopifyAuthFromEnv, shopifyTokenProvider, shopifyWebhookSecrets } from "@/lib/sources/shopify-auth";
 import { ShopifyLive } from "@/lib/sources/shopify-live";
 
 const CC = { mode: "client_credentials" as const, clientId: "cid", clientSecret: "csecret" };
@@ -100,7 +100,10 @@ describe("shopify auth", () => {
     delete process.env.SHOPIFY_CLIENT_SECRET;
     delete process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
     expect(shopifyAuthFromEnv()).toBeNull();
-    process.env.SHOPIFY_WEBHOOK_SECRET = "old";
-    expect(shopifyAppSecret()).toBe("old");
+    process.env.SHOPIFY_WEBHOOK_SECRET = "store-key";
+    expect(shopifyAppSecret()).toBeUndefined();
+    expect(shopifyWebhookSecrets()).toEqual(["store-key"]);
+    process.env.SHOPIFY_CLIENT_SECRET = "csecret";
+    expect(shopifyWebhookSecrets()).toEqual(["csecret", "store-key"]);
   });
 });

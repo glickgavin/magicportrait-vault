@@ -21,7 +21,7 @@ This is the reference for every external read and write the vault (`my.magicport
 | `SHOPIFY_CLIENT_ID` | Client ID of the r_orders app (a Shopify **Dev Dashboard** app: client id + secret, no permanent token) |
 | `SHOPIFY_CLIENT_SECRET` | Its client secret. Used for the client credentials grant **and** to verify `orders/paid` webhook HMACs and checkout-extension session tokens |
 | `SHOPIFY_ADMIN_ACCESS_TOKEN` | Optional fallback: a permanent `shpat_` Admin token, used only when the client id/secret aren't set |
-| `SHOPIFY_WEBHOOK_SECRET` | Deprecated older name for the client secret, read only when `SHOPIFY_CLIENT_SECRET` isn't set |
+| `SHOPIFY_WEBHOOK_SECRET` | The store's notification key, for an `orders/paid` webhook made in Shopify Admin › Settings › Notifications › Webhooks ("Your webhooks will be signed with …"). The webhook accepts this or the client secret |
 
 **Decision (4 Nov 2026):** r_orders is a Dev Dashboard app, so there is no permanent token (a static token was the cause of the preview's `shopify_http_401`). The vault gets its Admin API token the same way the live site's redeem functions do, with the client credentials grant (§5.1), in `lib/sources/shopify-auth.ts`.
 
@@ -851,7 +851,7 @@ Variables: `{ "id": "gid://shopify/Order/<id>", "tags": ["mug:ready"] }`. This i
   - `email`, `contact_email`, `customer.id`, `customer.email`
   - `created_at`, `processed_at`, `financial_status`, `cancelled_at`, `test`, `tags`
   - `line_items[]`: `id`, `product_id`, `variant_id`, `title`, `quantity`, `properties[] { name, value }` (same keys as 4.2)
-- **Headers:** verify `X-Shopify-Hmac-Sha256`, the base64 HMAC-SHA256 of the **raw** body with the app's client secret (`SHOPIFY_CLIENT_SECRET`), before parsing. Use `X-Shopify-Webhook-Id` for idempotency. `X-Shopify-Topic` and `X-Shopify-Shop-Domain` identify the source.
+- **Headers:** verify `X-Shopify-Hmac-Sha256`, the base64 HMAC-SHA256 of the **raw** body, before parsing. It must match the app's client secret (`SHOPIFY_CLIENT_SECRET`, for webhooks the app registers) or the store's notification key (`SHOPIFY_WEBHOOK_SECRET`, for webhooks made in Shopify Admin › Notifications). A mismatch logs one line (topic only) and returns 401. Use `X-Shopify-Webhook-Id` for idempotency. `X-Shopify-Topic` and `X-Shopify-Shop-Domain` identify the source.
 - **Creating the subscription** is not done here because it is a write. It is either done in the custom app's admin settings, or with:
   ```graphql
   mutation VaultCreateOrdersPaidWebhook($sub: WebhookSubscriptionInput!) {
