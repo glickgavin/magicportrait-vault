@@ -57,6 +57,7 @@ export function VaultGuest({ data }: { data: HomeData }) {
           <span className="block text-[16px] font-bold">{t("home.allMyPortraits")}</span>
           <span className="block text-[14px] text-ink-2">{t("home.sessionsSummary", { sessions: profile.sessions.length, portraits: profile.portraitCount })}</span>
         </span>
+        <span className="ml-auto mr-1 shrink-0 text-[15px] font-semibold text-pink-link">{t("home.seeAll")}</span>
         <ChevronRight className="h-5 w-5 text-ink-3" aria-hidden="true" />
       </Link>
 

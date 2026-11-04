@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { ShoppingBag, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/types";
 import { MenuSheet } from "@/components/MenuSheet";
 import { AccountMenu } from "@/components/AccountMenu";
 import { t } from "@/lib/i18n";
-import { CART_PATH, mainSite } from "@/lib/site-links";
 
 export function Header({ user, mainSiteUrl, thumbnails, cardsEnabled }: { user: SessionUser | null; mainSiteUrl: string; thumbnails?: string[]; cardsEnabled?: boolean }) {
   return (
@@ -17,14 +16,11 @@ export function Header({ user, mainSiteUrl, thumbnails, cardsEnabled }: { user: 
         {user ? (
           <AccountMenu user={user} />
         ) : (
-          <Link href="/signin" aria-label={t("ui.account.signIn")} className="absolute right-[56px] top-1/2 flex h-11 w-11 -translate-y-1/2 flex-col items-center justify-center text-ink">
+          <Link href="/signin" aria-label={t("ui.account.signIn")} className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 flex-col items-center justify-center text-ink">
             <UserRound className="h-5 w-5" aria-hidden="true" />
             <span className="text-[10px] font-semibold leading-none">{t("ui.account.signIn")}</span>
           </Link>
         )}
-        <a href={mainSite(mainSiteUrl, CART_PATH)} aria-label={t("ui.cart")} className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-[12px] bg-black/[0.05] hover:bg-black/10">
-          <ShoppingBag className="h-5 w-5" aria-hidden="true" />
-        </a>
       </div>
     </header>
   );

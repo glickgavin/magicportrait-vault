@@ -129,14 +129,14 @@ How a person's portraits are found: email → `analytics_events_mirror` (`proper
 
 ## 7. Sign-in and the account menu
 
-- **6-digit code.** Supabase Auth email OTP, sent from `cards@magicportraitspartners.com` via AgentMail SMTP. The sign-in screen (`SignIn`) has two steps: email, then code. It has "Resend code" and "Change email".
+- **6-digit code.** Supabase Auth email OTP, sent from `cards@magicportraitspartners.com` via AgentMail SMTP. The sign-in screen (`SignIn`) has two steps: email, then code. It has "Resend code" and "Change email". Its heading reads **"Create my greeting card"** (the default and `purpose=gift`), except for people on their way to their orders or `/redeem`, who keep the My Magic Portraits / order wording (4 Nov review).
 - **One-tap link.** The offer email and the thank-you pop-up carry `/g/[token]`.
   - The token is a random, opaque value (32+ bytes). It is stored only as a hash on the `gift_offers` row, and never contains the email or the order number.
   - It expires after `gift.link_valid_days` (default 30).
   - Opening it signs the person in (server-side magic-link exchange), then redirects to the builder with the token removed from the address.
   - An expired or unknown token falls back to the normal sign-in screen.
 - **Old redeem links.** `/redeem`, `/redeem?order=…` and `/redeem/[order]` land on `RedeemEntry`: the sign-in screen worded for an order. After sign-in it opens that order. If the order isn't on the signed-in email, it shows **one generic message**, identical whether or not the order exists: "We couldn't find that order on this email", with "Switch account".
-- **Initials circle.** In the header, left of the bag, on every page. Initials come from the Shopify customer's first and last name, or else the first two letters of the email. When signed out, the same spot shows a person icon labelled "Sign in".
+- **Initials circle.** In the header, at the top right (where the cart was; the cart was removed in the 4 Nov review), on every page. Initials come from the Shopify customer's first and last name, or else the first two letters of the email. When signed out, the same spot shows a person icon labelled "Sign in".
 - **Account menu** (`Account`), opened from the circle: name and email, then My cards, My portraits, Orders/downloads & mugs, Settings (super users only, with a "Super user" tag), and Sign out.
 - **Sign out** clears the session and calls `posthog.reset()`.
 
@@ -150,12 +150,12 @@ Most people arrive once, from the offer email, with no cards yet. For them it mu
   - Portrait: the newest ordered portrait, else the newest portrait.
   - Message: the version's first message idea. Ideas may use `{pet}`, filled from the session's pet name; ideas with `{pet}` are skipped when the name isn't known.
   - From: their first name.
-- **They do one thing:** type who it's for. "I'll share it" is selected; "Email it for me" adds one email field (sends now, no scheduling on the first card).
-- **The button:** "Create my card" (or "Create and send"). It's disabled until a name is typed, and an email too when emailing.
+- **They do one thing:** type who it's for (placeholder "Name"). There is no delivery choice before the card exists (4 Nov review): the card is created first and sent from the Ready screen.
+- **The button:** "Create my card". It's disabled until a name is typed.
 - **Optional, never required:**
   - "Change design" (cycles through in-season designs; long-press or a second tap opens the picker sheet)
   - "Change photo" (portrait picker sheet)
-  - "Try another" (next message idea)
+  - "Change message" (next message idea, wrapping round)
   - "From … change"
   - "See all designs", which opens the full builder with everything carried over.
 - **What triggers it:** `cards.first_card_mode = one_screen` (default) and the person has made no cards. Set it to `full_builder` to switch it off, or use a PostHog flag to compare the two.
@@ -177,29 +177,33 @@ Most people arrive once, from the offer email, with no cards yet. For them it mu
 | Site menu, home, My cards, order page | `Menu`, `FirstHome`/`VaultHome`, `MyCards`, `OrderDetail` | `/create`, which shows `FirstCard` when they have no cards yet, else step 1 (signs in first if needed) |
 
 ### 8.2 Builder steps
-Steps are mobile first; the desktop step bar reads Theme · Portrait · Message · Ready (`DesktopVault`).
+Three steps, mobile first (4 Nov review). The step bar reads "Step N of 3" (Occasion · Portrait · Message), stays pinned under the site header on every step, with a plain back arrow (no container; 44 px tap target, visible focus).
 
-1. **Theme** (`M1Theme`).
+1. **Occasion** (`M1Theme`).
    - Tabs: All · Holidays · New Year · Birthdays · General, each with a count.
    - "All" shows one horizontal row per category, with an "In season" tag and "See all". A category tab shows a 2-column grid.
    - Each tile is one version (e.g. Christmas · Snowfall), with a "New" badge when set.
    - Shown: only live versions of live themes inside their date window.
    - In season: a category is in season when one of its live themes starts within `themes.in_season_days_before` days, or is already inside its window. In-season categories sort first.
 2. **Portrait** (`M2Portrait`).
-   - Every portrait the person made, grouped by session, newest first, with an ORDERED badge on ordered ones.
-   - Tap to pick; optional zoom and move inside the photo zone.
+   - Every portrait the person made in **one grid**, newest first, 3 across on a phone (no grouping by date), with an ORDERED badge on ordered ones.
+   - Each thumbnail shows the whole portrait at its real shape (no square crop) inside an equal cell.
+   - A compact card preview stays pinned under the step bar while the grid scrolls, so each pick visibly changes the card (not pinned on short screens, under 700 px tall).
+   - Tap to pick; optional zoom and move inside the photo window.
 3. **Message** (`M3Message`).
-   - Fields: To, From (prefilled with the first name), Message (counter; max `cards.message_max_chars` or the version's own max).
-   - Idea chips from the version, and a live preview.
-   - "How should it reach them?": **Email it for me** (their email; When: Send now or Pick a date) or **I'll share it**.
-   - Button: **Create my card**.
+   - Fields: To (placeholder "Name": the recipient's name, not an email), From (prefilled with the first name; placeholder "Your name"), Message (counter; max `cards.message_max_chars` or the version's own max).
+   - One **Change message** button: each tap fills in the next of the version's message ideas, wrapping round. Typing still works. Live preview.
+   - Button: **Create my card**. No delivery choice here: cards are created first, then sent.
+   - Scheduled sending ("Send now or pick a date") is kept behind `cards.scheduling_enabled` (default off). When on, the old "How should it reach them?" fields come back on this step.
 4. **Creating** (`M4Creating`).
    - The server renders the JPEG while three progress lines show.
    - On failure: "Try again", and the error is logged.
-5. **Ready** (`M5Ready`).
-   - The card with Share (native share sheet), Download, Copy link, and WhatsApp, Messages, Facebook and Instagram buttons. Instagram uses the share sheet, or download plus a tip.
-   - Shows "Emailed to …" or "Sends 31 Dec, 18:00".
-   - Then "Make another card" and "Go to My cards".
+5. **Ready** (`M5Ready`), the end of every flow including `FirstCard`.
+   - "Your card is ready", then the card.
+   - **Send by email:** an email box for the recipient's address with **Send** beside it. Sends at once (`card_deliveries` + AgentMail). One recipient per card: afterwards it shows "Sent to j***@example.com · Resend", and a different address is refused (make another card instead). Sends and resends count towards `cards.email_sends_per_day` per person (default 20).
+   - **Share:** the phone's share sheet (`navigator.share`, with the card image attached where files are supported and the link in the text). Where there's no share sheet (most computers) it's **Copy link**. No app buttons.
+   - **Download** (the JPEG).
+   - **Make another card** and "Go to My cards". A scheduled card shows "Sends 31 Dec, 18:00".
 
 ### 8.3 Rules
 - `cards.enabled` off → the builder says "Cards are paused" and every entry point is hidden.
@@ -220,7 +224,8 @@ Steps are mobile first; the desktop step bar reads Theme · Portrait · Message 
 
 ### 8.4 Card rendering
 - Size: `cards.size_px` (1500 × 2100), JPEG at `cards.jpeg_quality` (90).
-- Layers: background, then the portrait clipped to the photo zone's shape, then the overlay, then the text zones (`docs/schema.md` § Layout JSON).
+- Layers: background, then the portrait clipped to the photo window's shape, then the overlay, then the text zones (`docs/schema.md` § Layout JSON).
+- **The photo window follows the image** (4 Nov review). `layout.photo` is the maximum photo area; with `photo.fit = "adapt"` (default) the portrait is fitted inside it at its own aspect ratio, centred, uncropped, and the frame follows (rect and rounded shrink to the fitted box; arch keeps a semicircular top across the fitted width, capped at half the height; circle stays a cover-cropped circle). `"cover"` keeps the designed box and cover-crops, for art that draws the frame itself (`frame.width: 0`, which defaults to cover).
 - Text shrinks before it wraps and never overflows its box.
 - The live preview and the server render share one layout module, so what you see is what you get.
 
@@ -229,6 +234,7 @@ Steps are mobile first; the desktop step bar reads Theme · Portrait · Message 
 - **My cards** (`MyCards`).
   - Every card the person made, newest first, with status: Emailed · Opened <date> · Scheduled <date> · Shared · Downloaded · Failed.
   - Actions: Share, Download, **Use again** (same theme, portrait and message, blank recipient), Resend (emailed cards), **Change or Cancel** (scheduled cards; not in the mockup, add a "…" menu).
+  - Sending a card that hasn't been emailed yet happens on its Ready screen (open the card).
 - **What the recipient gets** (`RecipientEmail`).
   - From "<Sender> via Magic Portraits"; subject "<Sender> sent you a <theme> card".
   - The card, "Save the card" and "Open full size" (both open `/c/[slug]`).

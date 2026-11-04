@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
 import { createCanvas } from "@napi-rs/canvas";
 import { SEED_THEMES, defaultLayout } from "@/lib/seed-data";
-import { fitText, parseLayout, photoSourceRect, placeLines, usableIdeas } from "@/lib/render/layout";
+import { archRadius, fitText, fittedPhoto, parseLayout, photoFit, photoSourceRect, placeLines, usableIdeas, type Layout } from "@/lib/render/layout";
 import { drawCard, registerFonts } from "@/lib/render/render";
 import { measurer, type Ctx } from "@/lib/render/draw";
 
@@ -49,6 +49,64 @@ describe("card renderer: golden images per seed version", () => {
       });
     }
   }
+});
+
+async function expectGolden(png: Buffer, name: string) {
+  const file = `${GOLDEN}/${name}.png`;
+  if (!existsSync(file) || process.env.UPDATE_GOLDEN) {
+    writeFileSync(file, png);
+    return;
+  }
+  const [a, b] = await Promise.all([rgba(png), rgba(readFileSync(file))]);
+  expect([a.info.width, a.info.height]).toEqual([b.info.width, b.info.height]);
+  let differing = 0;
+  for (let i = 0; i < a.data.length; i += 4) {
+    const d = Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]);
+    if (d > 48) differing++;
+  }
+  expect(differing / (a.info.width * a.info.height)).toBeLessThan(0.005);
+}
+
+describe("photo window follows the image (photo.fit)", () => {
+  const square = portrait;
+  const tall = readFileSync("tests/fixtures/portrait-3x4.jpg");
+  const base = parseLayout(defaultLayout(SEED_THEMES[0].versions[0].look));
+  const bg = readFileSync(`public/theme-placeholders/${SEED_THEMES[0].slug}-${SEED_THEMES[0].versions[0].slug}.jpg`);
+  const render = async (layout: Layout, p: Buffer) =>
+    (await drawCard({ layout, background: bg, portrait: p, photoBg: "#E8E2D8", to: "Grandma Rose", from: "Sam", message: "Wishing you the happiest day.", footerText: "Made with Magic Portraits AI", size: SIZE })).encode("png");
+
+  it("adapt: square portrait (golden)", async () => expectGolden(await render(base, square), "fit-adapt-square"));
+  it("adapt: 3:4 portrait (golden)", async () => expectGolden(await render(base, tall), "fit-adapt-3x4"));
+  it("cover: 3:4 portrait fills the designed box (golden)", async () => expectGolden(await render({ ...base, photo: { ...base.photo, fit: "cover" } }, tall), "fit-cover-3x4"));
+  it("adapt: arch with a 3:4 portrait (golden)", async () => expectGolden(await render({ ...base, photo: { ...base.photo, shape: "arch" } }, tall), "fit-adapt-arch-3x4"));
+
+  it("fits inside the maximum area at the image's own ratio, centred, frame included", () => {
+    const p = { x: 100, y: 200, w: 800, h: 800, shape: "rounded" as const, radius: 30, frame: { color: "#FFFFFF", width: 20 } };
+    const f = fittedPhoto(p, 600, 800); // 3:4
+    expect(f.h).toBe(800);
+    expect((f.w - 40) / (f.h - 40)).toBeCloseTo(0.75, 5);
+    expect(f.x + f.w / 2).toBeCloseTo(500, 5);
+    expect(f.y).toBe(200);
+    const wide = fittedPhoto(p, 800, 600);
+    expect(wide.w).toBe(800);
+    expect(wide.y + wide.h / 2).toBeCloseTo(600, 5);
+  });
+  it("circles and cover keep the designed box; no portrait keeps it too", () => {
+    const p = { x: 0, y: 0, w: 500, h: 500, shape: "circle" as const };
+    expect(fittedPhoto(p, 600, 800)).toEqual(p);
+    const c = { x: 0, y: 0, w: 500, h: 700, shape: "rounded" as const, fit: "cover" as const };
+    expect(fittedPhoto(c, 800, 800)).toEqual(c);
+    expect(fittedPhoto({ ...c, fit: "adapt" }, null, null)).toEqual({ ...c, fit: "adapt" });
+  });
+  it("defaults: cover when the art draws the frame (frame.width 0), otherwise adapt", () => {
+    expect(photoFit({ x: 0, y: 0, w: 1, h: 1, shape: "rect", frame: { color: "#FFFFFF", width: 0 } })).toBe("cover");
+    expect(photoFit({ x: 0, y: 0, w: 1, h: 1, shape: "rounded", frame: { color: "#FFFFFF", width: 28 } })).toBe("adapt");
+    expect(photoFit({ x: 0, y: 0, w: 1, h: 1, shape: "rounded" })).toBe("adapt");
+  });
+  it("arch keeps a semicircular top across the width, capped for wide boxes", () => {
+    expect(archRadius(600, 800)).toBe(300);
+    expect(archRadius(800, 600)).toBe(300);
+  });
 });
 
 describe("text fitting", () => {

@@ -52,7 +52,7 @@ export function FirstHome({ data, footerText }: { data: HomeData; footerText: st
         <CardsBlocked data={data} />
       )}
       <div className="mt-4 flex flex-col gap-3">
-        <RowLink href="/portraits" icon={<ImageIcon className="h-5 w-5" />} title={t("home.myPortraits")} sub={tn("home.portraitsCount", profile.portraitCount)} />
+        <RowLink href="/portraits" icon={<ImageIcon className="h-5 w-5" />} title={t("home.myPortraits")} sub={tn("home.portraitsCount", profile.portraitCount)} action={t("home.seeAll")} testId="portraits-see-all" />
         <RowLink
           href="/orders"
           icon={<Package className="h-5 w-5" />}

@@ -83,7 +83,7 @@ export function MenuSheet({ user, mainSiteUrl, thumbnails = [], cardsEnabled = t
                   {item.n}
                 </span>
                 <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[10px]" style={{ backgroundColor: item.tint }}>
-                  {thumbnails[i] ? <img src={thumbnails[i]} alt="" className="h-full w-full object-cover" loading="lazy" /> : <ImageIcon className="h-5 w-5 text-black/40" aria-hidden="true" />}
+                  {thumbnails[i] ? <img src={thumbnails[i]} alt="" className="h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" /> : <ImageIcon className="h-5 w-5 text-black/40" aria-hidden="true" />}
                 </span>
                 <span className="text-[17px] text-ink">{t(item.titleKey)}</span>
               </a>

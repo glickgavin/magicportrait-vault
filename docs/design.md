@@ -32,8 +32,7 @@ Load them with `next/font/google`. The card renderer needs the same font files o
 - Height 56 px, background `#F3F1E7`.
 - **Left:** hamburger, opens the menu sheet.
 - **Centre:** the Magic Portraits logo, centred (`left: 50%; transform: translateX(-50%)`). It is 36 px tall on the live site, but **30 px tall (`top: 13px`) whenever the initials circle or the Sign-in icon shows**. At 36 px the circle overlaps the logo on phones. Check at 360 px.
-- **Right:** the ShoppingBag icon, linking to the main site's cart.
-- **Avatar:** a 34 px circle with the person's initials, at `right: 58px`, inside a 44 px tap target.
+- **Right:** the avatar (no cart icon: removed in the 4 Nov review). A 34 px circle with the person's initials, at `right: 12px`, inside a 44 px tap target.
   - Avatar gradient background, white 13 px weight 800 initials.
   - Ring: `box-shadow: 0 0 0 2px #F3F1E7, 0 0 0 3.5px rgba(221,7,196,0.35)`.
   - Signed out: a person-outline icon with the label "Sign in".
@@ -64,7 +63,8 @@ The live site's footer, unchanged: Chat With Us · VIP Login · About Us, Follow
 - `Header`, `MenuSheet`, `Footer`, `Avatar` / `AccountMenu`
 - `PrimaryButton` (gradient), `SecondaryButton` (white with border), `Chip` / `Tab` (gradient when active), `Badge` (ORDERED, NEW, status)
 - `CardPreview`: the live card at any size, drawn from the same layout JSON the server renderer uses, so the preview matches the JPEG. The design's `CardPreview` board shows the 10 target looks.
-- `PortraitGrid` (grouped by session, radio-group selection), `ThemeTile`, `StepHeader` ("Step 2 of 4"), `StickyFooterBar` (Next / Create)
+- `PortraitGrid` (one grid, newest first, 3 across on a phone; each portrait whole at its own shape in an equal cell; radio-group selection), `ThemeTile`, `StepHeader` ("Step 2 of 3", pinned under the header at `top: 56px`, tight padding, a plain arrow back button with a 44 px tap target and a visible focus ring, no container), the compact pinned preview on the Portrait step (pinned only when the screen is at least 700 px tall), `StickyFooterBar` (Next / Create)
+- `ReadyActions` (Ready screen): email box with **Send** beside it (then "Sent to j***@… · Resend"), **Share** (the share sheet; **Copy link** where there is none) and **Download** side by side. No app buttons.
 - Admin: `AdminShell` (sidebar groups INSIGHTS · SETUP · GREETING CARDS · REDEEM · SYSTEM), `KpiTile`, `DataTable` (search, filters, paging, CSV), `Timeline`, `StatusPill`
 
 ## Behaviour

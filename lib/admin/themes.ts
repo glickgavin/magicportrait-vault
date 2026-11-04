@@ -7,8 +7,9 @@ import { drawCard } from "@/lib/render/render";
 import { parseLayout, type Layout } from "@/lib/render/layout";
 import type { VersionRow } from "@/lib/db/themes";
 
-export async function sampleRender(v: Pick<VersionRow, "background_path" | "overlay_path" | "layout" | "message_ideas">, size?: { w: number; h: number }, footerText = "Made with Magic Portraits AI") {
-  const [background, overlay, portrait] = await Promise.all([loadThemeAsset(v.background_path), loadThemeAsset(v.overlay_path), readFile(path.join(process.cwd(), "assets/sample-portrait.jpg"))]);
+export async function sampleRender(v: Pick<VersionRow, "background_path" | "overlay_path" | "layout" | "message_ideas">, size?: { w: number; h: number }, footerText = "Made with Magic Portraits AI", sample: "square" | "3x4" = "square") {
+  const file = sample === "3x4" ? "assets/sample-portrait-3x4.jpg" : "assets/sample-portrait.jpg";
+  const [background, overlay, portrait] = await Promise.all([loadThemeAsset(v.background_path), loadThemeAsset(v.overlay_path), readFile(path.join(process.cwd(), file))]);
   const layout: Layout = parseLayout(v.layout);
   const message = (v.message_ideas.find((i) => !i.includes("{pet}")) ?? v.message_ideas[0] ?? "Wishing you the happiest day.").replaceAll("{pet}", "Biscuit");
   return drawCard({ layout, background, overlay, portrait, to: "Grandma Rose", from: "Sam", message, footerText, size });

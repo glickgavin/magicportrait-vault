@@ -7,9 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { CardPreview } from "@/components/CardPreview";
 import { StepHeader, StickyFooterBar } from "./StepHeader";
 import { useDraft } from "./useDraft";
-import type { BuilderData, ClientSession } from "./types";
+import type { BuilderData } from "./types";
 import { t } from "@/lib/i18n";
-import { fmtDate } from "@/lib/format";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 
@@ -33,47 +32,72 @@ export function PortraitStep({ data, versionId, imageId }: { data: BuilderData; 
   const session = data.sessions.find((s) => s.sessionId === portrait?.sessionId);
   const label = portrait && session ? `${[session.petName, session.themeName].filter(Boolean).join(", ")} ${session.portraits.indexOf(portrait) + 1}` : t("builder.nothingSelected");
 
+  // One grid, newest first (sessions arrive newest first), each labelled by its session.
+  const items = data.sessions.flatMap((s) => {
+    const title = [s.themeName, s.petName].filter(Boolean).join(" · ") || t("portraits.untitled");
+    return s.portraits.map((p, i) => ({ p, s, label: t("builder.portraitN", { theme: title, n: i + 1 }) }));
+  });
+
   return (
     <div className="mx-auto max-w-[760px] pb-28" data-testid="step-portrait">
       <StepHeader step={2} onBack={() => router.push(`/create?step=theme`)} />
-      <div className="mt-5 flex items-center gap-4 rounded-[20px] bg-white p-3 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-        <div className="w-[96px] shrink-0">
-          <CardPreview
-            layout={version.layout}
-            backgroundUrl={version.backgroundUrl}
-            overlayUrl={version.overlayUrl}
-            portraitUrl={portrait?.imageUrl}
-            crop={draft.crop}
-            photoBg={version.photoBg}
-            to={draft.to || t("home.theirName")}
-            from={draft.from || data.firstName}
-            message={draft.message}
-            footerText={data.footerText}
-            label={`${version.themeName} · ${version.name}`}
-            maxWidth={120}
-          />
+      {/* Compact preview pinned under the step bar so each pick visibly changes the card; not pinned on short screens. */}
+      <div className="z-20 -mx-4 bg-page/95 px-4 pb-2 pt-3 backdrop-blur [@media(min-height:700px)]:sticky [@media(min-height:700px)]:top-[106px]" data-testid="portrait-preview">
+        <div className="flex items-center gap-4 rounded-[20px] bg-white p-3 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+          <div className="w-[84px] shrink-0 lg:w-[110px]">
+            <CardPreview
+              layout={version.layout}
+              backgroundUrl={version.backgroundUrl}
+              overlayUrl={version.overlayUrl}
+              portraitUrl={portrait?.imageUrl}
+              crop={draft.crop}
+              photoBg={version.photoBg}
+              to={draft.to || t("home.theirName")}
+              from={draft.from || data.firstName}
+              message={draft.message}
+              footerText={data.footerText}
+              label={`${version.themeName} · ${version.name}`}
+              maxWidth={120}
+            />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-extrabold leading-tight">{t("builder.choosePortrait")}</h1>
+            <p className="mt-1 text-[14px] text-ink-2">{t("builder.choosePortraitBody", { design: version.name })}</p>
+            {portrait && (
+              <button type="button" className="mt-1 inline-flex min-h-[44px] items-center gap-2 text-[14px] font-semibold text-pink-link" aria-expanded={adjust} onClick={() => setAdjust((a) => !a)}>
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" /> {t("builder.adjust")}
+              </button>
+            )}
+          </div>
         </div>
-        <div>
-          <h1 className="text-[24px] font-extrabold leading-tight">{t("builder.choosePortrait")}</h1>
-          <p className="mt-1 text-[15px] text-ink-2">{t("builder.choosePortraitBody", { design: version.name })}</p>
-        </div>
+        {portrait && adjust && <CropControls crop={draft.crop} onChange={(crop) => update({ crop })} />}
       </div>
 
-      {portrait && (
-        <div className="mt-3">
-          <button type="button" className="inline-flex items-center gap-2 text-[15px] font-semibold text-pink-link" aria-expanded={adjust} onClick={() => setAdjust((a) => !a)}>
-            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" /> {t("builder.adjust")}
+      <div role="radiogroup" aria-label={t("builder.choosePortrait")} className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5" data-testid="portrait-grid">
+        {items.map(({ p, s, label: itemLabel }) => (
+          <button
+            key={p.imageId}
+            type="button"
+            role="radio"
+            aria-checked={draft.imageId === p.imageId}
+            aria-label={`${itemLabel}${p.ordered ? `, ${t("portraits.ordered").toLowerCase()}` : ""}`}
+            onClick={() => {
+              update({ imageId: p.imageId, crop: { zoom: 1, x: 0, y: 0 } });
+              trackClient("card_portrait_selected", { session_id: s.sessionId, image_id: p.imageId, was_ordered: p.ordered });
+            }}
+            className={cn("relative flex aspect-square items-center justify-center overflow-hidden rounded-[14px] bg-[#EFEBE1]", draft.imageId === p.imageId && "ring-[3px] ring-magenta")}
+          >
+            {/* The whole portrait at its own shape (no square crop). */}
+            <img src={p.imageUrl} alt="" loading="lazy" width={p.width ?? undefined} height={p.height ?? undefined} className="h-full w-full object-contain" />
+            {p.ordered && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold text-[#1f6b35]">{t("portraits.ordered")}</span>}
+            {draft.imageId === p.imageId && (
+              <span className="bg-avatar-gradient absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-white" aria-hidden="true">
+                <Check className="h-4 w-4" />
+              </span>
+            )}
           </button>
-          {adjust && <CropControls crop={draft.crop} onChange={(crop) => update({ crop })} />}
-        </div>
-      )}
-
-      {data.sessions.map((s) => (
-        <SessionPicker key={s.sessionId} s={s} selected={draft.imageId} onPick={(id, ordered) => {
-          update({ imageId: id, crop: { zoom: 1, x: 0, y: 0 } });
-          trackClient("card_portrait_selected", { session_id: s.sessionId, image_id: id, was_ordered: ordered });
-        }} />
-      ))}
+        ))}
+      </div>
 
       <StickyFooterBar label={t("builder.selected")} value={label}>
         <Button size="lg" disabled={!portrait} onClick={() => router.push(`/create/message?v=${version.id}&image=${portrait!.imageId}`)} data-testid="next">
@@ -81,41 +105,6 @@ export function PortraitStep({ data, versionId, imageId }: { data: BuilderData; 
         </Button>
       </StickyFooterBar>
     </div>
-  );
-}
-
-function SessionPicker({ s, selected, onPick }: { s: ClientSession; selected: string | null; onPick: (id: string, ordered: boolean) => void }) {
-  const title = [s.themeName, s.petName].filter(Boolean).join(" · ") || t("portraits.untitled");
-  return (
-    <section className="mt-5" aria-labelledby={`s-${s.sessionId}`}>
-      <div className="flex items-baseline justify-between">
-        <h2 id={`s-${s.sessionId}`} className="text-[17px] font-bold">
-          {title}
-        </h2>
-        <span className="text-[13px] text-ink-2">{fmtDate(s.createdAt)}</span>
-      </div>
-      <div role="radiogroup" aria-label={t("builder.portraitsLabel", { theme: title })} className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
-        {s.portraits.map((p, i) => (
-          <button
-            key={p.imageId}
-            type="button"
-            role="radio"
-            aria-checked={selected === p.imageId}
-            aria-label={`${t("builder.portraitN", { theme: title, n: i + 1 })}${p.ordered ? `, ${t("portraits.ordered").toLowerCase()}` : ""}`}
-            onClick={() => onPick(p.imageId, p.ordered)}
-            className={cn("relative aspect-square overflow-hidden rounded-[14px] bg-[#EADFD0]", selected === p.imageId && "ring-[3px] ring-magenta")}
-          >
-            <img src={p.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-            {p.ordered && <span className="absolute bottom-2 left-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold text-[#1f6b35]">{t("portraits.ordered")}</span>}
-            {selected === p.imageId && (
-              <span className="bg-avatar-gradient absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-white" aria-hidden="true">
-                <Check className="h-4 w-4" />
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
 

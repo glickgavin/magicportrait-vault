@@ -14,6 +14,8 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('cards.footer_text', '"Made with Magic Portraits AI"'::jsonb, 'text', 'cards', 'Card footer line', null, null, 'seed', now()),
   ('cards.first_card_mode', '"one_screen"'::jsonb, 'choice', 'cards', 'First card', 'one_screen shows FirstCard to people with no cards (SPEC §8.0).', '["one_screen","full_builder"]'::jsonb, 'seed', now()),
   ('cards.first_card_default_version', '"with-love-love"'::jsonb, 'text', 'cards', 'First card default design', 'theme-version slug (e.g. with-love-love) used when nothing is in season', null, 'seed', now()),
+  ('cards.scheduling_enabled', 'false'::jsonb, 'boolean', 'cards', 'Scheduled sending', 'On: the Message step offers “Send now or pick a date” again. Off (default): cards are created first, then sent from the ready screen at once.', null, 'seed', now()),
+  ('cards.email_sends_per_day', '20'::jsonb, 'number', 'cards', 'Card emails per person per day', 'Limits Send on the ready screen (and resends) per signed-in person, so the cards inbox can''t be used for spam.', null, 'seed', now()),
   ('cards.schedule_max_days', '366'::jsonb, 'number', 'cards', 'Furthest a card can be scheduled (days)', null, null, 'seed', now()),
   ('cards.signed_url_seconds', '600'::jsonb, 'number', 'cards', 'Card image link lifetime (s)', null, null, 'seed', now()),
   ('gift.offer_email_enabled', 'false'::jsonb, 'boolean', 'gift', 'Free gift offer email', 'After a qualifying paid order (Shopify orders/paid webhook), sends the offer with a one-tap link to make a free card. Channel below. Also sends free_gift_unlocked to Klaviyo for segments.', null, 'seed', now()),

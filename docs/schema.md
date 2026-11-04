@@ -189,7 +189,7 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 {
   "canvas": { "w": 1500, "h": 2100 },
   "photo": { "x": 210, "y": 520, "w": 1080, "h": 1080, "shape": "rounded", "radius": 48,
-             "frame": { "color": "#FFFFFF", "width": 30 } },
+             "frame": { "color": "#FFFFFF", "width": 30 }, "fit": "adapt" },
   "text": {
     "to":      { "x": 150, "y": 1660, "w": 1200, "font": "DM Serif Display", "size": 64, "color": "#3B1F0E", "align": "center", "template": "Dear {to}," },
     "message": { "x": 150, "y": 1740, "w": 1200, "h": 220, "font": "Plus Jakarta Sans", "size": 44, "lineHeight": 1.35, "color": "#3B1F0E", "align": "center", "valign": "middle", "maxLines": 4 },
@@ -198,11 +198,12 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 }
 ```
 
-`shape` is one of `rect` · `rounded` · `circle` · `arch` (a rectangle with a semicircular top of radius `w/2`). The approved fonts are DM Serif Display and Plus Jakarta Sans; more can be added in Settings later (the font files ship with the app). Text is shrunk down to `minSize` (default 70% of `size`) before wrapping, and never overflows its box.
+`shape` is one of `rect` · `rounded` · `circle` · `arch` (a rectangle with a semicircular top of radius `w/2`, capped at `h/2` for wide boxes). The approved fonts are DM Serif Display and Plus Jakarta Sans; more can be added in Settings later (the font files ship with the app). Text is shrunk down to `minSize` (default 70% of `size`) before wrapping, and never overflows its box.
 
 - `y` is the **top** of each text box. `to` and `from` are single lines (box height ≈ `size × 1.25`) that shrink to fit `w`.
 - `message.valign` is `top` (default) or `middle`; `middle` centres the wrapped lines vertically in the `h` box.
 - `photo.frame` is drawn **inside** the photo box, over the portrait's edge; `width: 0` means no frame (the background art supplies it).
+- **`photo.fit`** (4 Nov review): `"adapt"` or `"cover"`. With `"adapt"`, `photo` (x, y, w, h) is the **maximum photo area**: the portrait is fitted inside it at its own aspect ratio, centred, with no crop, and the frame and shape follow the fitted box (`rect`/`rounded` shrink to it, `arch` keeps its semicircular top across the fitted width, `circle` stays a cover-cropped circle). With `"cover"`, the box stays as designed and the portrait is cover-cropped into it (the old behaviour). When `fit` is missing it is `"cover"` if `frame.width` is 0 (the art draws the frame, so the window must line up with it) and `"adapt"` otherwise. The fitting lives in `lib/render/layout.ts` (`fittedPhoto`), shared by the preview and the server render; both read the portrait's size from the loaded image. The template editor labels the zone "Maximum photo area" and previews and test-renders with a square or a 3:4 sample.
 - Layer order: background, portrait (clipped to `shape`), frame, overlay, text.
 
 ## Seed data

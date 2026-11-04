@@ -2,7 +2,7 @@
  * The one drawing routine for a card, used by the server renderer (@napi-rs/canvas) and the browser
  * preview (HTML canvas), so what you see is what you get.
  */
-import { fill, fitText, photoSourceRect, placeLines, shapePath, tracePath, type Crop, type FontName, type Layout, type Measure } from "./layout";
+import { fill, fitText, fittedPhoto, photoSourceRect, placeLines, shapePath, tracePath, type Crop, type FontName, type Layout, type Measure } from "./layout";
 
 export type DrawImage = { width: number; height: number };
 
@@ -71,7 +71,8 @@ export function drawLayers(ctx: Ctx, input: DrawInput, family: (f: FontName) => 
     ctx.fillRect(0, 0, W, H);
   }
 
-  const p = layout.photo;
+  // The photo window follows the portrait's own shape ("adapt"), or stays as designed ("cover").
+  const p = fittedPhoto(layout.photo, input.portrait?.width, input.portrait?.height);
   const frameW = p.frame?.width ?? 0;
   if (p.frame && frameW > 0) {
     ctx.save();

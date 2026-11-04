@@ -92,9 +92,9 @@ Business events that happen in the browser (share, copy link, download, mug tile
 | `card_portrait_selected` | Portrait tapped | `session_id`, `image_id`, `was_ordered` |
 | `card_crop_adjusted` | Zoom or move | `zoom` |
 | `page_view_card_message` | Step 3 | |
-| `card_message_idea_used` | Idea chip tapped | `idea` |
-| `card_delivery_selected` | Email it / I'll share it | `delivery` |
-| `card_create_tapped` | "Create my card" | `theme_slug`, `delivery`, `message_length`, `scheduled` |
+| `card_message_idea_used` | "Change message" tapped (the next idea is filled in) | `idea` |
+| `card_delivery_selected` | **Send** tapped on the Ready screen (`delivery=email`); with `cards.scheduling_enabled`, also the Email it / I'll share it choice on the Message step | `delivery` |
+| `card_create_tapped` | "Create my card" | `theme_slug`, `delivery`, `message_length`, `scheduled`. Since the 4 Nov review cards are created first, so `delivery` is `self` unless scheduling is switched on; whether a card was emailed shows as `card_email_sent`. |
 | `card_render_completed` (server) | JPEG ready | `card_id`, `render_ms` |
 | `error_card_render_failed` (server) | Render failed | `card_id`, `reason` |
 | `page_view_card_ready` | Step 5 | `card_id` |
@@ -106,7 +106,7 @@ Business events that happen in the browser (share, copy link, download, mug tile
 | `page_view_card_first` | `FirstCard` shown | `theme_slug`, `version_slug`, `portrait_was_ordered`, `pet_name_known`, `entry_point` |
 | `card_first_design_changed` | "Change design" | `to_version_slug`, `via` (`cycle` / `picker`) |
 | `card_first_photo_changed` | "Change photo" | `image_id`, `was_ordered` |
-| `card_first_idea_changed` | "Try another" | `idea_index` |
+| `card_first_idea_changed` | "Change message" on FirstCard | `idea_index` |
 | `card_first_full_builder_opened` | "See all designs" | |
 | `page_view_vault_home_first` | `FirstHome` (no cards yet) | `mug_pending` |
 
@@ -118,7 +118,7 @@ Business events that happen in the browser (share, copy link, download, mug tile
 | `card_email_sent` (server) | Card emailed to the recipient | `card_id`, `scheduled` |
 | `card_downloaded` | Download JPEG | `card_id` |
 | `card_link_copied` | Copy link | `card_id` |
-| `card_shared` | Share sheet or app button | `card_id`, `channel` (`whatsapp` / `messages` / `facebook` / `instagram` / `native`) |
+| `card_shared` | Share sheet (the app buttons were removed in the 4 Nov review) | `card_id`, `channel` (`native`; older rows may have `whatsapp` / `messages` / `facebook` / `instagram`) |
 | `card_another_tapped` | "Make another card" | `cards_created` |
 | `page_view_vault_cards` | My cards | `cards_count` |
 | `card_reused` / `card_resent` | From My cards | `card_id` |
@@ -186,7 +186,7 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 
 ## 5. Dashboards, funnels and replays to set up in PostHog
 
-1. **Card funnel:** `gift_offer_email_sent` → `page_view_card_theme` → `card_theme_selected` → `card_portrait_selected` → `card_create_tapped` → `card_render_completed` → (`card_email_sent` or `card_shared` or `card_downloaded`). Break down by `entry_point` and `delivery`.
+1. **Card funnel:** `gift_offer_email_sent` → `page_view_card_theme` → `card_theme_selected` → `card_portrait_selected` → `card_create_tapped` → `card_render_completed` → (`card_email_sent` or `card_shared` or `card_link_copied` or `card_downloaded`). Break down by `entry_point`. (Since the 4 Nov review the delivery is chosen after the card exists, so break the last step down by which of those events happened, not by `delivery`.)
 2. **Sign-in health:** `page_view_vault_signin` → `vault_code_requested` → `vault_code_verified` → `vault_lookup_succeeded`, plus the `vault_lookup_empty` rate.
 3. **Vault to order:** `vault_signed_in` → `vault_order_wall_art_tapped` → `checkout_started` → `purchase_completed`. Split by `is_customer`.
 4. **Theme performance:** `card_theme_selected` and completed cards by `category` and `theme_slug`, and selection rate by `position`.

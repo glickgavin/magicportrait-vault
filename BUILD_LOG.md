@@ -163,6 +163,29 @@ One Claude Code cloud session, branch `claude/cool-volta-69zljg`, working throug
 - **Screenshots** of every route at 390 px (fixture data only) are in `docs/build-screens/` (35 images: 21 customer screens and states, 13 Settings pages, the menu).
 - **Preview:** Vercel builds every push of this branch (all READY up to Part 12; the final commit was building when this was written).
 
+## Review fixes (4 Nov)
+
+From Gavin and Gideon's walk-through (`review-fixes-2026-11-04.md`), reviewed against the live system first, then built on the branch restarted from `main` (PRs #2–#5 were already merged). Row 3 (the 12-template theme pack) stays skipped: `assets/themes/` is in the repo (it came with `main`) but nothing is imported into the theme library.
+
+| # | Change | Notes |
+|---|---|---|
+| 1 | Sign-in heading "Create my greeting card" | Default and `purpose=gift`; people heading to `/orders` or `/redeem` keep the old wording (decision 4). |
+| 2 | Portrait count + "See all" on every home | VaultHome title shows "N portraits"; FirstHome and VaultGuest rows get a "See all". Fixes "1 portraits". |
+| 4 | Step bar pinned | `sticky top-14`, tight padding, "Step N of 3". |
+| 5 | Plain back arrow | No container; 44 px target, focus ring, label kept. |
+| 6–7 | One portrait grid, real shapes | Newest first, 3 across; each portrait whole (`object-contain`) in an equal cell (decision 6). `ClientPortrait` carries Imagen width/height. |
+| 8 | Pinned compact preview on the Portrait step | Only on screens ≥ 700 px tall, so small phones keep room for the grid. |
+| 9 | Placeholders | To "Name", From "Your name" (FirstCard's "Who is it for?" too). |
+| 10 | "Change message" | One button cycling the version's ideas (FirstCard's "Try another" renamed the same). |
+| 11–14 | Create first, then send | 3 steps; no delivery choice before the card exists; Ready screen: Send (one recipient per card; same address = resend, another = refused; `cards.email_sends_per_day`, default 20, shared with resends and the scheduling path), Share (share sheet with the image where supported, link in the text) or Copy link, Download, Make another. Scheduling behind `cards.scheduling_enabled` (off; nothing was scheduled on magic-vault). New route `POST /api/cards/[id]/send` (owner check, suppression, claim-once). WhatsApp/Messages/Facebook/Instagram buttons removed. Draft key bumped to v2. |
+| 15 | Cart removed | Avatar / Sign in at the top right. |
+| 16 | Menu pictures | Migration `20261104000002_menu_thumbnails.sql` (writes only while `[]`). Kept `alt=""`: the product name is printed next to each picture (decision 8); lazy, `referrerPolicy="no-referrer"`. |
+| 17 | Photo window follows the image | `photo.fit` adapt/cover in `lib/render/layout.ts` (`fittedPhoto`), used by `drawLayers`, so preview and render match; sizes come from the loaded image (no extra `sharp` read needed). Arch radius capped at h/2 (decision 7). Unset `fit` = cover when `frame.width` is 0. Editor: "Maximum photo area", Photo fit, square / 3:4 samples. Goldens: `fit-adapt-square`, `fit-adapt-3x4`, `fit-cover-3x4`, `fit-adapt-arch-3x4`; the 10 seed goldens are unchanged (their areas are square). |
+
+- **Shopify sign-in** (the doc's last section) was already done (client credentials). Webhooks deliberately accept the store's notification key as well as the client secret, because the live webhook was made in Shopify Admin.
+- **Tests:** unit 205 (new: send-now, photo fit); e2e 106 at 390 × 844 and 1280 × 800 with axe, updated for the 3-step builder and the Ready screen (incl. a test for `cards.scheduling_enabled`). Screenshots refreshed in `docs/build-screens/` (new `14b-card-ready-unsent`).
+- **Docs:** SPEC §5 (sign-in, header), §8.0, §8.2, §8.4, §9; `docs/design.md`; `docs/analytics.md` (`card_delivery_selected` now = Send tapped, funnel note, `card_shared` channel); `docs/schema.md` (`photo.fit`).
+
 ## Decisions
 
 - **orders/paid accepts the store's notification key too (4 Nov):** the webhook was created in Shopify Admin › Settings › Notifications › Webhooks, whose deliveries (and "Send test notification") are signed with the store's notification key, not the app's client secret, so they were rejected silently. The handler now accepts either `SHOPIFY_CLIENT_SECRET` or `SHOPIFY_WEBHOOK_SECRET` (the store key, set in Vercel only), and logs one line (topic only) when neither matches. Checkout session tokens still use the client secret only.

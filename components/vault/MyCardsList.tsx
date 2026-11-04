@@ -1,5 +1,6 @@
 "use client";
 
+import { DRAFT_KEY } from "@/components/builder/useDraft";
 import { Download, MoreHorizontal, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -43,7 +44,7 @@ const BADGE: Record<MyCard["label"], string> = {
 
 function saveDraft(d: Draft) {
   try {
-    sessionStorage.setItem("vault.card.draft.v1", JSON.stringify(d));
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d));
   } catch {
     /* */
   }

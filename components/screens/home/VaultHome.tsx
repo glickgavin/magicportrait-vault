@@ -8,7 +8,7 @@ import { CardStatusLabel } from "@/components/vault/CardStatusLabel";
 import { TrackPageView } from "@/components/TrackPageView";
 import { CardsBlocked } from "./FirstHome";
 import type { HomeData } from "@/lib/vault/home";
-import { t } from "@/lib/i18n";
+import { t, tn } from "@/lib/i18n";
 
 /** Home after the first card (VaultHome). */
 export function VaultHome({ data }: { data: HomeData }) {
@@ -73,10 +73,10 @@ export function VaultHome({ data }: { data: HomeData }) {
       <section className="mt-6" aria-labelledby="portraits-title">
         <div className="flex items-baseline justify-between">
           <h2 id="portraits-title" className="text-[19px] font-extrabold">
-            {t("home.yourPortraits")}
+            {t("home.yourPortraits")} <span className="ml-1 text-[15px] font-semibold text-ink-2" data-testid="portrait-count">{tn("home.portraitsCount", profile.portraitCount)}</span>
           </h2>
-          <Link href="/portraits" className="link text-[15px]">
-            {t("home.portraitsSeeAll", { count: profile.portraitCount })}
+          <Link href="/portraits" className="link text-[15px]" data-testid="portraits-see-all">
+            {t("home.seeAll")}
           </Link>
         </div>
         <ul className="mt-3 grid grid-cols-3 gap-2">

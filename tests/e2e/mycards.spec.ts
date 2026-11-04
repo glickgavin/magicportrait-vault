@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { admin, signInWithLink } from "./auth";
-import { deleteCardsOf } from "./db";
+import { deleteCardsOf, setSetting } from "./db";
 import { expectNoAxeViolations } from "./helpers";
 
 const OUTBOX = process.env.EMAIL_OUTBOX_DIR || path.join(tmpdir(), "magic-vault", "sent-emails");
@@ -17,7 +17,9 @@ function mailsTo(to: string) {
   return files.map((f) => JSON.parse(readFileSync(path.join(OUTBOX, f), "utf8")) as { to: string; subject: string; html: string }).filter((m) => m.to === to);
 }
 
+/** Create first, then Send from the ready screen; with `schedule`, the scheduling path (cards.scheduling_enabled). */
 async function makeEmailedCard(page: import("@playwright/test").Page, recipient: string, schedule = false) {
+  if (schedule) await setSetting("cards.scheduling_enabled", true);
   await page.goto("/create?step=theme");
   await page.evaluate(() => sessionStorage.clear());
   await page.reload();
@@ -31,15 +33,22 @@ async function makeEmailedCard(page: import("@playwright/test").Page, recipient:
     await page.getByTestId("next").click();
   }
   await page.getByLabel("To", { exact: true }).fill("Grandma Rose");
-  await page.getByRole("radio", { name: /Email it for me/ }).check();
-  await page.getByLabel("Their email").fill(recipient);
   if (schedule) {
+    await page.getByRole("radio", { name: /Email it for me/ }).check();
+    await page.getByLabel("Their email").fill(recipient);
     await page.getByRole("radio", { name: "Pick a date" }).check();
     const at = new Date(Date.now() + 5 * 86_400_000);
     await page.getByLabel("Date and time").fill(new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
   }
   await page.getByTestId("create-card").click();
   await page.waitForURL(/\/cards\/C-/, { timeout: 30_000 });
+  if (schedule) {
+    await setSetting("cards.scheduling_enabled", false);
+    return;
+  }
+  await page.getByLabel("Their email address").fill(recipient);
+  await page.getByTestId("send-card").click();
+  await expect(page.getByTestId("send-box")).toContainText("Sent to");
 }
 
 test.describe.configure({ mode: "serial" });
@@ -53,7 +62,7 @@ test.describe("email delivery and My cards", () => {
     const recipient = `gr${Date.now()}@example.com`;
     await signInWithLink(page, "rose@example.com", "/");
     await makeEmailedCard(page, recipient);
-    await expect(page.getByTestId("delivery-status")).toContainText("Emailed to Grandma Rose");
+    await expect(page.getByTestId("send-box")).toContainText(`Sent to ${recipient.slice(0, 1)}***@example.com`);
     const [mail] = mailsTo(recipient);
     expect(mail.subject).toMatch(/Rose sent you a .* card/);
     const link = mail.html.match(/href="([^"]*\/c\/[^"?]+\?d=[0-9a-f-]{36})"/)![1].replace(/&amp;/g, "&");

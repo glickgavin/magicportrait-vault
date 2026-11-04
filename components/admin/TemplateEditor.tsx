@@ -31,6 +31,7 @@ export function TemplateEditor(p: Props) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [zone, setZone] = useState<ZoneKey>("photo");
+  const [sample, setSample] = useState<"square" | "3x4">("square");
   const stage = useRef<HTMLDivElement>(null);
   const drag = useRef<{ key: ZoneKey; mode: "move" | "resize"; sx: number; sy: number; start: { x: number; y: number; w: number; h: number } } | null>(null);
 
@@ -97,7 +98,7 @@ export function TemplateEditor(p: Props) {
   async function testRender() {
     if (!(await save())) return;
     setBusy("render");
-    const r = await fetch(`/api/admin/versions/${p.versionId}/render`, { method: "POST" });
+    const r = await fetch(`/api/admin/versions/${p.versionId}/render?sample=${sample}`, { method: "POST" });
     setBusy(null);
     if (!r.ok) return setMsg({ ok: false, text: "Render failed" });
     window.open(URL.createObjectURL(await r.blob()), "_blank", "noopener");
@@ -149,7 +150,7 @@ export function TemplateEditor(p: Props) {
       <div className="mt-3 grid gap-5 lg:grid-cols-[1fr_360px]">
         <div className="rounded-[20px] bg-white p-5 shadow-sm">
           <div ref={stage} className="relative mx-auto w-full max-w-[420px] touch-none select-none" onPointerMove={onPointerMove} onPointerUp={() => (drag.current = null)}>
-            <CardPreview layout={layout} backgroundUrl={bg.url} overlayUrl={ov.url} portraitUrl="/sample-portrait.jpg" to={SAMPLE.to} from={SAMPLE.from} message={SAMPLE.message} footerText={p.footerText} label="Template preview" />
+            <CardPreview layout={layout} backgroundUrl={bg.url} overlayUrl={ov.url} portraitUrl={sample === "3x4" ? "/sample-portrait-3x4.jpg" : "/sample-portrait.jpg"} to={SAMPLE.to} from={SAMPLE.from} message={SAMPLE.message} footerText={p.footerText} label="Template preview" />
             {zones.map((k) => {
               const r = rectOf(k);
               return (
@@ -157,7 +158,7 @@ export function TemplateEditor(p: Props) {
                   key={k}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${k === "photo" ? "Photo zone" : `${k} text zone`}: drag to move`}
+                  aria-label={`${k === "photo" ? "Maximum photo area" : `${k} text zone`}: drag to move`}
                   onPointerDown={(e) => onPointerDown(e, k, "move")}
                   onKeyDown={(e) => {
                     const step = e.shiftKey ? 50 : 10;
@@ -172,13 +173,20 @@ export function TemplateEditor(p: Props) {
                   style={{ left: pct(r.x, W), top: pct(r.y, H), width: pct(r.w, W), height: pct(r.h, H) }}
                   data-testid={`zone-${k}`}
                 >
-                  <span className="absolute -top-5 left-0 rounded bg-magenta px-1.5 text-[11px] font-bold text-white">{k === "photo" ? "Photo zone" : k}</span>
+                  <span className="absolute -top-5 left-0 rounded bg-magenta px-1.5 text-[11px] font-bold text-white">{k === "photo" ? "Maximum photo area" : k}</span>
                   <span onPointerDown={(e) => onPointerDown(e, k, "resize")} className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize border-2 border-magenta bg-white" aria-hidden="true" />
                 </div>
               );
             })}
           </div>
-          <p className="mt-3 text-center text-[13px] text-ink-2">Drag zones to position (arrow keys move the focused zone). Output {W} × {H} px.</p>
+          <div role="radiogroup" aria-label="Sample portrait" className="mt-3 flex justify-center gap-2 text-[13px] font-semibold">
+            {(["square", "3x4"] as const).map((s) => (
+              <button key={s} type="button" role="radio" aria-checked={sample === s} onClick={() => setSample(s)} className={cn("min-h-[36px] rounded-[8px] px-3", sample === s ? "bg-[#2b2b2b] text-white" : "bg-black/[0.05]")} data-testid={`sample-${s}`}>
+                {s === "square" ? "Square sample" : "3:4 sample"}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-center text-[13px] text-ink-2">Drag zones to position (arrow keys move the focused zone). The photo window fits each portrait inside the maximum photo area. Output {W} × {H} px.</p>
         </div>
 
         <div className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-sm">
@@ -242,6 +250,18 @@ export function TemplateEditor(p: Props) {
                     {["rect", "rounded", "circle", "arch"].map((s) => (
                       <option key={s}>{s}</option>
                     ))}
+                  </select>
+                </label>
+                <label className="col-span-2">
+                  Photo fit
+                  <select
+                    value={layout.photo.fit ?? (layout.photo.frame?.width === 0 ? "cover" : "adapt")}
+                    onChange={(e) => setLayout((l) => ({ ...l, photo: { ...l.photo, fit: e.target.value as "adapt" | "cover" } }))}
+                    className="mt-1 h-9 w-full rounded-[8px] border border-line text-[14px] font-normal"
+                    data-testid="photo-fit"
+                  >
+                    <option value="adapt">Adapt: window follows each portrait&apos;s shape</option>
+                    <option value="cover">Cover: fixed window, portrait cropped (art draws the frame)</option>
                   </select>
                 </label>
                 <label>
