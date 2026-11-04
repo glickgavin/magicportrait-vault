@@ -17,7 +17,7 @@ This is the reference for every external read and write the vault (`my.magicport
 
 **Known gap on both projects:** the `pg_net` extension grants `PUBLIC` (so every login role, `vault_reader` included) usage on schema `net` and all privileges on `net.http_request_queue` and `net._http_response`. A login could queue outbound HTTP requests from the database. `vault_reader`'s read-only default blocks this unless a client deliberately turns it off, and its password lives only in Vercel. Fully closing it means revoking those `PUBLIC` grants on each project, which affects every role: check nothing relies on them first (SPEC §21). Run the SQL versions of the queries below; ignore the PostgREST variants. Imagen images are in the public `images` bucket, so no Storage key is needed.
 
-| `SHOPIFY_STORE_DOMAIN` | `<shop>.myshopify.com`. **UNVERIFIED value**: the live code reads it from env and it was not visible |
+| `SHOPIFY_STORE_DOMAIN` | `storyboards.myshopify.com` (verified 4 Nov via the Admin API's `shop.myshopifyDomain`; the public domain is store.magicportraits.ai) |
 | `SHOPIFY_ADMIN_ACCESS_TOKEN` | Admin API token of the existing custom app "r_orders" |
 | `SHOPIFY_WEBHOOK_SECRET` | HMAC secret for the `orders/paid` webhook |
 

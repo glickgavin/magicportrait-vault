@@ -227,6 +227,13 @@ export async function testKlaviyo() {
   if (!transport) return { ok: false, mode: "not_configured" };
   if (transport.kind === "fixtures") return { ok: true, mode: "fixtures" };
   const s = await getSettings(["klaviyo.api_revision"] as const);
-  const res = await fetch("https://a.klaviyo.com/api/metrics/?page[size]=1", { headers: { authorization: `Klaviyo-API-Key ${env.optional("KLAVIYO_PRIVATE_KEY")}`, revision: s["klaviyo.api_revision"], accept: "application/vnd.api+json" } }).catch(() => null);
-  return { ok: Boolean(res?.ok), mode: "live", status: res?.status ?? 0, revision: s["klaviyo.api_revision"] };
+  // /api/metrics/ has no page[size]; sending one is a 400. Needs the metrics:read scope.
+  const res = await fetch("https://a.klaviyo.com/api/metrics/?fields[metric]=name", { headers: { authorization: `Klaviyo-API-Key ${env.optional("KLAVIYO_PRIVATE_KEY")}`, revision: s["klaviyo.api_revision"], accept: "application/vnd.api+json" } }).catch(() => null);
+  const out: Record<string, string | number | boolean> = { ok: Boolean(res?.ok), mode: "live", status: res?.status ?? 0, revision: s["klaviyo.api_revision"] };
+  if (res && !res.ok) {
+    const body = (await res.json().catch(() => null)) as { errors?: { code?: string; detail?: string }[] } | null;
+    const e = body?.errors?.[0];
+    if (e) out.error = `${e.code ?? ""} ${e.detail ?? ""}`.trim().slice(0, 160);
+  }
+  return out;
 }

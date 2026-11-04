@@ -47,7 +47,9 @@ export async function testSource(name: SourceName, by: string): Promise<CheckRes
       const warm = await getVaultProfile(by, { refresh: false, createdVia: "sign_in" });
       const warmMs = Date.now() - t1;
       detail = { cold_ms: coldMs, warm_ms: warmMs, sessions: warm.sessions.length, portraits: cold.portraitCount, orders: cold.orders.length, under_target: warmMs < 1500 };
-      ok = true;
+      // A lookup that ran with a source down is not a pass.
+      if (cold.unavailable.length) detail.unavailable = cold.unavailable;
+      ok = cold.unavailable.length === 0;
     } else {
       const fn = extraChecks[name];
       if (!fn) throw new Error("not_available");
@@ -57,6 +59,9 @@ export async function testSource(name: SourceName, by: string): Promise<CheckRes
   } catch (e) {
     const msg = (e as Error).message || "error";
     detail = { error: msg.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, "[email]").slice(0, 200) };
+    // <ref>.supabase.co and db.<ref>.supabase.co aren't reachable from Vercel (API host / IPv6-only).
+    if ((name === "imagen" || name === "mirror") && /CONNECT_TIMEOUT .*supabase\.co:5432/.test(msg))
+      detail.hint = "Use the Supabase pooler connection string (…pooler.supabase.com, user vault_reader.<ref>), not the direct db host.";
     ok = false;
   }
   const ms = Date.now() - started;
