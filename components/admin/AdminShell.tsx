@@ -44,7 +44,7 @@ export function AdminShell({ user, children }: { user: SessionUser; children: Re
           </div>
         </div>
       </aside>
-      <main id="main" className="mx-auto w-full max-w-[1200px] px-4 py-6 lg:px-8">
+      <main id="main" className="w-full min-w-0 px-4 py-6 lg:px-8 2xl:px-10">
         {children}
       </main>
     </div>

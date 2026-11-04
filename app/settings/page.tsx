@@ -24,7 +24,7 @@ export default async function GeneralSettings() {
       <TrackPageView event="settings_viewed" props={{ section: "general" }} />
       <h1 className="text-[30px] font-extrabold tracking-tight">General &amp; variables</h1>
       <p className="text-[15px] text-ink-2">Master data used across the app instead of hard-coded values. Every change is logged.</p>
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_320px]">
+      <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_380px]">
         <div className="flex min-w-0 flex-col gap-5">
           {[
             ["Greeting cards", pick(CARD_KEYS)],
@@ -33,7 +33,7 @@ export default async function GeneralSettings() {
           ].map(([title, list]) => (
             <section key={title as string} className="rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
               <h2 className="text-[19px] font-extrabold">{title as string}</h2>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {(list as typeof rows).map((r) => (
                   <div key={r.key} className="flex items-center justify-between gap-3 rounded-[14px] bg-black/[0.03] p-3">
                     <div className="min-w-0">
