@@ -2,12 +2,14 @@ import "server-only";
 import { render } from "@react-email/render";
 import CardDelivery, { type CardDeliveryProps } from "@/emails/card-delivery";
 import CardScheduled, { type CardScheduledProps } from "@/emails/card-scheduled";
+import GiftOffer, { type GiftOfferProps } from "@/emails/gift-offer";
 import SigninCode from "@/emails/signin-code";
 import SigninLink from "@/emails/signin-link";
 
 export const TEMPLATES = {
   "card-delivery": { component: CardDelivery, subject: (p: CardDeliveryProps) => `${p.fromName} sent you a ${p.themeName} card` },
   "card-scheduled": { component: CardScheduled, subject: (p: CardScheduledProps) => `Your card to ${p.toName} is scheduled` },
+  "gift-offer": { component: GiftOffer, subject: (_p: GiftOfferProps) => "Your free greeting card is ready" },
   "signin-code": { component: SigninCode, subject: () => "Your My Magic Portraits code" },
   "signin-link": { component: SigninLink, subject: () => "Your link to My Magic Portraits" },
 } as const;

@@ -57,7 +57,7 @@ export function AdminCards({ categories }: { categories: { slug: string; name: s
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+    <div className="grid gap-5 xl:grid-cols-[1fr_420px] 2xl:grid-cols-[1fr_520px]">
       <div className="min-w-0">
         <form
           className="flex flex-wrap items-end gap-2 rounded-[16px] bg-white p-3 shadow-sm"

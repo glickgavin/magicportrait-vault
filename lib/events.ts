@@ -89,6 +89,7 @@ export const EVENTS = {
   card_recipient_email_bounced: biz,
   card_recipient_unsubscribed: biz,
   page_view_card_unsubscribe: ui,
+  page_view_offer_unsubscribe: ui,
 
   // Redeem (live names)
   page_view_redeem: ui,
@@ -137,6 +138,8 @@ export const EVENTS = {
   // Lifecycle (server)
   vault_signin_link_used: biz,
   gift_offer_email_opened: biz,
+  gift_offer_email_failed: biz,
+  gift_offer_email_bounced: biz,
   gift_offer_skipped: biz,
   free_gift_unlocked: bizKlaviyo,
   gift_reminder_due: bizKlaviyo,

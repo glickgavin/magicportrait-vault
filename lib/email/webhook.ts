@@ -40,6 +40,8 @@ export async function handleAgentMailEvent(e: Raw): Promise<{ handled: string }>
   const type = e.event_type ?? "";
   const messageId = e.delivery?.message_id ?? e.bounce?.message_id ?? e.complaint?.message_id;
   if (!messageId) return { handled: "ignored" };
+  const offer = (await db().from("gift_offers").select("id, email, shopify_order_id, email_status").eq("provider_message_id", messageId).maybeSingle()).data as { id: string; email: string; shopify_order_id: string; email_status: string | null } | null;
+  if (offer) return handleOfferEvent(type, e, offer);
   const d = (await db().from("card_deliveries").select("id, card_id, status, type").eq("provider_message_id", messageId).maybeSingle()).data as { id: string; card_id: string; status: string; type: string } | null;
   const card = d ? ((await db().from("cards").select("id, public_id, sender_email, recipient_email, status").eq("id", d.card_id).single()).data as { id: string; public_id: string; sender_email: string; recipient_email: string | null; status: string } | null) : null;
 
@@ -60,6 +62,23 @@ export async function handleAgentMailEvent(e: Raw): Promise<{ handled: string }>
     const recipients = (e.complaint?.recipients ?? []).map(addr).filter(Boolean);
     for (const r of recipients.length ? recipients : card?.recipient_email ? [card.recipient_email] : []) await db().from("email_suppressions").upsert({ email: r, scope: "all", reason: "complaint" }, { onConflict: "email,scope", ignoreDuplicates: true });
     return { handled: "complained" };
+  }
+  return { handled: "ignored" };
+}
+
+/** Delivery events for the free gift offer email (gift_offers.provider_message_id). */
+async function handleOfferEvent(type: string, e: Raw, offer: { id: string; email: string; shopify_order_id: string; email_status: string | null }): Promise<{ handled: string }> {
+  const ref = { type: "order" as const, id: offer.shopify_order_id };
+  if (type === "message.delivered") {
+    await db().from("gift_offers").update({ email_status: "delivered", delivered_at: new Date().toISOString() }).eq("id", offer.id).eq("email_status", "sent");
+    return { handled: "offer_delivered" };
+  }
+  if (type === "message.bounced" || type === "message.complained") {
+    const permanent = type === "message.complained" || (e.bounce?.type ?? "").toLowerCase() !== "transient";
+    await db().from("gift_offers").update({ email_status: type === "message.bounced" ? "bounced" : "complained", email_error: `${e.bounce?.type ?? "complaint"}/${e.bounce?.sub_type ?? ""}`.slice(0, 120) }).eq("id", offer.id);
+    if (permanent) await db().from("email_suppressions").upsert({ email: offer.email, scope: "all", reason: type === "message.bounced" ? "bounce" : "complaint" }, { onConflict: "email,scope", ignoreDuplicates: true });
+    await track("gift_offer_email_bounced", { order_id: offer.shopify_order_id, permanent }, { email: offer.email, source: "email", actor: "system", ref });
+    return { handled: type === "message.bounced" ? "offer_bounced" : "offer_complained" };
   }
   return { handled: "ignored" };
 }

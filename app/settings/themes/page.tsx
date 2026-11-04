@@ -26,7 +26,7 @@ export default async function ThemeLibrary({ searchParams }: { searchParams: Pro
         <h1 className="text-[30px] font-extrabold tracking-tight">Theme library</h1>
         <p className="text-[15px] text-ink-2">Customers see live versions of live themes inside their dates. Use a theme’s Live switch to publish all its versions at once, or publish one version from the template editor.</p>
       </div>
-      <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+      <div className="grid gap-5 xl:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_380px]">
         <div className="flex min-w-0 flex-col gap-5">
           <nav aria-label="Category filter" className="flex flex-wrap gap-2">
             <Link href="/settings/themes" aria-current={!category ? "page" : undefined} className={`rounded-[10px] px-3 py-1.5 text-[14px] font-semibold ${!category ? "bg-[#2b2b2b] text-white" : "bg-white"}`}>

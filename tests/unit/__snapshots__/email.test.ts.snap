@@ -36,6 +36,24 @@ See My cards https://my.magicportraits.ai/cards
 Magic Portraits · magicportraits.ai"
 `;
 
+exports[`email templates > gift-offer renders (snapshot) 1`] = `"Your free greeting card is ready"`;
+
+exports[`email templates > gift-offer renders (snapshot) 2`] = `
+"SAM, YOUR FREE CARD IS READY
+
+Thank you for your order. As a gift, make a greeting card with your portrait and send it to someone you love. It's free.
+
+https://my.magicportraits.ai/g/example
+
+Make my free card https://my.magicportraits.ai/g/example
+
+The button signs you in, no password needed. It works for 30 days.
+
+You got this because of your Magic Portraits order #1001. Don't email me offers https://my.magicportraits.ai/gift/unsubscribe?o=example
+
+Magic Portraits · magicportraits.ai"
+`;
+
 exports[`email templates > signin-code renders (snapshot) 1`] = `"Your My Magic Portraits code"`;
 
 exports[`email templates > signin-code renders (snapshot) 2`] = `

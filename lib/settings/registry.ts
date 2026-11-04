@@ -80,7 +80,15 @@ export const REGISTRY = {
   "cards.signed_url_seconds": num("cards", 600, { label: "Card image link lifetime (s)", min: 60, max: 86400 }),
 
   // ---------- gift: the offer ----------
-  "gift.offer_email_enabled": bool("gift", false, { label: "Free gift offer event", description: "Sends free_gift_unlocked to Klaviyo after a qualifying order." }),
+  "gift.offer_email_enabled": bool("gift", false, {
+    label: "Free gift offer email",
+    description: "After a qualifying paid order (Shopify orders/paid webhook), sends the offer with a one-tap link to make a free card. Channel below. Also sends free_gift_unlocked to Klaviyo for segments.",
+  }),
+  "gift.offer_email_channel": choice("gift", ["agentmail", "klaviyo"] as const, "agentmail", {
+    label: "Offer email sent by",
+    description: "agentmail: this app sends it from the cards inbox and tracks sent, delivered, bounced and clicked. klaviyo: a Klaviyo flow on free_gift_unlocked sends it (don't use both).",
+  }),
+  "gift.offer_email_subject": text("gift", "Your free greeting card is ready", { label: "Offer email subject", allowEmpty: false, max: 120 }),
   "gift.popup_enabled": bool("gift", false, { label: "Thank-you pop-up link" }),
   "gift.popup_email_later_enabled": bool("gift", false, { label: "“Later, email me the link”", description: "Turn on once the Klaviyo offer flow exists." }),
   "gift.popup_window_minutes": num("gift", 60, { label: "Pop-up link window (minutes after payment)", min: 5, max: 1440 }),
@@ -90,7 +98,7 @@ export const REGISTRY = {
   "gift.unlock_rule": choice("gift", ["any_paid_order", "qualifying_products"] as const, "any_paid_order", { label: "Which orders unlock the free gift" }),
   "gift.qualifying_product_ids": list("gift", [], { label: "Qualifying product ids", item: numericId }),
   "gift.link_valid_days": num("gift", 30, { label: "One-tap link valid (days)", min: 1, max: 90 }),
-  "gift.offer_email_delay_minutes": num("gift", 0, { label: "Offer event delay (minutes)", min: 0, max: 10080 }),
+  "gift.offer_email_delay_minutes": num("gift", 0, { label: "Offer email delay after payment (minutes)", min: 0, max: 10080 }),
   "gift.offer_link_rate_limit_per_hour": num("gift", 30, { label: "Pop-up link requests per IP per hour", min: 1, max: 1000000 }),
 
   // ---------- redeem ----------
