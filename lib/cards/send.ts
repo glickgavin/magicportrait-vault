@@ -1,4 +1,5 @@
 import "server-only";
+import { emailFooter } from "@/lib/email/footer";
 import { db, must } from "@/lib/db/client";
 import { env } from "@/lib/env";
 import { getSettings } from "@/lib/settings";
@@ -56,6 +57,7 @@ export async function sendCardEmail(cardId: string, type: "email" | "resend", op
     openUrl: `${base}/c/${card.share_slug}?d=${deliveryId}`,
     tryUrl: `${base}/c/${card.share_slug}/try?via=email`,
     unsubscribeUrl: `${base}/c/${card.share_slug}/unsubscribe?d=${deliveryId}`,
+    footer: await emailFooter(),
   });
   const res = await emailSender().send({
     from: senderFrom(s["email.from_cards"], card.from_name),
@@ -94,6 +96,7 @@ export async function sendScheduledConfirmation(card: CardRow): Promise<void> {
     whenText: `${when} (UTC)`,
     imageUrl: `${base}/c/${card.share_slug}/image`,
     manageUrl: `${base}/cards`,
+    footer: await emailFooter(),
   });
   const res = await emailSender().send({ from: s["email.from_system"], to: card.sender_email, replyTo: s["email.reply_to"], subject, html, text, idempotencyKey: `card-scheduled-${card.id}-${card.scheduled_for}` });
   if (!res.ok) console.error(`[email] scheduled confirmation for ${card.public_id} failed: ${res.error}`);

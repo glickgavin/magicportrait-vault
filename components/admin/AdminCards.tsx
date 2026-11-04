@@ -113,7 +113,7 @@ export function AdminCards({ categories }: { categories: { slug: string; name: s
             Export CSV ({data?.total ?? 0} cards)
           </button>
         </form>
-        <div className="mt-2 overflow-x-auto rounded-[16px] bg-white p-2 shadow-sm">
+        <div className="mt-2 overflow-x-auto rounded-[16px] bg-white p-2 shadow-sm" tabIndex={0} role="region" aria-label="Cards table">
           <table className="w-full min-w-[720px] text-left text-[14px]" data-testid="cards-table">
             <thead>
               <tr className="border-b border-line text-[12px] uppercase text-ink-2">

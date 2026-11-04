@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/client";
 import { settingRows } from "@/lib/admin/data";
+import { emailFooter } from "@/lib/email/footer";
 import { previewProps, renderEmail, TEMPLATES } from "@/lib/email/render";
 import { emailSender } from "@/lib/email";
 import { SettingsTable } from "@/components/admin/SettingsTable";
@@ -19,7 +20,8 @@ export default async function EmailsPage() {
   const rows = all.filter((r) => r.section === "email" || r.key === "cards.email_sender_name");
   const offerRows = OFFER_KEYS.map((k) => all.find((r) => r.key === k)!).filter(Boolean);
   const [stats30, statsAll] = await Promise.all([giftOfferEmailStats(30), giftOfferEmailStats(3650)]);
-  const previews = await Promise.all((Object.keys(TEMPLATES) as (keyof typeof TEMPLATES)[]).map(async (n) => ({ name: n, ...(await renderEmail(n, previewProps(n) as never)) })));
+  const footer = await emailFooter();
+  const previews = await Promise.all((Object.keys(TEMPLATES) as (keyof typeof TEMPLATES)[]).map(async (n) => ({ name: n, ...(await renderEmail(n, { ...previewProps(n), footer } as never)) })));
   const sup = ((await db().from("email_suppressions").select("email, scope, reason, created_at").order("created_at", { ascending: false }).limit(200)).data ?? []) as { email: string; scope: string; reason: string; created_at: string }[];
   return (
     <div className="flex flex-col gap-5">

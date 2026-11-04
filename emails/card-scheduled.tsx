@@ -1,24 +1,23 @@
-import { Button, Heading, Img, Section, Text } from "@react-email/components";
-import { EmailLayout, brand, button } from "./Layout";
+import { Button, Heading, Img, Text } from "@react-email/components";
+import { Badge, EmailLayout, button, h1, lead, type EmailFooter } from "./Layout";
 
-export type CardScheduledProps = { appUrl: string; toName: string; whenText: string; imageUrl: string; manageUrl: string };
+export type CardScheduledProps = { appUrl: string; toName: string; whenText: string; imageUrl: string; manageUrl: string; footer?: EmailFooter };
 
 /** Confirmation to the sender that a card is scheduled. */
 export default function CardScheduled(p: CardScheduledProps) {
   return (
-    <EmailLayout appUrl={p.appUrl} preview={`Your card to ${p.toName} sends ${p.whenText}`}>
-      <Heading as="h1" style={{ fontSize: 22, margin: "0 0 6px", textAlign: "center" }}>
+    <EmailLayout appUrl={p.appUrl} footer={p.footer} preview={`Your card to ${p.toName} sends ${p.whenText}`}>
+      <Badge>🗓️&nbsp; SCHEDULED</Badge>
+      <Heading as="h1" style={h1}>
         Your card is scheduled
       </Heading>
-      <Text style={{ fontSize: 16, color: brand.muted, margin: "0 0 18px", textAlign: "center" }}>
+      <Text style={lead}>
         We&apos;ll email it to {p.toName} on {p.whenText}. You can change or cancel it until then.
       </Text>
-      <Img src={p.imageUrl} alt={`Your card to ${p.toName}`} width={240} style={{ width: 240, borderRadius: 8, margin: "0 auto" }} />
-      <Section style={{ textAlign: "center", paddingTop: 20 }}>
-        <Button href={p.manageUrl} style={button}>
-          See My cards
-        </Button>
-      </Section>
+      <Img src={p.imageUrl} alt={`Your card to ${p.toName}`} width={260} style={{ width: 260, height: "auto", borderRadius: 12, margin: "0 auto 22px", boxShadow: "0 6px 20px rgba(0,0,0,0.12)" }} />
+      <Button href={p.manageUrl} style={button}>
+        See My cards
+      </Button>
     </EmailLayout>
   );
 }

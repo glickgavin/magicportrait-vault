@@ -13,6 +13,8 @@ import { maskEmail } from "@/lib/utils";
 import { env } from "@/lib/env";
 import { emailSender } from "@/lib/email";
 import { renderEmail } from "@/lib/email/render";
+import { emailFooter } from "@/lib/email/footer";
+import { giftOfferSubject } from "@/emails/gift-offer";
 
 /** The subset of the orders/paid payload we rely on (docs/data.md §5.6). */
 export const orderPaidSchema = z.object({
@@ -278,16 +280,16 @@ async function sendOfferEmail(
     appUrl: base,
     firstName,
     orderName: o.order_name,
-    portraitImageUrl: o.portrait_image_url,
     linkUrl,
     validDays: s["gift.link_valid_days"],
     unsubscribeUrl,
+    footer: await emailFooter(),
   });
   const res = await emailSender().send({
     from: s["email.from_system"],
     to: o.email,
     replyTo: s["email.reply_to"],
-    subject: s["gift.offer_email_subject"],
+    subject: giftOfferSubject(s["gift.offer_email_subject"], o.order_name),
     html,
     text,
     headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` },
