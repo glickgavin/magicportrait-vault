@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db/client";
-import { cardsPerDay, funnel, kpis, periods, topThemes } from "@/lib/admin/insights";
+import { cardActions, cardsPerDay, funnel, kpis, periods, topThemes } from "@/lib/admin/insights";
 import { customerTimeline, deleteCustomer, exportCustomer } from "@/lib/admin/customers";
 import { getObject, putObject } from "@/lib/storage";
 import { createHash } from "node:crypto";
@@ -126,5 +126,34 @@ describe("data export and deletion", () => {
     const job = await db().from("outbound_events").select("kind, payload").eq("kind", "deletion").order("created_at", { ascending: false }).limit(1).single();
     expect(JSON.stringify(job.data!.payload)).toContain(e);
     expect((await db().from("data_requests").select("type, status").eq("id", r.requestId).single()).data).toEqual({ type: "delete", status: "done" });
+  });
+});
+
+describe("what people did with their cards", () => {
+  async function act(e: string, email: string, cardId: string, at: string) {
+    const r = await db().from("activity_log").insert({ event: e, email, occurred_at: at, source: "vault", actor: "customer", ref_type: "card", ref_id: cardId, props: { card_id: cardId } });
+    if (r.error) throw r.error;
+  }
+  // Its own window (June of the run's year), apart from the other tests' March rows.
+  const NOW2 = new Date(Date.UTC(YEAR, 5, 10, 12));
+  const jday = (d: number, h = 10) => new Date(Date.UTC(YEAR, 5, d, h)).toISOString();
+  it("counts distinct cards and people per action, and cards with nothing done yet", async () => {
+    const a = `act-a-${randomBytes(3).toString("hex")}@example.com`;
+    const b = `act-b-${randomBytes(3).toString("hex")}@example.com`;
+    const c1 = `C-${randomBytes(3).toString("hex")}`;
+    const c2 = `C-${randomBytes(3).toString("hex")}`;
+    const c3 = `C-${randomBytes(3).toString("hex")}`;
+    for (const [c, who] of [[c1, a], [c2, a], [c3, b]]) await act("card_created", who, c, jday(8));
+    await act("card_email_sent", a, c1, jday(8, 11));
+    await act("card_downloaded", a, c1, jday(8, 12)); // same card, two actions
+    await act("card_shared", b, c3, jday(9));
+    await act("card_shared", b, c3, jday(9, 11)); // shared twice still counts once
+    const r = await cardActions("7d", NOW2);
+    expect(r.emailed).toEqual({ cards: 1, people: 1 });
+    expect(r.downloaded).toEqual({ cards: 1, people: 1 });
+    expect(r.shared).toEqual({ cards: 1, people: 1 });
+    expect(r.link_copied).toEqual({ cards: 0, people: 0 });
+    expect(r.made).toBe(3);
+    expect(r.not_yet).toBe(1); // c2
   });
 });
