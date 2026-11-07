@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cardsPerDay, funnel, kpis, liveFeed, RANGES, topThemes, type Range } from "@/lib/admin/insights";
+import { cardActions, cardsPerDay, funnel, kpis, liveFeed, RANGES, topThemes, type Range } from "@/lib/admin/insights";
 import { getSettings } from "@/lib/settings";
 import { TrackPageView } from "@/components/TrackPageView";
 
@@ -17,7 +17,14 @@ const STEPS: [string, string][] = [
 export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const r = (await searchParams).range;
   const range: Range = r && r in RANGES ? (r as Range) : "7d";
-  const [tiles, perDay, themes, steps, feed, s] = await Promise.all([kpis(range), cardsPerDay(range), topThemes(range), funnel(range), liveFeed(), getSettings(["tracking.posthog_project_id", "tracking.posthog_ui_host"] as const)]);
+  const [tiles, perDay, themes, steps, feed, actions, s] = await Promise.all([kpis(range), cardsPerDay(range), topThemes(range), funnel(range), liveFeed(), cardActions(range), getSettings(["tracking.posthog_project_id", "tracking.posthog_ui_host"] as const)]);
+  const ACTIONS: [keyof Omit<typeof actions, "made" | "not_yet">, string][] = [
+    ["emailed", "Emailed"],
+    ["shared", "Shared"],
+    ["link_copied", "Link copied"],
+    ["downloaded", "Downloaded"],
+  ];
+  const actionTop = Math.max(1, actions.made, ...ACTIONS.map(([k]) => actions[k].cards));
   const max = Math.max(1, ...perDay.map((d) => d.n));
   const top = Math.max(1, steps.signed_in ?? 0, ...STEPS.map(([k]) => steps[k] ?? 0));
   return (
@@ -51,14 +58,20 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
           </li>
         ))}
       </ul>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
         <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="perday">
           <h2 id="perday" className="text-[19px] font-extrabold">
             Cards per day
           </h2>
-          <div className="mt-4 flex h-[160px] items-end gap-[3px]" role="img" aria-label={`Cards per day: ${perDay.map((d) => `${d.day} ${d.n}`).join(", ")}`}>
+          <div className="mt-4 flex h-[180px] items-end gap-[3px]" role="img" aria-label={`Cards per day: ${perDay.map((d) => `${d.day} ${d.n}`).join(", ")}`} data-testid="cards-per-day">
             {perDay.map((d) => (
-              <div key={d.day} className="flex-1 rounded-t-[3px] bg-primary-gradient" style={{ height: `${Math.max(2, (d.n / max) * 100)}%` }} title={`${d.day}: ${d.n}`} />
+              <div key={d.day} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end" title={`${d.day}: ${d.n}`}>
+                {/* The day's value above its bar (hidden for 0 so long ranges stay readable). */}
+                <span className={`mb-0.5 text-[11px] font-bold leading-none text-ink ${perDay.length > 14 ? "max-sm:hidden" : ""}`} aria-hidden="true" data-testid="bar-value">
+                  {d.n > 0 ? d.n : ""}
+                </span>
+                <div className="w-full rounded-t-[3px] bg-primary-gradient" style={{ height: `${Math.max(2, (d.n / max) * 85)}%` }} />
+              </div>
             ))}
           </div>
           <p className="mt-1 flex justify-between text-[12px] text-ink-2">
@@ -88,6 +101,41 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
               </li>
             ))}
           </ol>
+        </section>
+        <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="actions" data-testid="card-actions">
+          <div className="flex items-baseline justify-between">
+            <h2 id="actions" className="text-[19px] font-extrabold">
+              What people did with their cards
+            </h2>
+            <span className="text-[13px] text-ink-2">{actions.made} made</span>
+          </div>
+          <ol className="mt-3 flex flex-col gap-2">
+            {ACTIONS.map(([k, label]) => (
+              <li key={k} data-testid={`action-${k}`}>
+                <div className="flex justify-between gap-2 text-[14px]">
+                  <span>{label}</span>
+                  <span>
+                    <strong>{actions[k].cards}</strong> <span className="text-ink-2">{actions[k].cards === 1 ? "card" : "cards"} · {actions[k].people} {actions[k].people === 1 ? "person" : "people"}</span>
+                  </span>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-black/[0.06]">
+                  <div className="h-full rounded-full bg-primary-gradient" style={{ width: `${(actions[k].cards / actionTop) * 100}%` }} />
+                </div>
+              </li>
+            ))}
+            <li data-testid="action-not_yet">
+              <div className="flex justify-between gap-2 text-[14px]">
+                <span>Made, nothing done yet</span>
+                <span>
+                  <strong>{actions.not_yet}</strong> <span className="text-ink-2">{actions.not_yet === 1 ? "card" : "cards"}</span>
+                </span>
+              </div>
+              <div className="mt-1 h-2 rounded-full bg-black/[0.06]">
+                <div className="h-full rounded-full bg-black/25" style={{ width: `${(actions.not_yet / actionTop) * 100}%` }} />
+              </div>
+            </li>
+          </ol>
+          <p className="mt-3 text-[12px] text-ink-2">A card can count in more than one row (e.g. downloaded and emailed).</p>
         </section>
         <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="themes">
           <h2 id="themes" className="text-[19px] font-extrabold">

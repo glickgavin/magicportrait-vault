@@ -67,6 +67,16 @@ export async function funnel(range: Range, now = new Date()) {
   return ((await db().rpc("insights_funnel", { p_from: p.from.toISOString(), p_to: p.to.toISOString() })).data ?? {}) as Record<string, number>;
 }
 
+export type CardActions = Record<"emailed" | "shared" | "link_copied" | "downloaded", { cards: number; people: number }> & { made: number; not_yet: number };
+
+/** What people did with their cards in the period: distinct cards and people per action, and cards made with no action yet. */
+export async function cardActions(range: Range, now = new Date()): Promise<CardActions> {
+  const p = periods(range, now);
+  const d = ((await db().rpc("insights_card_actions", { p_from: p.from.toISOString(), p_to: p.to.toISOString() })).data ?? {}) as Partial<CardActions>;
+  const z = { cards: 0, people: 0 };
+  return { emailed: d.emailed ?? z, shared: d.shared ?? z, link_copied: d.link_copied ?? z, downloaded: d.downloaded ?? z, made: d.made ?? 0, not_yet: d.not_yet ?? 0 };
+}
+
 export async function liveFeed(limit = 20) {
   return ((await db().from("activity_log").select("id, occurred_at, event, source, ref_type, ref_id, actor").order("id", { ascending: false }).limit(limit)).data ?? []) as { id: number; occurred_at: string; event: string; source: string; ref_type: string | null; ref_id: string | null; actor: string }[];
 }
