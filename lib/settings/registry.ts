@@ -196,6 +196,12 @@ export const REGISTRY = {
   "links.vip_login_url": url("links", "https://shopify.com/4283367495/account", { label: "VIP Login" }),
 
   // ---------- tracking ----------
+  "tracking.entry_links": list("tracking", ["invoice"], {
+    label: "Tracked entry links",
+    description: "Names allowed in https://my.magicportraits.ai/from/<name> (e.g. the invoice email's link). Each click is counted, then the person goes to the site; a sign-in that follows is credited to it.",
+    max: 20,
+    item: z.string().regex(/^[a-z0-9-]{1,32}$/),
+  }),
   "tracking.posthog_project_id": text("tracking", "540098", { label: "PostHog project id" }),
   "tracking.posthog_ui_host": url("tracking", "https://us.posthog.com", { label: "PostHog app" }),
 

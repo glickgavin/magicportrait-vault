@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { makeLink, signInWithCode, signInWithLink } from "./auth";
+import { admin, makeLink, signInWithCode, signInWithLink } from "./auth";
 import { expectNoAxeViolations } from "./helpers";
 import { setSetting } from "./db";
 
@@ -101,5 +101,26 @@ test.describe("test sign-in (previews only)", () => {
     await page.getByTestId("test-signin").click();
     await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
     await expect(page.getByTestId("avatar-button")).toBeVisible();
+  });
+});
+
+test.describe("tracked entry link (/from/<name>)", () => {
+  test("the invoice link counts the click, goes to the site, and credits the sign-in that follows", async ({ page, request }) => {
+    const before = (await admin().from("activity_log").select("id", { count: "exact", head: true }).eq("event", "vault_entry_link_opened")).count ?? 0;
+    // Unknown names just go home, uncounted.
+    const unknown = await request.get("/from/not-a-link", { maxRedirects: 0 });
+    expect(unknown.status()).toBe(302);
+    await page.context().clearCookies();
+    // Clicks are counted at most 5 an hour per address; give this run its own.
+    await page.setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 250) + 1}, 10.0.0.${Date.now() % 250}` });
+    await page.goto("/from/invoice?to=/orders");
+    await expect(page).toHaveURL(/\/(signin|orders)/);
+    const after = (await admin().from("activity_log").select("id", { count: "exact", head: true }).eq("event", "vault_entry_link_opened")).count ?? 0;
+    expect(after).toBe(before + 1);
+    // A fresh address: Supabase sends one code per address per minute, and other tests use the fixture people.
+    const who = `entry${Date.now()}@example.com`;
+    await signInWithCode(page, who);
+    const s = await admin().from("activity_log").select("props").eq("event", "vault_signed_in").eq("email", who).order("id", { ascending: false }).limit(1).single();
+    expect(s.data?.props).toMatchObject({ method: "code", entry: "invoice" });
   });
 });
