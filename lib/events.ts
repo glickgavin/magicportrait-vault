@@ -137,6 +137,7 @@ export const EVENTS = {
 
   // Lifecycle (server)
   vault_signin_link_used: biz,
+  vault_entry_link_opened: biz,
   gift_offer_email_opened: biz,
   gift_offer_email_failed: biz,
   gift_offer_email_bounced: biz,

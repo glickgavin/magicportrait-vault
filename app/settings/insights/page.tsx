@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { cardActions, cardsPerDay, funnel, kpis, liveFeed, RANGES, topThemes, type Range } from "@/lib/admin/insights";
+import { cardActions, cardsPerDay, entries, funnel, kpis, liveFeed, RANGES, topThemes, type Range } from "@/lib/admin/insights";
+import { env } from "@/lib/env";
 import { getSettings } from "@/lib/settings";
 import { TrackPageView } from "@/components/TrackPageView";
 
@@ -17,7 +18,8 @@ const STEPS: [string, string][] = [
 export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const r = (await searchParams).range;
   const range: Range = r && r in RANGES ? (r as Range) : "7d";
-  const [tiles, perDay, themes, steps, feed, actions, s] = await Promise.all([kpis(range), cardsPerDay(range), topThemes(range), funnel(range), liveFeed(), cardActions(range), getSettings(["tracking.posthog_project_id", "tracking.posthog_ui_host"] as const)]);
+  const s = await getSettings(["tracking.posthog_project_id", "tracking.posthog_ui_host", "tracking.entry_links"] as const);
+  const [tiles, perDay, themes, steps, feed, actions, arrivals] = await Promise.all([kpis(range), cardsPerDay(range), topThemes(range), funnel(range), liveFeed(), cardActions(range), entries(range, s["tracking.entry_links"])]);
   const ACTIONS: [keyof Omit<typeof actions, "made" | "not_yet">, string][] = [
     ["emailed", "Emailed"],
     ["shared", "Shared"],
@@ -136,6 +138,50 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             </li>
           </ol>
           <p className="mt-3 text-[12px] text-ink-2">A card can count in more than one row (e.g. downloaded and emailed).</p>
+        </section>
+        <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="arrivals" data-testid="arrivals">
+          <h2 id="arrivals" className="text-[19px] font-extrabold">
+            Where people came from
+          </h2>
+          <table className="mt-3 w-full text-left text-[14px]">
+            <thead>
+              <tr className="border-b border-line text-[12px] uppercase text-ink-2">
+                <th className="py-1.5">Link</th>
+                <th className="text-right">Sent</th>
+                <th className="text-right">Clicked</th>
+                <th className="text-right">Signed in</th>
+                <th className="text-right">Made a card</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-line" data-testid="arrivals-offer_email">
+                <td className="py-2 font-semibold">Free gift offer email</td>
+                <td className="text-right">{arrivals.offer_email.sent}</td>
+                <td className="text-right">
+                  <strong>{arrivals.offer_email.clicked}</strong>
+                  {arrivals.offer_email.sent > 0 && <span className="text-ink-2"> ({Math.round((arrivals.offer_email.clicked / arrivals.offer_email.sent) * 100)}%)</span>}
+                </td>
+                <td className="text-right text-ink-2">{arrivals.offer_email.clicked}</td>
+                <td className="text-right">{arrivals.offer_email.cards}</td>
+              </tr>
+              {arrivals.links.map((l) => (
+                <tr key={l.entry} className="border-b border-line" data-testid={`arrivals-${l.entry}`}>
+                  <td className="py-2">
+                    <span className="font-semibold">{l.entry === "invoice" ? "Invoice email link" : `Link “${l.entry}”`}</span>
+                    <br />
+                    <code className="text-[11px] text-ink-2">{env.appUrl}/from/{l.entry}</code>
+                  </td>
+                  <td className="text-right text-ink-2">–</td>
+                  <td className="text-right">
+                    <strong>{l.clicks}</strong>
+                  </td>
+                  <td className="text-right">{l.signed_in}</td>
+                  <td className="text-right">{l.cards}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-[12px] text-ink-2">The offer email&apos;s button signs people in by itself, so its clicks are its sign-ins. A tracked link counts each click (repeat taps from one place count once an hour), then credits a sign-in within the hour. Add links in Settings › Tracking (tracking.entry_links).</p>
         </section>
         <section className="rounded-[20px] bg-white p-5 shadow-sm" aria-labelledby="themes">
           <h2 id="themes" className="text-[19px] font-extrabold">

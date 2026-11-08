@@ -7,6 +7,7 @@ import { safeNext } from "@/lib/auth/session";
 import { markSignedIn } from "@/lib/db/members";
 import { getSetting } from "@/lib/settings";
 import { track } from "@/lib/track";
+import { entryFromCookie } from "@/lib/auth/entry";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
   }
   await markSignedIn(email);
   await track("vault_code_verified", {}, { email });
-  await track("vault_signed_in", { method: "code" }, { email });
+  await track("vault_signed_in", { method: "code", entry: await entryFromCookie() }, { email });
   after(() => syncKlaviyoProfile(email));
   return json({ ok: true, next: safeNext(next, "/") });
 }

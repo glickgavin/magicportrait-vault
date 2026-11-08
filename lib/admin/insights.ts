@@ -77,6 +77,18 @@ export async function cardActions(range: Range, now = new Date()): Promise<CardA
   return { emailed: d.emailed ?? z, shared: d.shared ?? z, link_copied: d.link_copied ?? z, downloaded: d.downloaded ?? z, made: d.made ?? 0, not_yet: d.not_yet ?? 0 };
 }
 
+export type EntryRow = { entry: string; clicks: number; signed_in: number; cards: number };
+export type Entries = { offer_email: { sent: number; clicked: number; cards: number }; links: EntryRow[] };
+
+/** "Where people came from": the offer email and each tracked entry link (configured ones show even at 0). */
+export async function entries(range: Range, configured: string[], now = new Date()): Promise<Entries> {
+  const p = periods(range, now);
+  const d = ((await db().rpc("insights_entries", { p_from: p.from.toISOString(), p_to: p.to.toISOString() })).data ?? {}) as Partial<Entries>;
+  const links = [...(d.links ?? [])];
+  for (const name of configured) if (!links.some((l) => l.entry === name)) links.push({ entry: name, clicks: 0, signed_in: 0, cards: 0 });
+  return { offer_email: d.offer_email ?? { sent: 0, clicked: 0, cards: 0 }, links: links.sort((x, y) => x.entry.localeCompare(y.entry)) };
+}
+
 export async function liveFeed(limit = 20) {
   return ((await db().from("activity_log").select("id, occurred_at, event, source, ref_type, ref_id, actor").order("id", { ascending: false }).limit(limit)).data ?? []) as { id: number; occurred_at: string; event: string; source: string; ref_type: string | null; ref_id: string | null; actor: string }[];
 }

@@ -139,6 +139,8 @@ test.describe("settings (super users)", () => {
     // What people did with their cards, and a value on each non-empty day's bar.
     await expect(page.getByTestId("card-actions")).toContainText("Emailed");
     await expect(page.getByTestId("card-actions")).toContainText("Made, nothing done yet");
+    await expect(page.getByTestId("arrivals")).toContainText("Free gift offer email");
+    await expect(page.getByTestId("arrivals-invoice")).toContainText("/from/invoice");
     await expect(page.getByTestId("cards-per-day").getByTestId("bar-value").filter({ hasText: /^\d+$/ }).first()).toBeAttached();
     await page.goto("/settings/customers");
     await page.getByLabel("Email or name").fill("rose@example.com");

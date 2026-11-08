@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db/client";
-import { cardActions, cardsPerDay, funnel, kpis, periods, topThemes } from "@/lib/admin/insights";
+import { cardActions, cardsPerDay, entries, funnel, kpis, periods, topThemes } from "@/lib/admin/insights";
 import { customerTimeline, deleteCustomer, exportCustomer } from "@/lib/admin/customers";
 import { getObject, putObject } from "@/lib/storage";
 import { createHash } from "node:crypto";
@@ -155,5 +155,34 @@ describe("what people did with their cards", () => {
     expect(r.link_copied).toEqual({ cards: 0, people: 0 });
     expect(r.made).toBe(3);
     expect(r.not_yet).toBe(1); // c2
+  });
+});
+
+describe("where people came from", () => {
+  const NOW3 = new Date(Date.UTC(YEAR, 8, 10, 12));
+  const sday = (d: number, h = 10) => new Date(Date.UTC(YEAR, 8, d, h)).toISOString();
+  async function ev(e: string, email: string | null, at: string, props: Record<string, unknown> = {}) {
+    const r = await db().from("activity_log").insert({ event: e, email, occurred_at: at, source: "vault", actor: "customer", props });
+    if (r.error) throw r.error;
+  }
+  it("offer email: sent, clicked, made a card; tracked links: clicks, sign-ins credited, made a card", async () => {
+    const a = `ent-a-${randomBytes(3).toString("hex")}@example.com`;
+    const b = `ent-b-${randomBytes(3).toString("hex")}@example.com`;
+    const c = `ent-c-${randomBytes(3).toString("hex")}@example.com`;
+    for (let i = 0; i < 4; i++) await ev("gift_offer_email_sent", `o${i}${a}`, sday(8));
+    await ev("gift_offer_email_opened", a, sday(8, 11));
+    await ev("vault_signed_in", a, sday(8, 11), { method: "link", entry: "offer_email" });
+    await ev("card_created", a, sday(8, 12));
+    for (let i = 0; i < 3; i++) await ev("vault_entry_link_opened", null, sday(9), { entry: "invoice" });
+    await ev("vault_signed_in", b, sday(9, 11), { method: "code", entry: "invoice" });
+    await ev("vault_signed_in", b, sday(9, 12), { method: "code", entry: "invoice" }); // twice, one person
+    await ev("vault_signed_in", c, sday(9, 13), { method: "code", entry: "invoice" });
+    await ev("card_created", c, sday(9, 14));
+    const r = await entries("7d", ["invoice", "order-page"], NOW3);
+    expect(r.offer_email).toEqual({ sent: 4, clicked: 1, cards: 1 });
+    expect(r.links).toEqual([
+      { entry: "invoice", clicks: 3, signed_in: 2, cards: 1 },
+      { entry: "order-page", clicks: 0, signed_in: 0, cards: 0 },
+    ]);
   });
 });

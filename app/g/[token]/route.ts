@@ -8,6 +8,7 @@ import { markSignedIn } from "@/lib/db/members";
 import { db } from "@/lib/db/client";
 import { env } from "@/lib/env";
 import { track } from "@/lib/track";
+import { entryFromCookie } from "@/lib/auth/entry";
 import { getSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ token: string 
 
   await markSignedIn(link.email);
   await track("vault_signin_link_used", { order_id: link.order_legacy_id, expired: false }, { email: link.email });
-  await track("vault_signed_in", { method: "link" }, { email: link.email });
+  await track("vault_signed_in", { method: "link", entry: link.purpose === "gift_offer" ? "offer_email" : await entryFromCookie() }, { email: link.email });
   after(() => syncKlaviyoProfile(link.email));
   if (link.gift_offer_id && firstUse) {
     const now = new Date().toISOString();

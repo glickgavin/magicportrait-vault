@@ -104,6 +104,7 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('links.order_session_url_template', '"https://magicportraits.ai/order?product_id=8471707222212&magicid=999&session={lptemp_session_id}"'::jsonb, 'text', 'links', 'Order as wall art link', null, null, 'seed', now()),
   ('links.menu_thumbnails', '[]'::jsonb, 'list', 'links', 'Menu thumbnails (six image URLs)', null, null, 'seed', now()),
   ('links.vip_login_url', '"https://shopify.com/4283367495/account"'::jsonb, 'text', 'links', 'VIP Login', null, null, 'seed', now()),
+  ('tracking.entry_links', '["invoice"]'::jsonb, 'list', 'tracking', 'Tracked entry links', 'Names allowed in https://my.magicportraits.ai/from/<name> (e.g. the invoice email''s link). Each click is counted, then the person goes to the site; a sign-in that follows is credited to it.', null, 'seed', now()),
   ('tracking.posthog_project_id', '"540098"'::jsonb, 'text', 'tracking', 'PostHog project id', null, null, 'seed', now()),
   ('tracking.posthog_ui_host', '"https://us.posthog.com"'::jsonb, 'text', 'tracking', 'PostHog app', null, null, 'seed', now()),
   ('klaviyo.enabled', 'false'::jsonb, 'boolean', 'klaviyo', 'Send to Klaviyo', 'Off: outbox rows are marked skipped.', null, 'seed', now()),
