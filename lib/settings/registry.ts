@@ -202,6 +202,12 @@ export const REGISTRY = {
     max: 20,
     item: z.string().regex(/^[a-z0-9-]{1,32}$/),
   }),
+  "tracking.entry_link_valid_hours": num("tracking", 24, {
+    label: "Signed entry links valid (hours)",
+    description: "A signed /from/<name>?o=…&t=…&s=… link (the invoice email) signs the order's customer straight in for this long after the email was made; after that it asks them to sign in.",
+    min: 1,
+    max: 168,
+  }),
   "tracking.posthog_project_id": text("tracking", "540098", { label: "PostHog project id" }),
   "tracking.posthog_ui_host": url("tracking", "https://us.posthog.com", { label: "PostHog app" }),
 

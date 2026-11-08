@@ -17,7 +17,7 @@ const PATTERNS = [
   ["Env name: cron secret", /CRON_SECRET/],
   ["Env name: AgentMail key", /AGENTMAIL_API_KEY/],
   ["Env name: Klaviyo key", /KLAVIYO_PRIVATE_KEY/],
-  ["Env name: Shopify token", /SHOPIFY_ADMIN_ACCESS_TOKEN|SHOPIFY_WEBHOOK_SECRET|SHOPIFY_CLIENT_SECRET/],
+  ["Env name: Shopify token", /SHOPIFY_ADMIN_ACCESS_TOKEN|SHOPIFY_WEBHOOK_SECRET|SHOPIFY_CLIENT_SECRET|ENTRY_LINK_SECRET/],
   ["Env name: database URLs", /IMAGEGEN_DATABASE_URL|MIRROR_DATABASE_URL/],
 ];
 const extra = (process.env.SECRET_VALUES || "").split(",").filter((s) => s.length >= 12);
