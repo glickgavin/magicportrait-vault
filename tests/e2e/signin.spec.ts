@@ -124,3 +124,37 @@ test.describe("tracked entry link (/from/<name>)", () => {
     expect(s.data?.props).toMatchObject({ method: "code", entry: "invoice" });
   });
 });
+
+test.describe("signed invoice link (/from/invoice?o=&t=&s=)", () => {
+  const SECRET = "local-test-entry-link-secret-0123456789abcdef0123";
+  const link = async (order: string, t: number, ip: string) => {
+    const { createHmac } = await import("node:crypto");
+    const s = createHmac("sha256", SECRET).update(`${order}.${t}`).digest("hex");
+    return { url: `/from/invoice?o=${order}&t=${t}&s=${s}&to=/orders`, ip };
+  };
+  const freshIp = () => `203.0.113.${Math.floor(Math.random() * 250) + 1}`;
+
+  test("a fresh signed link signs the order's customer straight in and strips the signature", async ({ page }) => {
+    await page.context().clearCookies();
+    const l = await link("1001", Math.floor(Date.now() / 1000) - 60, freshIp());
+    await page.setExtraHTTPHeaders({ "x-forwarded-for": l.ip });
+    await page.goto(l.url);
+    await expect(page).toHaveURL(/\/orders$/);
+    await expect(page.getByTestId("avatar-button")).toBeVisible();
+    const s = await admin().from("activity_log").select("props").eq("event", "vault_signed_in").eq("email", "sam@example.com").order("id", { ascending: false }).limit(1).single();
+    expect(s.data?.props).toMatchObject({ method: "entry_link", entry: "invoice" });
+  });
+
+  test("an expired or altered link doesn't sign anyone in", async ({ page }) => {
+    await page.context().clearCookies();
+    const old = await link("1001", Math.floor(Date.now() / 1000) - 25 * 3600, freshIp());
+    await page.setExtraHTTPHeaders({ "x-forwarded-for": old.ip });
+    await page.goto(old.url);
+    await expect(page).toHaveURL(/\/signin/);
+    await expect(page.getByTestId("avatar-button")).toHaveCount(0);
+    // Someone changes the order number in a valid link: refused.
+    const ok = await link("1001", Math.floor(Date.now() / 1000), freshIp());
+    await page.goto(ok.url.replace("o=1001", "o=1002"));
+    await expect(page.getByTestId("avatar-button")).toHaveCount(0);
+  });
+});
