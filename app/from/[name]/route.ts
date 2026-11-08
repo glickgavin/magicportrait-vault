@@ -3,7 +3,7 @@ import { clientIp, hashKey, rateLimit } from "@/lib/auth/http";
 import { getSessionUser, safeNext } from "@/lib/auth/session";
 import { ENTRY_COOKIE, ENTRY_COOKIE_SECONDS } from "@/lib/auth/entry";
 import { getSettings } from "@/lib/settings";
-import { checkEntryLink } from "@/lib/auth/entry-link";
+import { checkEntryLink, secretFingerprint } from "@/lib/auth/entry-link";
 import { establishSession } from "@/lib/auth/exchange";
 import { markSignedIn } from "@/lib/db/members";
 import { db } from "@/lib/db/client";
@@ -56,7 +56,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ name: string }>
 
   // Count the click (scanners and repeat taps from one address count once per hour, up to 5).
   if (await rateLimit(`entry:${name}:${ip}`, 5, 3600)) {
-    await track("vault_entry_link_opened", { entry: name, signed: Boolean(signedIn), ...(note && note !== "missing" ? { link_check: note } : {}) }, { email: signedIn ?? user?.email ?? null, actor: "customer" });
+    await track(
+      "vault_entry_link_opened",
+      { entry: name, signed: Boolean(signedIn), ...(note && note !== "missing" ? { link_check: note } : {}), ...(note === "bad_signature" ? { key_fp: secretFingerprint() } : {}) },
+      { email: signedIn ?? user?.email ?? null, actor: "customer" },
+    );
   }
   const res = go(signedIn || user ? to : note === "expired" ? `/signin?next=${encodeURIComponent(to)}&expired=1` : to);
   res.cookies.set(ENTRY_COOKIE, name, { maxAge: ENTRY_COOKIE_SECONDS, httpOnly: true, sameSite: "lax", secure: url.protocol === "https:", path: "/" });

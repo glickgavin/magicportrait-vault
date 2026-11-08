@@ -168,7 +168,7 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 | Event | When | Key properties |
 |---|---|---|
 | `vault_signin_link_used` | A `/g/[token]` link signs someone in | `order_id`, `expired` |
-| `vault_entry_link_opened` | A tracked entry link `/from/<name>` was clicked (e.g. the invoice email's link; names in `tracking.entry_links`). Counted before sign-in, so `email` is set only if they were already signed in or the link was signed. A sign-in within the next hour carries `entry` on `vault_signed_in`. | `entry`, `signed` (the signed link signed them straight in), `link_check` (why a signature didn't sign them in: `expired`, `bad_signature`, `malformed`, `not_configured`, `order_not_found`, `super_user`) |
+| `vault_entry_link_opened` | A tracked entry link `/from/<name>` was clicked (e.g. the invoice email's link; names in `tracking.entry_links`). Counted before sign-in, so `email` is set only if they were already signed in or the link was signed. A sign-in within the next hour carries `entry` on `vault_signed_in`. | `entry`, `signed` (the signed link signed them straight in), `link_check` (why a signature didn't sign them in: `expired`, `bad_signature`, `malformed`, `not_configured`, `order_not_found`, `super_user`), `key_fp` (on `bad_signature`: first 8 hex of SHA-256 of the server's key, to compare with `printf %s '<key>' \| sha256sum \| cut -c1-8`) |
 | `gift_offer_email_opened` | Gift offer link first opened (first use of its `/g/[token]`): the "clicked" count | `order_id` |
 | `gift_offer_email_failed` | AgentMail refused the offer email | `order_id`, `error` |
 | `gift_offer_email_bounced` | AgentMail reported a bounce or complaint for the offer email | `order_id`, `permanent` |
