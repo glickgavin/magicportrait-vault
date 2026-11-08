@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createHmac } from "node:crypto";
-import { checkEntryLink, signEntryLink } from "@/lib/auth/entry-link";
+import { checkEntryLink, entryLinkSecret, secretFingerprint, signEntryLink } from "@/lib/auth/entry-link";
 
 const SECRET = "test-entry-link-secret-0123456789abcdef0123456789";
 const NOW = Date.UTC(2026, 10, 8, 12) ;
@@ -32,5 +32,19 @@ describe("signed entry links (invoice email)", () => {
     expect(checkEntryLink(new URLSearchParams(), 24, NOW, SECRET)).toEqual({ ok: false, reason: "missing" });
     expect(checkEntryLink(params("1", t, "a".repeat(64)), 24, NOW, "")).toEqual({ ok: false, reason: "not_configured" });
     expect(checkEntryLink(params("12; drop", t, "x"), 24, NOW, SECRET)).toEqual({ ok: false, reason: "malformed" });
+  });
+});
+
+describe("entry link secret", () => {
+  it("ignores spaces and line breaks around the key, and fingerprints it without revealing it", () => {
+    const before = process.env.ENTRY_LINK_SECRET;
+    process.env.ENTRY_LINK_SECRET = `  ${SECRET}\n`;
+    try {
+      expect(entryLinkSecret()).toBe(SECRET);
+      expect(secretFingerprint()).toBe(secretFingerprint(SECRET));
+      expect(secretFingerprint(SECRET)).toMatch(/^[0-9a-f]{8}$/);
+    } finally {
+      process.env.ENTRY_LINK_SECRET = before;
+    }
   });
 });

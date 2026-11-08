@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 
 /**
@@ -8,8 +8,17 @@ import { env } from "@/lib/env";
  * `| hmac_sha256: secret`. Valid for `tracking.entry_link_valid_hours` after `t`.
  */
 export function entryLinkSecret(): string | undefined {
-  const s = env.optional("ENTRY_LINK_SECRET");
+  // Trimmed: a space or line break pasted into Vercel would otherwise break every signature.
+  const s = env.optional("ENTRY_LINK_SECRET")?.trim();
   return s && s.length >= 32 ? s : undefined;
+}
+
+/**
+ * First 8 hex characters of SHA-256(secret): safe to log, and lets someone holding the key check it's
+ * the same one (`printf %s '<key>' | sha256sum | cut -c1-8`) without the key ever being shown.
+ */
+export function secretFingerprint(secret = entryLinkSecret()): string | null {
+  return secret ? createHash("sha256").update(secret).digest("hex").slice(0, 8) : null;
 }
 
 export function signEntryLink(secret: string, order: string, t: number): string {
