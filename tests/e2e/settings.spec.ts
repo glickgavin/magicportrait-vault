@@ -110,6 +110,18 @@ test.describe("settings (super users)", () => {
     await expect(page.getByTestId("editor-message")).toContainText("Background checked and saved");
     await page.getByTestId("upload-overlay").setInputFiles(ovFile);
     await expect(page.getByTestId("editor-message")).toContainText("Overlay checked and saved");
+    // A placeholder image for this design: used in the preview, then removed again.
+    const sampleFile = path.join(dir, "placeholder.jpg");
+    writeFileSync(sampleFile, await sharp({ create: { width: 600, height: 800, channels: 3, background: "#1990C6" } }).jpeg().toBuffer());
+    await page.getByTestId("upload-sample").setInputFiles(sampleFile);
+    await expect(page.getByTestId("editor-message")).toContainText("Placeholder image saved");
+    await expect(page.getByTestId("sample-custom")).toHaveAttribute("aria-checked", "true");
+    expect((await admin().from("theme_versions").select("sample_portrait_path").eq("id", version.data!.id).single()).data!.sample_portrait_path).toMatch(/sample-\d+\.jpg$/);
+    page.once("dialog", (d) => void d.accept());
+    await page.getByTestId("remove-sample").click();
+    await expect(page.getByTestId("editor-message")).toContainText("Placeholder image removed");
+    await expect(page.getByTestId("sample-custom")).toHaveCount(0);
+    expect((await admin().from("theme_versions").select("sample_portrait_path").eq("id", version.data!.id).single()).data!.sample_portrait_path).toBeNull();
     // Preview hides every box; Edit brings them back.
     await page.getByTestId("mode-preview").click();
     await expect(page.getByTestId("zone-photo")).toHaveCount(0);

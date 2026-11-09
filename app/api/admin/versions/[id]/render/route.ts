@@ -14,7 +14,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const v = (await db().from("theme_versions").select("*").eq("id", (await ctx.params).id).single()).data as VersionRow | null;
   if (!v) return new Response("Not found", { status: 404 });
   const s = await getSettings(["cards.jpeg_quality", "cards.footer_text", "cards.size_px"] as const);
-  const sample = new URL(req.url).searchParams.get("sample") === "3x4" ? "3x4" : "square";
+  const q = new URL(req.url).searchParams.get("sample");
+  const sample = q === "3x4" ? "3x4" : q === "custom" ? "custom" : "square";
   const canvas = await sampleRender(v, s["cards.size_px"], s["cards.footer_text"], sample);
   const jpeg = await canvas.encode("jpeg", s["cards.jpeg_quality"]);
   return new Response(new Uint8Array(jpeg), { headers: { "content-type": "image/jpeg", "cache-control": "no-store" } });
