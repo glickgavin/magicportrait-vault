@@ -70,7 +70,7 @@ describe("insights KPIs", () => {
   });
 
   it("periods: today and all time", () => {
-    const p = periods("today", NOW);
+    const p = periods("today", NOW, "UTC");
     expect(p.from.toISOString()).toBe(`${YEAR}-03-10T00:00:00.000Z`);
     expect(p.prevFrom!.toISOString()).toBe(`${YEAR}-03-09T00:00:00.000Z`);
     expect(periods("all", NOW).prevFrom).toBeNull();
