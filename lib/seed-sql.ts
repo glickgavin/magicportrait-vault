@@ -49,7 +49,7 @@ export function buildTestSeedSql(): string {
   out.push(`update public.settings set value = 'true'::jsonb, updated_by = 'seed-test', updated_at = now() where key = 'cards.enabled';`);
   out.push(`insert into public.super_users (email, added_by) values (${q(TEST_SUPER_USER)}, 'seed-test') on conflict (email) do nothing;`);
   // Every e2e request comes from one IP: lift the per-IP limits locally.
-  for (const k of ["auth.link_ip_rate_limit_per_hour", "auth.code_ip_rate_limit_per_hour", "auth.code_rate_limit_per_hour", "auth.verify_rate_limit_per_hour", "redeem.download_rate_limit_per_hour", "vault.lookup_rate_limit_per_hour", "gift.offer_link_rate_limit_per_hour"]) {
+  for (const k of ["auth.link_ip_rate_limit_per_hour", "auth.code_ip_rate_limit_per_hour", "auth.code_rate_limit_per_hour", "auth.verify_rate_limit_per_hour", "redeem.download_rate_limit_per_hour", "vault.lookup_rate_limit_per_hour", "gift.offer_link_rate_limit_per_hour", "cards.email_sends_per_day"]) {
     out.push(`update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = ${q(k)};`);
   }
   for (const tv of TEST_LIVE_VERSIONS) {

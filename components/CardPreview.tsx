@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { drawLayers, type Ctx, type DrawImage } from "@/lib/render/draw";
 import type { Crop, FontName, Layout } from "@/lib/render/layout";
+import { fontFiles } from "@/lib/render/fonts";
 import { cn } from "@/lib/utils";
 
 export type CardPreviewProps = {
@@ -41,20 +42,36 @@ function loadImg(url: string | null | undefined): Promise<HTMLImageElement | nul
   return p;
 }
 
+/** The brand fonts come from next/font (renamed families); the Google Fonts load from public/fonts/card/. */
 function cssFamily(f: FontName): string {
+  if (f !== "DM Serif Display" && f !== "Plus Jakarta Sans") return `"${f}"`;
   const v = f === "DM Serif Display" ? "--font-dmserif" : "--font-jakarta";
   const fromVar = typeof document !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(v).trim() : "";
   return fromVar || `"${f}"`;
 }
 
-let fontsLoaded: Promise<void> | null = null;
-function ensureFonts() {
-  fontsLoaded ??= Promise.all([
+let brandFonts: Promise<void> | null = null;
+const faceLoads = new Map<string, Promise<void>>();
+/** Loads only the fonts this layout uses (each file once per page), so previews stay cheap. */
+function ensureFonts(layout: Layout) {
+  brandFonts ??= Promise.all([
     document.fonts.load(`400 40px ${cssFamily("DM Serif Display")}`),
     document.fonts.load(`500 40px ${cssFamily("Plus Jakarta Sans")}`),
     document.fonts.load(`600 40px ${cssFamily("Plus Jakarta Sans")}`),
   ]).then(() => undefined, () => undefined);
-  return fontsLoaded;
+  const used = new Set<FontName>([layout.text.to.font, layout.text.message.font, layout.text.from.font]);
+  const faces = [...used].flatMap((f) =>
+    fontFiles(f).map(({ weight, file }) => {
+      let p = faceLoads.get(file);
+      if (!p) {
+        const face = new FontFace(f, `url(${file})`, { weight: String(weight) });
+        p = face.load().then((loaded) => void document.fonts.add(loaded), () => undefined);
+        faceLoads.set(file, p);
+      }
+      return p;
+    }),
+  );
+  return Promise.all([brandFonts, ...faces]).then(() => undefined);
 }
 
 /**
@@ -81,7 +98,7 @@ export function CardPreview(props: CardPreviewProps) {
     let cancelled = false;
     const canvas = ref.current;
     (async () => {
-      const [bg, ov, pt] = await Promise.all([loadImg(backgroundUrl), loadImg(overlayUrl), loadImg(portraitUrl), ensureFonts()]);
+      const [bg, ov, pt] = await Promise.all([loadImg(backgroundUrl), loadImg(overlayUrl), loadImg(portraitUrl), ensureFonts(layout)]);
       if (cancelled) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const cssW = Math.min(width, maxWidth ?? 2000);

@@ -16,8 +16,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@napi-rs/canvas", "sharp", "postgres", "archiver", "agentmail", "svix"],
   // The renderer reads fonts, the placeholder artwork and the sample portrait from disk at runtime.
   outputFileTracingIncludes: {
-    "/api/**": ["./assets/**", "./public/theme-placeholders/**", "./public/fixtures/**"],
-    "/settings/**": ["./assets/**", "./public/theme-placeholders/**"],
+    "/api/**": ["./assets/**", "./public/theme-placeholders/**", "./public/fixtures/**", "./public/fonts/card/**"],
+    "/settings/**": ["./assets/**", "./public/theme-placeholders/**", "./public/fonts/card/**"],
   },
   images: { unoptimized: true },
   async rewrites() {

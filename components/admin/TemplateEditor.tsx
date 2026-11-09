@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { CardPreview } from "@/components/CardPreview";
-import { FONTS, type Layout, type TextZone } from "@/lib/render/layout";
+import { type Layout, type TextZone } from "@/lib/render/layout";
+import { FONT_DEFS, fontDef, weightFor } from "@/lib/render/fonts";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -346,9 +347,25 @@ export function TemplateEditor(p: Props) {
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[12px] font-semibold">
                   <label>
                     Font
-                    <select value={z.font} onChange={(e) => setText(zone as "to", { font: e.target.value as TextZone["font"] })} className="mt-1 h-9 w-full rounded-[8px] border border-line text-[14px] font-normal">
-                      {FONTS.map((f) => (
-                        <option key={f}>{f}</option>
+                    <select value={z.font} onChange={(e) => setText(zone as "to", { font: e.target.value as TextZone["font"], weight: undefined })} className="mt-1 h-9 w-full rounded-[8px] border border-line text-[14px] font-normal" data-testid="zone-font">
+                      {(["Serif", "Sans", "Script"] as const).map((g) => (
+                        <optgroup key={g} label={g === "Script" ? "Script & handwriting" : g}>
+                          {FONT_DEFS.filter((f) => f.group === g).map((f) => (
+                            <option key={f.name} value={f.name}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Weight
+                    <select value={weightFor(z.font, z.weight)} onChange={(e) => setText(zone as "to", { weight: Number(e.target.value) })} className="mt-1 h-9 w-full rounded-[8px] border border-line text-[14px] font-normal" data-testid="zone-weight">
+                      {fontDef(z.font).weights.map((w) => (
+                        <option key={w} value={w}>
+                          {w === 400 ? "Regular" : w === 500 ? "Medium" : w === 600 ? "Semibold" : w === 700 ? "Bold" : w === 800 ? "Extra bold" : w}
+                        </option>
                       ))}
                     </select>
                   </label>

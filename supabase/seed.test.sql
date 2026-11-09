@@ -10,6 +10,7 @@ update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' whe
 update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'redeem.download_rate_limit_per_hour';
 update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'vault.lookup_rate_limit_per_hour';
 update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'gift.offer_link_rate_limit_per_hour';
+update public.settings set value = '100000'::jsonb, updated_by = 'seed-test' where key = 'cards.email_sends_per_day';
 update public.theme_versions v set status = 'live', published_at = now() from public.themes t where v.theme_id = t.id and t.slug = 'christmas' and v.slug = 'snowfall';
 update public.theme_versions v set status = 'live', published_at = now() from public.themes t where v.theme_id = t.id and t.slug = 'christmas' and v.slug = 'classic';
 update public.theme_versions v set status = 'live', published_at = now() from public.themes t where v.theme_id = t.id and t.slug = 'new-year' and v.slug = 'midnight';

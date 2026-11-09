@@ -118,6 +118,9 @@ test.describe("settings (super users)", () => {
     // Centre the "to" zone horizontally.
     await page.getByTestId("zone-to").click();
     await page.getByTestId("centre-zone").click();
+    // A Google Font for the "to" line: the preview loads it.
+    await page.getByTestId("zone-font").selectOption("Great Vibes");
+    await expect.poll(() => page.evaluate(() => document.fonts.check('40px "Great Vibes"')), { timeout: 10_000 }).toBe(true);
     // drag the photo zone a little
     const z = await page.getByTestId("zone-photo").boundingBox();
     await page.mouse.move(z!.x + 20, z!.y + 20);
@@ -133,6 +136,7 @@ test.describe("settings (super users)", () => {
     expect((v.data!.layout as { photo: { x: number } }).photo.x).not.toBe(270);
     const to = (v.data!.layout as { canvas: { w: number }; text: { to: { x: number; w: number } } });
     expect(Math.abs(to.text.to.x + to.text.to.w / 2 - to.canvas.w / 2)).toBeLessThanOrEqual(1);
+    expect((v.data!.layout as { text: { to: { font: string } } }).text.to.font).toBe("Great Vibes");
     expect(v.data!.overlay_path).toMatch(/overlay-\d+\.png$/);
     // Remove overlay (with a confirm): the design goes back to none.
     page.once("dialog", (d) => void d.accept());
