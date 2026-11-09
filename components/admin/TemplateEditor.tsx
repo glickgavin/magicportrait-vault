@@ -119,6 +119,17 @@ export function TemplateEditor(p: Props) {
     else setOv({ url: b.url!, path: b.path! });
     setMsg({ ok: true, text: `${kind === "background" ? "Background" : "Overlay"} checked and saved (${b.width} × ${b.height}, ${((b.bytes ?? 0) / 1024).toFixed(0)} KB${b.notes?.length ? `; ${b.notes.join(", ")}` : ""}).${kind === "overlay" ? " It's drawn on top of everything." : ""}` });
   }
+  async function removeOverlay() {
+    if (!window.confirm("Remove the overlay from this design? New cards are made without it straight away if the design is live.")) return;
+    setBusy("overlay");
+    setMsg(null);
+    const r = await fetch(`/api/admin/versions/${p.versionId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ removeOverlay: true }) });
+    setBusy(null);
+    if (!r.ok) return setMsg({ ok: false, text: "Couldn't remove the overlay" });
+    setOv({ url: null, path: null });
+    setMsg({ ok: true, text: "Overlay removed. Publish the version to refresh its thumbnail." });
+    router.refresh();
+  }
   async function testRender() {
     if (!(await save())) return;
     setBusy("render");
@@ -269,6 +280,11 @@ export function TemplateEditor(p: Props) {
                 </label>
                 <p className="truncate text-[12px] text-ink-2">{(kind === "background" ? bg.path : ov.path) ?? "None"}</p>
                 <input id={`up-${kind}`} type="file" accept={kind === "background" ? "image/jpeg,image/png" : "image/png"} disabled={Boolean(busy)} onChange={(e) => e.target.files?.[0] && void upload(kind, e.target.files[0])} className="mt-1 text-[13px]" data-testid={`upload-${kind}`} />
+                {kind === "overlay" && ov.path && (
+                  <button type="button" onClick={() => void removeOverlay()} disabled={Boolean(busy)} className="mt-2 min-h-[36px] rounded-[8px] border border-line bg-white px-3 text-[13px] font-semibold text-danger" data-testid="remove-overlay">
+                    Remove overlay
+                  </button>
+                )}
               </div>
             ))}
             <p className="mt-1 text-[12px] text-ink-2">Checked on upload: 1500 × 2100 (5:7 pictures of another size are resized), sRGB. Background under 2 MB, no see-through areas. Overlay: a PNG with transparency, compressed if large (up to 4 MB), drawn on top of everything.</p>

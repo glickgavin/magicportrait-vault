@@ -133,6 +133,13 @@ test.describe("settings (super users)", () => {
     expect((v.data!.layout as { photo: { x: number } }).photo.x).not.toBe(270);
     const to = (v.data!.layout as { canvas: { w: number }; text: { to: { x: number; w: number } } });
     expect(Math.abs(to.text.to.x + to.text.to.w / 2 - to.canvas.w / 2)).toBeLessThanOrEqual(1);
+    expect(v.data!.overlay_path).toMatch(/overlay-\d+\.png$/);
+    // Remove overlay (with a confirm): the design goes back to none.
+    page.once("dialog", (d) => void d.accept());
+    await page.getByTestId("remove-overlay").click();
+    await expect(page.getByTestId("editor-message")).toContainText("Overlay removed");
+    await expect(page.getByTestId("remove-overlay")).toHaveCount(0);
+    expect((await admin().from("theme_versions").select("overlay_path").eq("id", version.data!.id).single()).data!.overlay_path).toBeNull();
     // A customer with cards sees it in step 1
     await page.context().clearCookies();
     await insertCard("rose@example.com");
