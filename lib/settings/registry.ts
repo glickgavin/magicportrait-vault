@@ -73,7 +73,7 @@ export const REGISTRY = {
   "cards.size_px": json("cards", { w: 1500, h: 2100 }, z.object({ w: z.number().int().min(300).max(4000), h: z.number().int().min(300).max(5600) }), { label: "Card size (px)" }),
   "cards.jpeg_quality": num("cards", 90, { label: "JPEG quality", min: 50, max: 100 }),
   "cards.email_sender_name": text("cards", "{from} via Magic Portraits", { label: "Card email sender name", description: "{from} is the sender's first name", allowEmpty: false, max: 120 }),
-  "cards.footer_text": text("cards", "Made with Magic Portraits AI", { label: "Card footer line", max: 80 }),
+  "cards.footer_text": text("cards", "", { label: "Card footer line", description: "Small line along the bottom of every card. Empty (default) shows none.", max: 80 }),
   "cards.first_card_mode": choice("cards", ["one_screen", "full_builder"] as const, "one_screen", { label: "First card", description: "one_screen shows FirstCard to people with no cards (SPEC §8.0)." }),
   "cards.first_card_default_version": text("cards", "with-love-love", { label: "First card default design", description: "theme-version slug (e.g. with-love-love) used when nothing is in season", pattern: /^[a-z0-9-]+$/ }),
   "cards.scheduling_enabled": bool("cards", false, {

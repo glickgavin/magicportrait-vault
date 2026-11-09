@@ -2,7 +2,7 @@ import { adminOr404, actorOf } from "@/lib/admin/guard";
 import { json } from "@/lib/auth/http";
 import { db } from "@/lib/db/client";
 import { putObject } from "@/lib/storage";
-import { checkArtwork } from "@/lib/admin/artwork";
+import { checkArtwork, prepareArtwork } from "@/lib/admin/artwork";
 import { getSetting } from "@/lib/settings";
 import { themeAssetUrl } from "@/lib/render/assets";
 import { track } from "@/lib/track";
@@ -18,9 +18,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const kind = form?.get("kind");
   const file = form?.get("file");
   if ((kind !== "background" && kind !== "overlay") || !(file instanceof File)) return json({ error: "Choose a file." }, 400);
-  if (file.size > 10 * 1024 * 1024) return json({ errors: ["Must be under 2 MB"] }, 400);
-  const buf = Buffer.from(await file.arrayBuffer());
-  const check = await checkArtwork(buf, kind, await getSetting("cards.size_px"));
+  if (file.size > 20 * 1024 * 1024) return json({ errors: ["Must be under 20 MB before compression"] }, 400);
+  const size = await getSetting("cards.size_px");
+  const prepared = await prepareArtwork(Buffer.from(await file.arrayBuffer()), kind, size);
+  if (prepared.error) return json({ errors: [prepared.error] }, 400);
+  const buf = prepared.buf;
+  // Overlays may be up to 4 MB after compression (large transparent art); backgrounds stay under 2 MB.
+  const check = await checkArtwork(buf, kind, size, (kind === "overlay" ? 4 : 2) * 1024 * 1024);
   if (!check.ok) return json({ errors: check.errors }, 400);
   const v = (await db().from("theme_versions").select("slug, theme_id").eq("id", id).single()).data as { slug: string; theme_id: string } | null;
   if (!v) return json({ error: "No such version." }, 404);
@@ -30,5 +34,5 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   await putObject("theme-assets", key, buf, ext === "png" ? "image/png" : "image/jpeg");
   await db().from("theme_versions").update(kind === "background" ? { background_path: key } : { overlay_path: key }).eq("id", id);
   await track("admin_version_updated", { version_slug: `${t.slug}-${v.slug}`, fields: kind }, { email: u.email, actor: actorOf(u), ref: { type: "version", id } });
-  return json({ ok: true, path: key, url: themeAssetUrl(key), width: check.width, height: check.height, bytes: check.bytes, format: check.format });
+  return json({ ok: true, path: key, url: themeAssetUrl(key), width: check.width, height: check.height, bytes: check.bytes, format: check.format, notes: prepared.notes });
 }

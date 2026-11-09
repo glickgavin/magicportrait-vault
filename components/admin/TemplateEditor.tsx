@@ -32,6 +32,10 @@ export function TemplateEditor(p: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [zone, setZone] = useState<ZoneKey>("photo");
   const [sample, setSample] = useState<"square" | "3x4">("square");
+  // "Preview" hides every zone box for a clean look at the card; "Edit" shows them.
+  const [showBoxes, setShowBoxes] = useState(true);
+  // True while a dragged zone is snapped to the horizontal centre (shows the guide line).
+  const [snapped, setSnapped] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const drag = useRef<{ key: ZoneKey; mode: "move" | "resize"; sx: number; sy: number; start: { x: number; y: number; w: number; h: number } } | null>(null);
 
@@ -57,8 +61,28 @@ export function TemplateEditor(p: Props) {
     const scale = W / stage.current.getBoundingClientRect().width;
     const dx = (e.clientX - d.sx) * scale;
     const dy = (e.clientY - d.sy) * scale;
-    if (d.mode === "move") setRect(d.key, { ...d.start, x: d.start.x + dx, y: d.start.y + dy });
-    else setRect(d.key, { ...d.start, w: d.start.w + dx, h: d.start.h + dy });
+    if (d.mode === "move") {
+      let x = d.start.x + dx;
+      // Snap to the horizontal centre when the zone's middle comes within ~1.5% of the card's middle.
+      const centred = (W - d.start.w) / 2;
+      const snap = Math.abs(x - centred) <= W * 0.015;
+      if (snap) x = centred;
+      setSnapped(snap);
+      setRect(d.key, { ...d.start, x, y: d.start.y + dy });
+    } else {
+      let w = d.start.w + dx;
+      // Resizing snaps too: the zone's width that keeps it centred.
+      const centredW = W - d.start.x * 2;
+      const snap = Math.abs(w - centredW) <= W * 0.015;
+      if (snap) w = centredW;
+      setSnapped(snap);
+      setRect(d.key, { ...d.start, w, h: d.start.h + dy });
+    }
+  }
+  /** Centre the selected zone horizontally (also the arrow-key friendly way). */
+  function centreZone(k: ZoneKey) {
+    const r = rectOf(k);
+    setRect(k, { ...r, x: (W - r.w) / 2 });
   }
 
   async function save(): Promise<boolean> {
@@ -85,7 +109,7 @@ export function TemplateEditor(p: Props) {
     f.set("kind", kind);
     f.set("file", file);
     const r = await fetch(`/api/admin/versions/${p.versionId}/upload`, { method: "POST", body: f });
-    const b = (await r.json().catch(() => ({}))) as { url?: string; path?: string; errors?: string[]; error?: string; width?: number; height?: number; bytes?: number };
+    const b = (await r.json().catch(() => ({}))) as { url?: string; path?: string; errors?: string[]; error?: string; width?: number; height?: number; bytes?: number; notes?: string[] };
     setBusy(null);
     if (!r.ok) {
       setMsg({ ok: false, text: (b.errors ?? [b.error ?? "Upload failed"]).join(" · ") });
@@ -93,7 +117,7 @@ export function TemplateEditor(p: Props) {
     }
     if (kind === "background") setBg({ url: b.url!, path: b.path! });
     else setOv({ url: b.url!, path: b.path! });
-    setMsg({ ok: true, text: `${kind === "background" ? "Background" : "Overlay"} checked and saved (${b.width} × ${b.height}, ${((b.bytes ?? 0) / 1024).toFixed(0)} KB).` });
+    setMsg({ ok: true, text: `${kind === "background" ? "Background" : "Overlay"} checked and saved (${b.width} × ${b.height}, ${((b.bytes ?? 0) / 1024).toFixed(0)} KB${b.notes?.length ? `; ${b.notes.join(", ")}` : ""}).${kind === "overlay" ? " It's drawn on top of everything." : ""}` });
   }
   async function testRender() {
     if (!(await save())) return;
@@ -119,6 +143,7 @@ export function TemplateEditor(p: Props) {
 
   const pct = (v: number, of: number) => `${(v / of) * 100}%`;
   const zones: ZoneKey[] = ["photo", "to", "message", "from"];
+  const visibleZones = showBoxes ? zones : [];
   const z = zone === "photo" ? null : layout.text[zone];
 
   return (
@@ -149,9 +174,32 @@ export function TemplateEditor(p: Props) {
 
       <div className="mt-3 grid gap-5 lg:grid-cols-[1fr_360px]">
         <div className="rounded-[20px] bg-white p-5 shadow-sm">
-          <div ref={stage} className="relative mx-auto w-full max-w-[420px] touch-none select-none" onPointerMove={onPointerMove} onPointerUp={() => (drag.current = null)}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div role="radiogroup" aria-label="Boxes" className="flex gap-1 rounded-[10px] bg-black/[0.05] p-1 text-[13px] font-semibold">
+              {([true, false] as const).map((v) => (
+                <button key={String(v)} type="button" role="radio" aria-checked={showBoxes === v} onClick={() => setShowBoxes(v)} className={cn("min-h-[36px] rounded-[8px] px-3", showBoxes === v ? "bg-[#2b2b2b] text-white" : "")} data-testid={v ? "mode-edit" : "mode-preview"}>
+                  {v ? "Edit (show boxes)" : "Preview (hide boxes)"}
+                </button>
+              ))}
+            </div>
+            {showBoxes && (
+              <button type="button" onClick={() => centreZone(zone)} className="min-h-[36px] rounded-[8px] bg-black/[0.05] px-3 text-[13px] font-semibold" data-testid="centre-zone">
+                Centre {zone === "photo" ? "photo area" : `“${zone}”`} horizontally
+              </button>
+            )}
+          </div>
+          <div
+            ref={stage}
+            className="relative mx-auto w-full max-w-[420px] touch-none select-none"
+            onPointerMove={onPointerMove}
+            onPointerUp={() => {
+              drag.current = null;
+              setSnapped(false);
+            }}
+          >
             <CardPreview layout={layout} backgroundUrl={bg.url} overlayUrl={ov.url} portraitUrl={sample === "3x4" ? "/sample-portrait-3x4.jpg" : "/sample-portrait.jpg"} to={SAMPLE.to} from={SAMPLE.from} message={SAMPLE.message} footerText={p.footerText} label="Template preview" />
-            {zones.map((k) => {
+            {showBoxes && snapped && <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0 border-l-2 border-dashed border-[#1990c6]" aria-hidden="true" data-testid="centre-guide" />}
+            {visibleZones.map((k) => {
               const r = rectOf(k);
               return (
                 <div
@@ -223,7 +271,7 @@ export function TemplateEditor(p: Props) {
                 <input id={`up-${kind}`} type="file" accept={kind === "background" ? "image/jpeg,image/png" : "image/png"} disabled={Boolean(busy)} onChange={(e) => e.target.files?.[0] && void upload(kind, e.target.files[0])} className="mt-1 text-[13px]" data-testid={`upload-${kind}`} />
               </div>
             ))}
-            <p className="mt-1 text-[12px] text-ink-2">Checked on upload: 1500 × 2100, sRGB, under 2 MB; the overlay must have transparency.</p>
+            <p className="mt-1 text-[12px] text-ink-2">Checked on upload: 1500 × 2100 (5:7 pictures of another size are resized), sRGB. Background under 2 MB, no see-through areas. Overlay: a PNG with transparency, compressed if large (up to 4 MB), drawn on top of everything.</p>
           </section>
           <section>
             <h2 className="text-[17px] font-extrabold">Zones</h2>
@@ -335,7 +383,7 @@ export function TemplateEditor(p: Props) {
               <li>Keep the photo zone and the three text zones clear of busy detail; the system places the portrait and the text.</li>
               <li>Put the headline in the artwork (e.g. &quot;Happy Christmas&quot;), at the top, outside the zones.</li>
               <li>Overlay (optional): a transparent PNG laid over the portrait, e.g. a frame or snow. Everything outside the decoration must be fully transparent.</li>
-              <li>Leave about 60 px at the bottom for the &quot;Made with Magic Portraits AI&quot; line.</li>
+              <li>The overlay is drawn on top of everything (portrait, frame and text), so keep its transparent areas clear where the photo and words go.</li>
             </ul>
           </details>
         </div>

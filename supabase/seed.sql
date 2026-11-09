@@ -11,7 +11,7 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('cards.size_px', '{"w":1500,"h":2100}'::jsonb, 'json', 'cards', 'Card size (px)', null, null, 'seed', now()),
   ('cards.jpeg_quality', '90'::jsonb, 'number', 'cards', 'JPEG quality', null, null, 'seed', now()),
   ('cards.email_sender_name', '"{from} via Magic Portraits"'::jsonb, 'text', 'cards', 'Card email sender name', '{from} is the sender''s first name', null, 'seed', now()),
-  ('cards.footer_text', '"Made with Magic Portraits AI"'::jsonb, 'text', 'cards', 'Card footer line', null, null, 'seed', now()),
+  ('cards.footer_text', '""'::jsonb, 'text', 'cards', 'Card footer line', 'Small line along the bottom of every card. Empty (default) shows none.', null, 'seed', now()),
   ('cards.first_card_mode', '"one_screen"'::jsonb, 'choice', 'cards', 'First card', 'one_screen shows FirstCard to people with no cards (SPEC §8.0).', '["one_screen","full_builder"]'::jsonb, 'seed', now()),
   ('cards.first_card_default_version', '"with-love-love"'::jsonb, 'text', 'cards', 'First card default design', 'theme-version slug (e.g. with-love-love) used when nothing is in season', null, 'seed', now()),
   ('cards.scheduling_enabled', 'false'::jsonb, 'boolean', 'cards', 'Scheduled sending', 'On: the Message step offers “Send now or pick a date” again. Off (default): cards are created first, then sent from the ready screen at once.', null, 'seed', now()),
