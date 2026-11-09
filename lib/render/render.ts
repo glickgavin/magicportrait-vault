@@ -3,6 +3,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { drawLayers, type Ctx, type DrawInput } from "./draw";
 import type { FontName } from "./layout";
+import { FONTS, fontFiles } from "./fonts";
 
 let fontsReady = false;
 export function registerFonts() {
@@ -14,6 +15,13 @@ export function registerFonts() {
   };
   reg("DMSerifDisplay-Regular.ttf", "DM Serif Display");
   reg("PlusJakartaSans.ttf", "Plus Jakarta Sans");
+  // The Google Fonts, from the same files the browser preview loads (public/fonts/card/).
+  for (const f of FONTS) {
+    for (const { file } of fontFiles(f)) {
+      const p = path.join(process.cwd(), "public", file);
+      if (existsSync(p)) GlobalFonts.registerFromPath(p, f);
+    }
+  }
   fontsReady = true;
 }
 

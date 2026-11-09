@@ -5,6 +5,7 @@ import { createCanvas } from "@napi-rs/canvas";
 import { SEED_THEMES, defaultLayout } from "@/lib/seed-data";
 import { archRadius, fitText, fittedPhoto, parseLayout, photoFit, photoSourceRect, placeLines, usableIdeas, type Layout } from "@/lib/render/layout";
 import { drawCard, registerFonts } from "@/lib/render/render";
+import { FONT_DEFS, fontFiles, weightFor, type FontDef } from "@/lib/render/fonts";
 import { measurer, type Ctx } from "@/lib/render/draw";
 
 const portrait = readFileSync("public/fixtures/portraits/pet-1.jpg");
@@ -106,6 +107,33 @@ describe("photo window follows the image (photo.fit)", () => {
   it("arch keeps a semicircular top across the width, capped for wide boxes", () => {
     expect(archRadius(600, 800)).toBe(300);
     expect(archRadius(800, 600)).toBe(300);
+  });
+});
+
+describe("card fonts", () => {
+  registerFonts();
+  const ctx = createCanvas(10, 10).getContext("2d");
+  const width = (family: string, weight = 400) => {
+    ctx.font = `${weight} 60px ${family}`;
+    return ctx.measureText("Happy Birthday Grandma Rose!").width;
+  };
+  const fallback = width('"No Such Font"');
+  for (const f of FONT_DEFS) {
+    it(`${f.name} is registered on the server and draws in its own shape`, () => {
+      for (const w of f.weights) expect(Math.abs(width(`"${f.name}"`, w) - fallback)).toBeGreaterThan(1);
+    });
+  }
+  it("each Google Font has its file and licence in public/fonts/card", () => {
+    for (const f of FONT_DEFS) {
+      for (const { file } of fontFiles(f.name)) expect(existsSync(`public${file}`)).toBe(true);
+      const slug = (f as FontDef).slug;
+      if (slug) expect(existsSync(`public/fonts/card/OFL-${slug}.txt`)).toBe(true);
+    }
+  });
+  it("weights snap to one the font has", () => {
+    expect(weightFor("Great Vibes", 700)).toBe(400);
+    expect(weightFor("Montserrat", 600)).toBe(700);
+    expect(weightFor("Plus Jakarta Sans")).toBe(500);
   });
 });
 

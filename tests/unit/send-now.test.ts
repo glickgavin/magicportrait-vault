@@ -41,7 +41,7 @@ describe("ready screen Send", () => {
     await setSetting("cards.enabled", true, by);
   });
   afterAll(async () => {
-    await setSetting("cards.email_sends_per_day", 20, by);
+    await setSetting("cards.email_sends_per_day", 100000, by); // the test stack runs with a high limit (seed.test.sql)
     rmSync(outbox, { recursive: true, force: true });
   });
 

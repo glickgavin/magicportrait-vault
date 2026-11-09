@@ -4,8 +4,9 @@
  */
 import { z } from "zod";
 
-export const FONTS = ["DM Serif Display", "Plus Jakarta Sans"] as const;
-export type FontName = (typeof FONTS)[number];
+import { FONTS, type FontName } from "./fonts";
+
+export { FONTS, type FontName };
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const textZone = z.object({

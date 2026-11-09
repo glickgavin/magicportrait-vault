@@ -198,7 +198,7 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 }
 ```
 
-`shape` is one of `rect` · `rounded` · `circle` · `arch` (a rectangle with a semicircular top of radius `w/2`, capped at `h/2` for wide boxes). The approved fonts are DM Serif Display and Plus Jakarta Sans; more can be added in Settings later (the font files ship with the app). Text is shrunk down to `minSize` (default 70% of `size`) before wrapping, and never overflows its box.
+`shape` is one of `rect` · `rounded` · `circle` · `arch` (a rectangle with a semicircular top of radius `w/2`, capped at `h/2` for wide boxes). The fonts are listed once in `lib/render/fonts.ts` (`FONT_DEFS`): the brand fonts DM Serif Display and Plus Jakarta Sans, plus 12 Google Fonts (9 Nov): Playfair Display, Lora, Cormorant Garamond (serif); Montserrat, Poppins, Nunito (sans); Great Vibes, Dancing Script, Pacifico, Caveat, Lobster, Amatic SC (script and handwriting). All SIL Open Font License. Their files (latin subset, one `.woff2` per weight, with licences) are in `public/fonts/card/`, fetched by `scripts/fetch-card-fonts.mjs`; the server renderer registers them and the browser preview loads the same files, so they match. A zone's `weight` snaps to one the font has (default per font). To add a font: add it to `FONT_DEFS` and run the script. Text is shrunk down to `minSize` (default 70% of `size`) before wrapping, and never overflows its box.
 
 - `y` is the **top** of each text box. `to` and `from` are single lines (box height ≈ `size × 1.25`) that shrink to fit `w`.
 - `message.valign` is `top` (default) or `middle`; `middle` centres the wrapped lines vertically in the `h` box.

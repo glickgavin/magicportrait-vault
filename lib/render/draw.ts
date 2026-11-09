@@ -2,6 +2,7 @@
  * The one drawing routine for a card, used by the server renderer (@napi-rs/canvas) and the browser
  * preview (HTML canvas), so what you see is what you get.
  */
+import { weightFor } from "./fonts";
 import { fill, fitText, fittedPhoto, photoSourceRect, placeLines, shapePath, tracePath, type Crop, type FontName, type Layout, type Measure } from "./layout";
 
 export type DrawImage = { width: number; height: number };
@@ -47,11 +48,10 @@ export type DrawInput = {
   photoBg?: string;
 };
 
-const WEIGHT: Record<FontName, number> = { "DM Serif Display": 400, "Plus Jakarta Sans": 500 };
 
 /** `family` maps our font names to the CSS family the canvas knows (next/font renames them in the browser). */
 export function fontString(font: FontName, size: number, weight: number | undefined, family: (f: FontName) => string) {
-  return `${weight ?? WEIGHT[font]} ${size.toFixed(2)}px ${family(font)}`;
+  return `${weightFor(font, weight)} ${size.toFixed(2)}px ${family(font)}`;
 }
 
 export function measurer(ctx: Ctx, family: (f: FontName) => string): Measure {
