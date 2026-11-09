@@ -24,6 +24,8 @@ const textZone = z.object({
   maxChars: z.number().int().min(1).max(1000).optional(),
   template: z.string().max(200).optional(),
   weight: z.number().int().min(100).max(900).optional(),
+  /** false: this line isn't printed on the design (and the builder doesn't ask for the message). */
+  show: z.boolean().optional(),
 });
 
 export const layoutSchema = z.object({
@@ -43,6 +45,8 @@ export const layoutSchema = z.object({
      * frame is drawn by the background art (frame.width 0), otherwise "adapt".
      */
     fit: z.enum(["adapt", "cover"]).optional(),
+    /** false: a design without a photo (no window or frame, and no Portrait step). */
+    show: z.boolean().optional(),
   }),
   text: z.object({ to: textZone, message: textZone, from: textZone }),
   footer: z.object({ y: z.number(), size: z.number().positive(), color }).optional(),
@@ -164,6 +168,11 @@ export function photoSourceRect(imgW: number, imgH: number, zoneW: number, zoneH
   const cx = imgW / 2 + Math.max(-1, Math.min(1, crop.x || 0)) * maxX;
   const cy = imgH / 2 + Math.max(-1, Math.min(1, crop.y || 0)) * maxY;
   return { sx: cx - sw / 2, sy: cy - sh / 2, sw, sh };
+}
+
+/** Whether a zone is on the design (missing `show` means yes). */
+export function isShown(zone: { show?: boolean }): boolean {
+  return zone.show !== false;
 }
 
 export type PhotoFit = "adapt" | "cover";

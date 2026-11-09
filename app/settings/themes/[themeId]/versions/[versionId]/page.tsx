@@ -38,6 +38,8 @@ export default async function EditVersionPage({ params }: { params: Promise<{ th
           overlayUrl: themeAssetUrl(v.overlay_path),
           backgroundPath: v.background_path,
           overlayPath: v.overlay_path,
+          samplePath: v.sample_portrait_path,
+          sampleUrl: themeAssetUrl(v.sample_portrait_path),
         }}
       />
     </>

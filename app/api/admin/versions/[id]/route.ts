@@ -18,6 +18,8 @@ const body = z
     messageMaxChars: z.number().int().min(20).max(1000).nullable(),
     /** Template editor "Remove overlay": the design goes back to no overlay (the stored file is kept). */
     removeOverlay: z.literal(true),
+    /** "Remove placeholder image": back to the built-in sample portrait. */
+    removeSample: z.literal(true),
   })
   .partial();
 
@@ -37,6 +39,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (d.messageIdeas !== undefined) patch.message_ideas = d.messageIdeas;
   if (d.messageMaxChars !== undefined) patch.message_max_chars = d.messageMaxChars;
   if (d.removeOverlay) patch.overlay_path = null;
+  if (d.removeSample) patch.sample_portrait_path = null;
   const id = (await ctx.params).id;
   const r = await db().from("theme_versions").update(patch).eq("id", id).select("slug, theme_id").single();
   if (r.error) return json({ error: "Couldn't save." }, 400);

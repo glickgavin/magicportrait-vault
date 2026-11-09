@@ -110,6 +110,18 @@ test.describe("settings (super users)", () => {
     await expect(page.getByTestId("editor-message")).toContainText("Background checked and saved");
     await page.getByTestId("upload-overlay").setInputFiles(ovFile);
     await expect(page.getByTestId("editor-message")).toContainText("Overlay checked and saved");
+    // A placeholder image for this design: used in the preview, then removed again.
+    const sampleFile = path.join(dir, "placeholder.jpg");
+    writeFileSync(sampleFile, await sharp({ create: { width: 600, height: 800, channels: 3, background: "#1990C6" } }).jpeg().toBuffer());
+    await page.getByTestId("upload-sample").setInputFiles(sampleFile);
+    await expect(page.getByTestId("editor-message")).toContainText("Placeholder image saved");
+    await expect(page.getByTestId("sample-custom")).toHaveAttribute("aria-checked", "true");
+    expect((await admin().from("theme_versions").select("sample_portrait_path").eq("id", version.data!.id).single()).data!.sample_portrait_path).toMatch(/sample-\d+\.jpg$/);
+    page.once("dialog", (d) => void d.accept());
+    await page.getByTestId("remove-sample").click();
+    await expect(page.getByTestId("editor-message")).toContainText("Placeholder image removed");
+    await expect(page.getByTestId("sample-custom")).toHaveCount(0);
+    expect((await admin().from("theme_versions").select("sample_portrait_path").eq("id", version.data!.id).single()).data!.sample_portrait_path).toBeNull();
     // Preview hides every box; Edit brings them back.
     await page.getByTestId("mode-preview").click();
     await expect(page.getByTestId("zone-photo")).toHaveCount(0);
@@ -118,6 +130,13 @@ test.describe("settings (super users)", () => {
     // Centre the "to" zone horizontally.
     await page.getByTestId("zone-to").click();
     await page.getByTestId("centre-zone").click();
+    // Show / hide: hide the "from" line, then show it again.
+    await page.getByTestId("zone-from").click();
+    await page.getByTestId("zone-show").uncheck();
+    await expect(page.getByTestId("zone-from")).toContainText("(hidden)");
+    await page.getByTestId("zone-show").check();
+    await expect(page.getByTestId("zone-from")).not.toContainText("(hidden)");
+    await page.getByTestId("zone-to").click();
     // A Google Font for the "to" line: the preview loads it.
     await page.getByTestId("zone-font").selectOption("Great Vibes");
     await expect.poll(() => page.evaluate(() => document.fonts.check('40px "Great Vibes"')), { timeout: 10_000 }).toBe(true);

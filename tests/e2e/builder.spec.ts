@@ -135,6 +135,31 @@ test.describe("card builder", () => {
     expect(card).toMatchObject({ to_name: "Grandpa", status: "ready", delivery: "self", flow: "full" });
   });
 
+  test("a design without a photo or message: no Portrait step, no message box, the card is made", async ({ page }) => {
+    const v = (await admin().from("theme_versions").select("id, layout").eq("status", "live").limit(1).single()).data as { id: string; layout: { photo: Record<string, unknown>; text: Record<string, Record<string, unknown>> } };
+    const original = v.layout;
+    const layout = { ...original, photo: { ...original.photo, show: false }, text: { ...original.text, message: { ...original.text.message, show: false } } };
+    await admin().from("theme_versions").update({ layout }).eq("id", v.id);
+    try {
+      await signInWithLink(page, "rose@example.com", "/create?step=theme");
+      await clearDraft(page);
+      await page.goto(`/create/portrait?v=${v.id}`);
+      // The Portrait step sends them straight on to the message step.
+      await expect(page.getByTestId("step-message")).toBeVisible();
+      await expect(page.getByLabel("Message", { exact: true })).toHaveCount(0);
+      await expect(page.getByTestId("change-message")).toHaveCount(0);
+      await page.getByLabel("To", { exact: true }).fill("Grandpa");
+      await page.getByTestId("create-card").click();
+      await page.waitForURL(/\/cards\/C-/, { timeout: 30_000 });
+      const [card] = await cardsOf("rose@example.com");
+      expect(card).toMatchObject({ to_name: "Grandpa", status: "ready" });
+      const row = (await admin().from("cards").select("message, portrait_path, imagen_image_id").eq("id", card.id).single()).data!;
+      expect(row).toEqual({ message: "", portrait_path: null, imagen_image_id: null });
+    } finally {
+      await admin().from("theme_versions").update({ layout: original }).eq("id", v.id);
+    }
+  });
+
   test("cards.scheduling_enabled brings back Send now or pick a date", async ({ page }) => {
     await setSetting("cards.scheduling_enabled", true);
     try {

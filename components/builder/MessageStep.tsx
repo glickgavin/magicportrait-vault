@@ -10,7 +10,7 @@ import { DeliveryFields } from "./DeliveryFields";
 import { useDraft } from "./useDraft";
 import { submitCard } from "./submit";
 import type { BuilderData } from "./types";
-import { usableIdeas } from "@/lib/render/layout";
+import { isShown, usableIdeas } from "@/lib/render/layout";
 import { t } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 
@@ -22,6 +22,11 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
   const version = data.versions.find((v) => v.id === draft.versionId) ?? null;
   const portrait = data.sessions.flatMap((s) => s.portraits).find((p) => p.imageId === draft.imageId) ?? null;
   const session = data.sessions.find((s) => s.sessionId === portrait?.sessionId);
+  // What this design prints (4 Nov+ templates can hide the photo or any line).
+  const photoOn = version ? isShown(version.layout.photo) : true;
+  const messageOn = version ? isShown(version.layout.text.message) : true;
+  const toOn = version ? isShown(version.layout.text.to) : true;
+  const fromOn = version ? isShown(version.layout.text.from) : true;
   const ideas = useMemo(() => (version ? usableIdeas(version.messageIdeas, session?.petName, draft.to) : []), [version, session?.petName, draft.to]);
   const max = version?.messageMaxChars ?? data.maxChars;
 
@@ -31,16 +36,16 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
   useEffect(() => {
     if (!ready) return;
     if (!version) router.replace("/create?step=theme");
-    else if (!portrait) router.replace(`/create/portrait?v=${version.id}`);
-    else if (!draft.messageTouched && !draft.message && ideas[0]) update({ message: ideas[0] });
-  }, [ready, version, portrait, draft.messageTouched, draft.message, ideas, router, update]);
-  if (!version || !portrait) return null;
+    else if (!portrait && photoOn) router.replace(`/create/portrait?v=${version.id}`);
+    else if (messageOn && !draft.messageTouched && !draft.message && ideas[0]) update({ message: ideas[0] });
+  }, [ready, version, portrait, photoOn, messageOn, draft.messageTouched, draft.message, ideas, router, update]);
+  if (!version || (!portrait && photoOn)) return null;
 
   // Without scheduling, cards are created first and sent from the ready screen (4 Nov review).
   // Editing an already-scheduled card keeps its delivery fields.
   const showDelivery = data.schedulingEnabled || Boolean(editCardId);
   const delivery = showDelivery ? draft.delivery : "self";
-  const canSubmit = draft.to.trim() && draft.from.trim() && draft.message.length <= max && (delivery === "self" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.recipientEmail.trim())) && (draft.when === "now" || delivery === "self" || draft.scheduledLocal);
+  const canSubmit = draft.to.trim() && draft.from.trim() && (!messageOn || draft.message.length <= max) && (delivery === "self" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.recipientEmail.trim())) && (draft.when === "now" || delivery === "self" || draft.scheduledLocal);
 
   /** "Change message": the next of the version's ideas, wrapping round. */
   function nextIdea() {
@@ -54,7 +59,7 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
   async function create() {
     setBusy(true);
     setError(null);
-    const r = await submitCard({ ...draft, delivery, flow: "full" }, version!.fullSlug, editCardId ? { method: "PATCH", url: `/api/cards/${editCardId}` } : {});
+    const r = await submitCard({ ...draft, delivery, flow: "full", imageId: photoOn ? draft.imageId : null, message: messageOn ? draft.message : "" }, version!.fullSlug, editCardId ? { method: "PATCH", url: `/api/cards/${editCardId}` } : {});
     if (!r.ok) {
       setError(r.message);
       setBusy(false);
@@ -66,7 +71,7 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
   return (
     <div className="mx-auto max-w-[960px] pb-28 lg:grid lg:grid-cols-[1fr_420px] lg:gap-8" data-testid="step-message">
       <div className="lg:col-span-2">
-        <StepHeader step={3} onBack={() => router.push(`/create/portrait?v=${version.id}&image=${portrait.imageId}`)} />
+        <StepHeader step={3} onBack={() => router.push(photoOn && portrait ? `/create/portrait?v=${version.id}&image=${portrait.imageId}` : `/create?step=theme`)} />
       </div>
       <div className="mx-auto mt-5 w-[60%] max-w-[300px] lg:order-2 lg:w-full">
         <div className="lg:sticky lg:top-20">
@@ -74,7 +79,7 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
             layout={version.layout}
             backgroundUrl={version.backgroundUrl}
             overlayUrl={version.overlayUrl}
-            portraitUrl={portrait.imageUrl}
+            portraitUrl={portrait?.imageUrl}
             crop={draft.crop}
             photoBg={version.photoBg}
             to={draft.to || t("home.theirName")}
@@ -97,39 +102,43 @@ export function MessageStep({ data, versionId, imageId, editCardId }: { data: Bu
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="card-to" className="block text-[15px] font-bold">
-                {t("builder.to")}
+                {t("builder.to")} {!toOn && <span className="text-[12px] font-normal text-ink-2">{t("builder.notPrinted")}</span>}
               </label>
               <input id="card-to" value={draft.to} maxLength={60} onChange={(e) => update({ to: e.target.value })} autoComplete="off" placeholder={t("builder.toPlaceholder")} className="mt-1 h-12 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 text-[16px]" />
             </div>
             <div>
               <label htmlFor="card-from" className="block text-[15px] font-bold">
-                {t("builder.from")}
+                {t("builder.from")} {!fromOn && <span className="text-[12px] font-normal text-ink-2">{t("builder.notPrinted")}</span>}
               </label>
               <input id="card-from" value={draft.from} maxLength={60} onChange={(e) => update({ from: e.target.value })} autoComplete="given-name" placeholder={t("builder.fromPlaceholder")} className="mt-1 h-12 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 text-[16px]" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="flex justify-between">
-              <label htmlFor="card-message" className="block text-[15px] font-bold">
-                {t("builder.message")}
-              </label>
-              <span id="card-message-count" className={`text-[14px] ${draft.message.length > max ? "font-bold text-danger" : "text-ink-2"}`} aria-live="polite">
-                {t("builder.counter", { n: draft.message.length, max })}
-              </span>
+          {messageOn && (
+            <>
+            <div className="mt-3">
+              <div className="flex justify-between">
+                <label htmlFor="card-message" className="block text-[15px] font-bold">
+                  {t("builder.message")}
+                </label>
+                <span id="card-message-count" className={`text-[14px] ${draft.message.length > max ? "font-bold text-danger" : "text-ink-2"}`} aria-live="polite">
+                  {t("builder.counter", { n: draft.message.length, max })}
+                </span>
+              </div>
+              <textarea
+                id="card-message"
+                rows={3}
+                value={draft.message}
+                aria-describedby="card-message-count"
+                onChange={(e) => update({ message: e.target.value, messageTouched: true })}
+                className="mt-1 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 py-2.5 text-[16px] leading-snug"
+              />
             </div>
-            <textarea
-              id="card-message"
-              rows={3}
-              value={draft.message}
-              aria-describedby="card-message-count"
-              onChange={(e) => update({ message: e.target.value, messageTouched: true })}
-              className="mt-1 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 py-2.5 text-[16px] leading-snug"
-            />
-          </div>
-          {ideas.length > 1 && (
-            <button type="button" onClick={nextIdea} className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-pink-tint px-4 text-[15px] font-bold text-pink-dark" data-testid="change-message">
-              <RefreshCw className="h-4 w-4" aria-hidden="true" /> {t("builder.changeMessage")}
-            </button>
+            {ideas.length > 1 && (
+              <button type="button" onClick={nextIdea} className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-pink-tint px-4 text-[15px] font-bold text-pink-dark" data-testid="change-message">
+                <RefreshCw className="h-4 w-4" aria-hidden="true" /> {t("builder.changeMessage")}
+              </button>
+            )}
+            </>
           )}
         </div>
         {showDelivery && <DeliveryFields draft={draft} update={update} allowSchedule scheduleMaxDays={data.scheduleMaxDays} />}

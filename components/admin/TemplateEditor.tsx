@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { CardPreview } from "@/components/CardPreview";
-import { type Layout, type TextZone } from "@/lib/render/layout";
+import { isShown, type Layout, type TextZone } from "@/lib/render/layout";
 import { FONT_DEFS, fontDef, weightFor } from "@/lib/render/fonts";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,7 @@ type Props = {
   versionId: string;
   themeName: string;
   categoryName: string;
-  initial: { name: string; status: string; isNew: boolean; layout: Layout; ideas: string[]; maxChars: number | null; backgroundUrl: string; overlayUrl: string | null; backgroundPath: string; overlayPath: string | null };
+  initial: { name: string; status: string; isNew: boolean; layout: Layout; ideas: string[]; maxChars: number | null; backgroundUrl: string; overlayUrl: string | null; backgroundPath: string; overlayPath: string | null; samplePath: string | null; sampleUrl: string | null };
   defaultMaxChars: number;
   footerText: string;
 };
@@ -29,10 +29,12 @@ export function TemplateEditor(p: Props) {
   const [maxChars, setMaxChars] = useState<string>(p.initial.maxChars ? String(p.initial.maxChars) : "");
   const [bg, setBg] = useState({ url: p.initial.backgroundUrl, path: p.initial.backgroundPath });
   const [ov, setOv] = useState({ url: p.initial.overlayUrl, path: p.initial.overlayPath });
+  // The design's own placeholder portrait; none = the built-in square / 3:4 samples.
+  const [sp, setSp] = useState({ url: p.initial.sampleUrl, path: p.initial.samplePath });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [zone, setZone] = useState<ZoneKey>("photo");
-  const [sample, setSample] = useState<"square" | "3x4">("square");
+  const [sample, setSample] = useState<"square" | "3x4" | "custom">(p.initial.samplePath ? "custom" : "square");
   // "Preview" hides every zone box for a clean look at the card; "Edit" shows them.
   const [showBoxes, setShowBoxes] = useState(true);
   // True while a dragged zone is snapped to the horizontal centre (shows the guide line).
@@ -47,6 +49,10 @@ export function TemplateEditor(p: Props) {
     const c = { x: Math.round(Math.max(0, Math.min(W - 20, r.x))), y: Math.round(Math.max(0, Math.min(H - 20, r.y))), w: Math.round(Math.max(40, Math.min(W, r.w))), h: Math.round(Math.max(30, Math.min(H, r.h))) };
     setLayout((l) => (k === "photo" ? { ...l, photo: { ...l.photo, ...c } } : { ...l, text: { ...l.text, [k]: { ...l.text[k], ...c } } }));
   };
+  /** Whether a zone is printed on this design (photo, to, message, from). */
+  const shownOf = (k: ZoneKey) => isShown(k === "photo" ? layout.photo : layout.text[k]);
+  const setShown = (k: ZoneKey, show: boolean) =>
+    setLayout((l) => (k === "photo" ? { ...l, photo: { ...l.photo, show } } : { ...l, text: { ...l.text, [k]: { ...l.text[k], show } } }));
   const setText = (k: "to" | "message" | "from", patch: Partial<TextZone>) => setLayout((l) => ({ ...l, text: { ...l.text, [k]: { ...l.text[k], ...patch } } }));
 
   function onPointerDown(e: React.PointerEvent, key: ZoneKey, mode: "move" | "resize") {
@@ -103,7 +109,7 @@ export function TemplateEditor(p: Props) {
     router.refresh();
     return true;
   }
-  async function upload(kind: "background" | "overlay", file: File) {
+  async function upload(kind: "background" | "overlay" | "sample", file: File) {
     setBusy(kind);
     setMsg(null);
     const f = new FormData();
@@ -117,7 +123,13 @@ export function TemplateEditor(p: Props) {
       return;
     }
     if (kind === "background") setBg({ url: b.url!, path: b.path! });
-    else setOv({ url: b.url!, path: b.path! });
+    else if (kind === "overlay") setOv({ url: b.url!, path: b.path! });
+    else {
+      setSp({ url: b.url!, path: b.path! });
+      setSample("custom");
+      setMsg({ ok: true, text: `Placeholder image saved (${b.width} × ${b.height}). It's used in this preview, the test render and the thumbnail when you publish.` });
+      return;
+    }
     setMsg({ ok: true, text: `${kind === "background" ? "Background" : "Overlay"} checked and saved (${b.width} × ${b.height}, ${((b.bytes ?? 0) / 1024).toFixed(0)} KB${b.notes?.length ? `; ${b.notes.join(", ")}` : ""}).${kind === "overlay" ? " It's drawn on top of everything." : ""}` });
   }
   async function removeOverlay() {
@@ -130,6 +142,17 @@ export function TemplateEditor(p: Props) {
     setOv({ url: null, path: null });
     setMsg({ ok: true, text: "Overlay removed. Publish the version to refresh its thumbnail." });
     router.refresh();
+  }
+  async function removeSample() {
+    if (!window.confirm("Remove this design's placeholder image? The built-in sample portrait is used instead.")) return;
+    setBusy("sample");
+    setMsg(null);
+    const r = await fetch(`/api/admin/versions/${p.versionId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ removeSample: true }) });
+    setBusy(null);
+    if (!r.ok) return setMsg({ ok: false, text: "Couldn't remove the placeholder image" });
+    setSp({ url: null, path: null });
+    if (sample === "custom") setSample("square");
+    setMsg({ ok: true, text: "Placeholder image removed: the built-in sample is used. Publish to refresh the thumbnail." });
   }
   async function testRender() {
     if (!(await save())) return;
@@ -209,7 +232,7 @@ export function TemplateEditor(p: Props) {
               setSnapped(false);
             }}
           >
-            <CardPreview layout={layout} backgroundUrl={bg.url} overlayUrl={ov.url} portraitUrl={sample === "3x4" ? "/sample-portrait-3x4.jpg" : "/sample-portrait.jpg"} to={SAMPLE.to} from={SAMPLE.from} message={SAMPLE.message} footerText={p.footerText} label="Template preview" />
+            <CardPreview layout={layout} backgroundUrl={bg.url} overlayUrl={ov.url} portraitUrl={sample === "custom" && sp.url ? sp.url : sample === "3x4" ? "/sample-portrait-3x4.jpg" : "/sample-portrait.jpg"} to={SAMPLE.to} from={SAMPLE.from} message={SAMPLE.message} footerText={p.footerText} label="Template preview" />
             {showBoxes && snapped && <div className="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0 border-l-2 border-dashed border-[#1990c6]" aria-hidden="true" data-testid="centre-guide" />}
             {visibleZones.map((k) => {
               const r = rectOf(k);
@@ -229,20 +252,23 @@ export function TemplateEditor(p: Props) {
                       setRect(k, { ...r, x: r.x + m[e.key][0], y: r.y + m[e.key][1] });
                     }
                   }}
-                  className={cn("absolute cursor-move border-2 border-dashed", zone === k ? "border-magenta bg-magenta/10" : "border-magenta/50")}
+                  className={cn("absolute cursor-move border-2 border-dashed", !shownOf(k) ? "border-black/30 bg-black/[0.04]" : zone === k ? "border-magenta bg-magenta/10" : "border-magenta/50")}
                   style={{ left: pct(r.x, W), top: pct(r.y, H), width: pct(r.w, W), height: pct(r.h, H) }}
                   data-testid={`zone-${k}`}
                 >
-                  <span className="absolute -top-5 left-0 rounded bg-magenta px-1.5 text-[11px] font-bold text-white">{k === "photo" ? "Maximum photo area" : k}</span>
+                  <span className={cn("absolute -top-5 left-0 rounded px-1.5 text-[11px] font-bold text-white", shownOf(k) ? "bg-magenta" : "bg-black/50")}>
+                    {k === "photo" ? "Maximum photo area" : k}
+                    {!shownOf(k) && " (hidden)"}
+                  </span>
                   <span onPointerDown={(e) => onPointerDown(e, k, "resize")} className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize border-2 border-magenta bg-white" aria-hidden="true" />
                 </div>
               );
             })}
           </div>
           <div role="radiogroup" aria-label="Sample portrait" className="mt-3 flex justify-center gap-2 text-[13px] font-semibold">
-            {(["square", "3x4"] as const).map((s) => (
+            {(sp.path ? (["custom", "square", "3x4"] as const) : (["square", "3x4"] as const)).map((s) => (
               <button key={s} type="button" role="radio" aria-checked={sample === s} onClick={() => setSample(s)} className={cn("min-h-[36px] rounded-[8px] px-3", sample === s ? "bg-[#2b2b2b] text-white" : "bg-black/[0.05]")} data-testid={`sample-${s}`}>
-                {s === "square" ? "Square sample" : "3:4 sample"}
+                {s === "custom" ? "Your placeholder" : s === "square" ? "Square sample" : "3:4 sample"}
               </button>
             ))}
           </div>
@@ -289,16 +315,40 @@ export function TemplateEditor(p: Props) {
               </div>
             ))}
             <p className="mt-1 text-[12px] text-ink-2">Checked on upload: 1500 × 2100 (5:7 pictures of another size are resized), sRGB. Background under 2 MB, no see-through areas. Overlay: a PNG with transparency, compressed if large (up to 4 MB), drawn on top of everything.</p>
+            <div className="mt-2 rounded-[12px] border border-dashed border-line p-3" data-testid="sample-section">
+              <label className="block text-[14px] font-bold" htmlFor="up-sample">
+                Placeholder image (optional)
+              </label>
+              <p className="text-[12px] text-ink-2">
+                The picture shown in the photo window here, in the test render and in this design&apos;s thumbnail. Customers&apos; cards always use their own portrait. None: the built-in sample.
+              </p>
+              <p className="truncate text-[12px] text-ink-2">{sp.path ?? "Built-in sample"}</p>
+              <input id="up-sample" type="file" accept="image/jpeg,image/png,image/webp" disabled={Boolean(busy)} onChange={(e) => e.target.files?.[0] && void upload("sample", e.target.files[0])} className="mt-1 text-[13px]" data-testid="upload-sample" />
+              {sp.path && (
+                <button type="button" onClick={() => void removeSample()} disabled={Boolean(busy)} className="mt-2 min-h-[36px] rounded-[8px] border border-line bg-white px-3 text-[13px] font-semibold text-danger" data-testid="remove-sample">
+                  Remove placeholder image
+                </button>
+              )}
+            </div>
           </section>
           <section>
             <h2 className="text-[17px] font-extrabold">Zones</h2>
             <div role="radiogroup" aria-label="Zone to edit" className="mt-2 flex flex-wrap gap-1">
               {zones.map((k) => (
-                <button key={k} type="button" role="radio" aria-checked={zone === k} onClick={() => setZone(k)} className={cn("rounded-[8px] px-2.5 py-1 text-[13px] font-semibold", zone === k ? "bg-[#2b2b2b] text-white" : "bg-black/[0.05]")}>
+                <button key={k} type="button" role="radio" aria-checked={zone === k} onClick={() => setZone(k)} className={cn("rounded-[8px] px-2.5 py-1 text-[13px] font-semibold", zone === k ? "bg-[#2b2b2b] text-white" : "bg-black/[0.05]", !shownOf(k) && "line-through opacity-60")}>
                   {k === "photo" ? "Photo" : k}
                 </button>
               ))}
             </div>
+            <label className="mt-2 flex min-h-[44px] items-center justify-between gap-3 rounded-[10px] bg-black/[0.04] px-3 text-[14px] font-semibold">
+              <span>
+                Show {zone === "photo" ? "the photo" : `“${zone}”`} on this design
+                <span className="block text-[12px] font-normal text-ink-2">
+                  {zone === "photo" ? "Off: no photo window, and customers skip the Portrait step." : zone === "message" ? "Off: no message, and customers aren't asked for one." : "Off: not printed. Customers still type it (it's used in the email)."}
+                </span>
+              </span>
+              <input type="checkbox" role="switch" checked={shownOf(zone)} onChange={(e) => setShown(zone, e.target.checked)} className="h-5 w-5 accent-[#DD07C4]" data-testid="zone-show" />
+            </label>
             <div className="mt-2 grid grid-cols-4 gap-2">
               {(["x", "y", "w", "h"] as const).map((f) => (
                 <label key={f} className="text-[12px] font-semibold uppercase">

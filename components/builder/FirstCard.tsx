@@ -10,7 +10,7 @@ import { StickyFooterBar } from "./StepHeader";
 import { useDraft } from "./useDraft";
 import { submitCard } from "./submit";
 import type { BuilderData } from "./types";
-import { usableIdeas } from "@/lib/render/layout";
+import { isShown, usableIdeas } from "@/lib/render/layout";
 import { t } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,8 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
   }, [ready, ideas, ideaIndex, draft.messageTouched, update]);
 
   if (!version) return null;
+  const photoOn = isShown(version.layout.photo);
+  const messageOn = isShown(version.layout.text.message);
   const canCreate = Boolean(draft.to.trim()) && Boolean(draft.from.trim()) && !busy;
   const max = version.messageMaxChars ?? data.maxChars;
 
@@ -81,7 +83,7 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
     setBusy(true);
     setError(null);
     // Created first, sent from the ready screen (4 Nov review).
-    const r = await submitCard({ ...draft, delivery: "self", recipientEmail: "", flow: "first", when: "now", scheduledLocal: "" }, version!.fullSlug);
+    const r = await submitCard({ ...draft, delivery: "self", recipientEmail: "", flow: "first", when: "now", scheduledLocal: "", imageId: isShown(version!.layout.photo) ? draft.imageId : null, message: isShown(version!.layout.text.message) ? draft.message : "" }, version!.fullSlug);
     if (!r.ok) {
       setError(r.message);
       setBusy(false);
@@ -129,9 +131,11 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
         >
           <LayoutGrid className="h-4 w-4 text-magenta" aria-hidden="true" /> {t("builder.changeDesign")}
         </button>
-        <button type="button" onClick={() => setSheet("photo")} className="inline-flex h-11 items-center gap-2 rounded-full border border-line bg-white px-4 text-[15px] font-semibold">
-          <ImageIcon className="h-4 w-4 text-magenta" aria-hidden="true" /> {t("builder.changePhoto")}
-        </button>
+        {photoOn && (
+          <button type="button" onClick={() => setSheet("photo")} className="inline-flex h-11 items-center gap-2 rounded-full border border-line bg-white px-4 text-[15px] font-semibold">
+            <ImageIcon className="h-4 w-4 text-magenta" aria-hidden="true" /> {t("builder.changePhoto")}
+          </button>
+        )}
       </div>
       <p className="mt-2 text-center text-[14px] text-ink-2" aria-live="polite">
         {t(version.inSeason ? "builder.designNoteSeason" : "builder.designNote", { theme: version.themeName, name: version.name })}
@@ -157,33 +161,37 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
             onChange={(e) => update({ to: e.target.value })}
             className="mt-2 h-[52px] w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-4 text-[17px]"
           />
-          <div className="mt-4 flex items-baseline justify-between">
-            <label htmlFor="first-message" className="text-[17px] font-bold">
-              {t("builder.message")}
-            </label>
-            {ideas.length > 1 && (
-              <button
-                type="button"
-                className="text-[15px] font-bold text-pink-link"
-                onClick={() => {
-                  const next = (ideaIndex + 1) % ideas.length;
-                  setIdeaIndex(next);
-                  update({ message: ideas[next], messageTouched: false });
-                  trackClient("card_first_idea_changed", { idea_index: next });
-                }}
-              >
-                {t("builder.tryAnother")}
-              </button>
-            )}
-          </div>
-          <textarea
-            id="first-message"
-            rows={3}
-            value={draft.message}
-            maxLength={max}
-            onChange={(e) => update({ message: e.target.value, messageTouched: true })}
-            className="mt-2 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 py-2.5 text-[16px] leading-snug"
-          />
+          {messageOn && (
+            <>
+            <div className="mt-4 flex items-baseline justify-between">
+              <label htmlFor="first-message" className="text-[17px] font-bold">
+                {t("builder.message")}
+              </label>
+              {ideas.length > 1 && (
+                <button
+                  type="button"
+                  className="text-[15px] font-bold text-pink-link"
+                  onClick={() => {
+                    const next = (ideaIndex + 1) % ideas.length;
+                    setIdeaIndex(next);
+                    update({ message: ideas[next], messageTouched: false });
+                    trackClient("card_first_idea_changed", { idea_index: next });
+                  }}
+                >
+                  {t("builder.tryAnother")}
+                </button>
+              )}
+            </div>
+            <textarea
+              id="first-message"
+              rows={3}
+              value={draft.message}
+              maxLength={max}
+              onChange={(e) => update({ message: e.target.value, messageTouched: true })}
+              className="mt-2 w-full rounded-[12px] border border-black/15 bg-[#F8F6F0] px-3 py-2.5 text-[16px] leading-snug"
+            />
+            </>
+          )}
           <div className="mt-2 text-[14px] text-ink-2">
             {editingFrom ? (
               <span className="flex items-center gap-2">

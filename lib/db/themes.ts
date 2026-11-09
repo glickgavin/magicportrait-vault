@@ -16,6 +16,8 @@ export type VersionRow = {
   sort_order: number;
   background_path: string;
   overlay_path: string | null;
+  /** The design's own placeholder portrait (editor preview, test render, thumbnail); null = built-in. */
+  sample_portrait_path: string | null;
   thumbnail_path: string | null;
   layout: unknown;
   message_ideas: string[];

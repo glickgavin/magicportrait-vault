@@ -14,6 +14,7 @@ import { renderCardJpeg } from "@/lib/render/render";
 import { track } from "@/lib/track";
 import { emailSchema } from "@/lib/auth/schemas";
 import { underDailySendLimit } from "./send-now";
+import { isShown } from "@/lib/render/layout";
 import { maskEmail } from "@/lib/utils";
 
 export const ENTRY_POINTS = ["order_email", "thankyou_popup", "reminder_email", "site_menu", "home", "my_cards", "my_portraits", "order_page", "make_another", "use_again"] as const;
@@ -23,7 +24,8 @@ const name = z.string().trim().min(1).max(60).regex(/^[^<>{}]*$/);
 export const createCardSchema = z
   .object({
     versionId: z.string().uuid(),
-    imageId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    // Optional only for designs without a photo (checked against the version below).
+    imageId: z.string().regex(/^[0-9a-f-]{36}$/i).optional().nullable(),
     crop: z.object({ zoom: z.number().min(1).max(4), x: z.number().min(-1).max(1), y: z.number().min(-1).max(1) }).default({ zoom: 1, x: 0, y: 0 }),
     to: name,
     from: name,
@@ -105,10 +107,13 @@ export async function createCard(email: string, raw: unknown): Promise<{ card: C
   const version = catalog.versions.find((v) => v.id === input.versionId);
   if (!version) throw new CardError("bad_version");
 
-  // The portrait must be one of the signed-in person's own portraits.
-  const session = profile.sessions.find((g) => g.portraits.some((p) => p.imageId === input.imageId));
+  // The portrait must be one of the signed-in person's own portraits, unless the design has no photo.
+  const photoOn = isShown(version.layout.photo);
+  const session = photoOn ? profile.sessions.find((g) => g.portraits.some((p) => p.imageId === input.imageId)) : undefined;
   const portrait = session?.portraits.find((p) => p.imageId === input.imageId);
-  if (!session || !portrait) throw new CardError("bad_portrait", 404);
+  if (photoOn && (!session || !portrait)) throw new CardError("bad_portrait", 404);
+  // A design without a message line stores none.
+  if (!isShown(version.layout.text.message)) input.message = "";
 
   const max = version.messageMaxChars ?? s["cards.message_max_chars"];
   if (input.message.length > max) throw new CardError("too_long", 400, { max });
@@ -128,7 +133,7 @@ export async function createCard(email: string, raw: unknown): Promise<{ card: C
     if (sup.data?.length) throw new CardError("suppressed", 409);
   }
 
-  const portraitPath = await copyPortrait(email, portrait.imageId, portrait.imageUrl, s["redeem.allowed_image_hosts"]);
+  const portraitPath = portrait ? await copyPortrait(email, portrait.imageId, portrait.imageUrl, s["redeem.allowed_image_hosts"]) : null;
   const existing = await countCardsBySender(email);
   const offer = (await db().from("gift_offers").select("id").eq("email", email).order("created_at", { ascending: false }).limit(1)).data?.[0] as { id: string } | undefined;
 
@@ -146,8 +151,8 @@ export async function createCard(email: string, raw: unknown): Promise<{ card: C
         message: input.message,
         theme_id: version.themeId,
         version_id: version.id,
-        imagen_session_id: session.sessionId,
-        imagen_image_id: portrait.imageId,
+        imagen_session_id: session?.sessionId ?? null,
+        imagen_image_id: portrait?.imageId ?? null,
         portrait_path: portraitPath,
         crop: input.crop,
         delivery: input.delivery,
