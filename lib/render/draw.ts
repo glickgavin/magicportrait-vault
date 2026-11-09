@@ -3,7 +3,7 @@
  * preview (HTML canvas), so what you see is what you get.
  */
 import { weightFor } from "./fonts";
-import { fill, fitText, fittedPhoto, photoSourceRect, placeLines, shapePath, tracePath, type Crop, type FontName, type Layout, type Measure } from "./layout";
+import { fill, fitText, fittedPhoto, isShown, photoSourceRect, placeLines, shapePath, tracePath, type Crop, type FontName, type Layout, type Measure } from "./layout";
 
 export type DrawImage = { width: number; height: number };
 
@@ -73,8 +73,9 @@ export function drawLayers(ctx: Ctx, input: DrawInput, family: (f: FontName) => 
 
   // The photo window follows the portrait's own shape ("adapt"), or stays as designed ("cover").
   const p = fittedPhoto(layout.photo, input.portrait?.width, input.portrait?.height);
+  const photoOn = isShown(layout.photo);
   const frameW = p.frame?.width ?? 0;
-  if (p.frame && frameW > 0) {
+  if (photoOn && p.frame && frameW > 0) {
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.18)";
     ctx.shadowBlur = 40;
@@ -84,18 +85,20 @@ export function drawLayers(ctx: Ctx, input: DrawInput, family: (f: FontName) => 
     ctx.fill();
     ctx.restore();
   }
-  ctx.save();
-  tracePath(ctx, shapePath(p, frameW));
-  ctx.clip();
-  ctx.fillStyle = input.photoBg ?? "#E8E2D8";
-  ctx.fillRect(p.x, p.y, p.w, p.h);
-  if (input.portrait) {
-    const zw = p.w - frameW * 2;
-    const zh = p.h - frameW * 2;
-    const s = photoSourceRect(input.portrait.width, input.portrait.height, zw, zh, input.crop);
-    ctx.drawImage(input.portrait, s.sx, s.sy, s.sw, s.sh, p.x + frameW, p.y + frameW, zw, zh);
+  if (photoOn) {
+    ctx.save();
+    tracePath(ctx, shapePath(p, frameW));
+    ctx.clip();
+    ctx.fillStyle = input.photoBg ?? "#E8E2D8";
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    if (input.portrait) {
+      const zw = p.w - frameW * 2;
+      const zh = p.h - frameW * 2;
+      const s = photoSourceRect(input.portrait.width, input.portrait.height, zw, zh, input.crop);
+      ctx.drawImage(input.portrait, s.sx, s.sy, s.sw, s.sh, p.x + frameW, p.y + frameW, zw, zh);
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   const measure = measurer(ctx, family);
   const texts: [keyof Layout["text"], string][] = [
@@ -105,6 +108,7 @@ export function drawLayers(ctx: Ctx, input: DrawInput, family: (f: FontName) => 
   ];
   for (const [key, value] of texts) {
     const zone = layout.text[key];
+    if (!isShown(zone)) continue;
     const fit = fitText(value, zone, measure);
     ctx.fillStyle = zone.color;
     ctx.textAlign = zone.align;

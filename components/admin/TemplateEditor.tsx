@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { CardPreview } from "@/components/CardPreview";
-import { type Layout, type TextZone } from "@/lib/render/layout";
+import { isShown, type Layout, type TextZone } from "@/lib/render/layout";
 import { FONT_DEFS, fontDef, weightFor } from "@/lib/render/fonts";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +49,10 @@ export function TemplateEditor(p: Props) {
     const c = { x: Math.round(Math.max(0, Math.min(W - 20, r.x))), y: Math.round(Math.max(0, Math.min(H - 20, r.y))), w: Math.round(Math.max(40, Math.min(W, r.w))), h: Math.round(Math.max(30, Math.min(H, r.h))) };
     setLayout((l) => (k === "photo" ? { ...l, photo: { ...l.photo, ...c } } : { ...l, text: { ...l.text, [k]: { ...l.text[k], ...c } } }));
   };
+  /** Whether a zone is printed on this design (photo, to, message, from). */
+  const shownOf = (k: ZoneKey) => isShown(k === "photo" ? layout.photo : layout.text[k]);
+  const setShown = (k: ZoneKey, show: boolean) =>
+    setLayout((l) => (k === "photo" ? { ...l, photo: { ...l.photo, show } } : { ...l, text: { ...l.text, [k]: { ...l.text[k], show } } }));
   const setText = (k: "to" | "message" | "from", patch: Partial<TextZone>) => setLayout((l) => ({ ...l, text: { ...l.text, [k]: { ...l.text[k], ...patch } } }));
 
   function onPointerDown(e: React.PointerEvent, key: ZoneKey, mode: "move" | "resize") {
@@ -248,11 +252,14 @@ export function TemplateEditor(p: Props) {
                       setRect(k, { ...r, x: r.x + m[e.key][0], y: r.y + m[e.key][1] });
                     }
                   }}
-                  className={cn("absolute cursor-move border-2 border-dashed", zone === k ? "border-magenta bg-magenta/10" : "border-magenta/50")}
+                  className={cn("absolute cursor-move border-2 border-dashed", !shownOf(k) ? "border-black/30 bg-black/[0.04]" : zone === k ? "border-magenta bg-magenta/10" : "border-magenta/50")}
                   style={{ left: pct(r.x, W), top: pct(r.y, H), width: pct(r.w, W), height: pct(r.h, H) }}
                   data-testid={`zone-${k}`}
                 >
-                  <span className="absolute -top-5 left-0 rounded bg-magenta px-1.5 text-[11px] font-bold text-white">{k === "photo" ? "Maximum photo area" : k}</span>
+                  <span className={cn("absolute -top-5 left-0 rounded px-1.5 text-[11px] font-bold text-white", shownOf(k) ? "bg-magenta" : "bg-black/50")}>
+                    {k === "photo" ? "Maximum photo area" : k}
+                    {!shownOf(k) && " (hidden)"}
+                  </span>
                   <span onPointerDown={(e) => onPointerDown(e, k, "resize")} className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize border-2 border-magenta bg-white" aria-hidden="true" />
                 </div>
               );
@@ -328,11 +335,20 @@ export function TemplateEditor(p: Props) {
             <h2 className="text-[17px] font-extrabold">Zones</h2>
             <div role="radiogroup" aria-label="Zone to edit" className="mt-2 flex flex-wrap gap-1">
               {zones.map((k) => (
-                <button key={k} type="button" role="radio" aria-checked={zone === k} onClick={() => setZone(k)} className={cn("rounded-[8px] px-2.5 py-1 text-[13px] font-semibold", zone === k ? "bg-[#2b2b2b] text-white" : "bg-black/[0.05]")}>
+                <button key={k} type="button" role="radio" aria-checked={zone === k} onClick={() => setZone(k)} className={cn("rounded-[8px] px-2.5 py-1 text-[13px] font-semibold", zone === k ? "bg-[#2b2b2b] text-white" : "bg-black/[0.05]", !shownOf(k) && "line-through opacity-60")}>
                   {k === "photo" ? "Photo" : k}
                 </button>
               ))}
             </div>
+            <label className="mt-2 flex min-h-[44px] items-center justify-between gap-3 rounded-[10px] bg-black/[0.04] px-3 text-[14px] font-semibold">
+              <span>
+                Show {zone === "photo" ? "the photo" : `“${zone}”`} on this design
+                <span className="block text-[12px] font-normal text-ink-2">
+                  {zone === "photo" ? "Off: no photo window, and customers skip the Portrait step." : zone === "message" ? "Off: no message, and customers aren't asked for one." : "Off: not printed. Customers still type it (it's used in the email)."}
+                </span>
+              </span>
+              <input type="checkbox" role="switch" checked={shownOf(zone)} onChange={(e) => setShown(zone, e.target.checked)} className="h-5 w-5 accent-[#DD07C4]" data-testid="zone-show" />
+            </label>
             <div className="mt-2 grid grid-cols-4 gap-2">
               {(["x", "y", "w", "h"] as const).map((f) => (
                 <label key={f} className="text-[12px] font-semibold uppercase">

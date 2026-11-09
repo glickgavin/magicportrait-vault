@@ -290,6 +290,7 @@ export const en = {
     livePreview: "Live preview",
     to: "To",
     toPlaceholder: "Name",
+    notPrinted: "(not printed on this design)",
     fromPlaceholder: "Your name",
     from: "From",
     message: "Message",

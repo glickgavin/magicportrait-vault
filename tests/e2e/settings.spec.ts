@@ -130,6 +130,13 @@ test.describe("settings (super users)", () => {
     // Centre the "to" zone horizontally.
     await page.getByTestId("zone-to").click();
     await page.getByTestId("centre-zone").click();
+    // Show / hide: hide the "from" line, then show it again.
+    await page.getByTestId("zone-from").click();
+    await page.getByTestId("zone-show").uncheck();
+    await expect(page.getByTestId("zone-from")).toContainText("(hidden)");
+    await page.getByTestId("zone-show").check();
+    await expect(page.getByTestId("zone-from")).not.toContainText("(hidden)");
+    await page.getByTestId("zone-to").click();
     // A Google Font for the "to" line: the preview loads it.
     await page.getByTestId("zone-font").selectOption("Great Vibes");
     await expect.poll(() => page.evaluate(() => document.fonts.check('40px "Great Vibes"')), { timeout: 10_000 }).toBe(true);

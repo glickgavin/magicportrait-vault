@@ -188,6 +188,8 @@ From Gavin and Gideon's walk-through (`review-fixes-2026-11-04.md`), reviewed ag
 
 ## Decisions
 
+- **Show / hide per item (9 Nov, requested by Gavin):** `show` on `layout.photo` and each text zone, switched in the template editor ("Show … on this design"; hidden boxes stay editable, greyed and labelled "(hidden)"). Not drawn when off (shared draw routine). Builder: no photo → the Portrait step is skipped and the card has no portrait (`imageId` optional on the server only for such designs); no message → no message box, stored empty; hidden To/From are still asked ("not printed on this design") because the email and My cards use them.
+
 - **Placeholder image per design (9 Nov, requested by Gavin):** `theme_versions.sample_portrait_path` (migration `20261109000002_version_placeholder.sql`). The template editor can upload (JPEG/PNG/WebP, stored as a ≤1200 px JPEG) and remove it; when set it's the default sample in the editor preview ("Your placeholder"), the test render and the published thumbnail. None, or a missing file: the built-in square sample. Customers' cards always use their own portrait.
 
 - **Card fonts (9 Nov, requested by Gavin):** 12 Google Fonts added next to the two brand fonts, listed once in `lib/render/fonts.ts` and fetched from Fontsource (`scripts/fetch-card-fonts.mjs`, latin `.woff2`, 652 KB with licences) into `public/fonts/card/`. The server renderer registers the same files the browser preview loads (on demand, only the fonts a design uses). The template editor's font menu is grouped (Serif / Sans / Script & handwriting) with a Weight choice. Also: **Remove overlay** button in the editor, and the test stack's `cards.email_sends_per_day` is high (seed.test.sql), like its other rate limits.

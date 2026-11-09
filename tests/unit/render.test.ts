@@ -137,6 +137,33 @@ describe("card fonts", () => {
   });
 });
 
+describe("show / hide per zone", () => {
+  it("a hidden photo draws no window or frame, and hidden lines draw no text", async () => {
+    const base = parseLayout(defaultLayout(SEED_THEMES[0].versions[0].look));
+    const W = base.canvas.w;
+    const H = base.canvas.h;
+    const plain = await sharp({ create: { width: W, height: H, channels: 3, background: { r: 20, g: 20, b: 20 } } }).png().toBuffer();
+    const at = (c: Awaited<ReturnType<typeof drawCard>>, x: number, y: number) => [...c.getContext("2d").getImageData(Math.round(x), Math.round(y), 1, 1).data].slice(0, 3);
+    const render = (layout: Layout) => drawCard({ layout, background: plain, portrait, to: "WWWWWWWWWWWW", from: "Sam", message: "Hi", size: { w: W, h: H } });
+    const shown = await render(base);
+    const hidden = await render({ ...base, photo: { ...base.photo, show: false }, text: { ...base.text, to: { ...base.text.to, show: false } } });
+    const px = base.photo.x + base.photo.w / 2;
+    const py = base.photo.y + base.photo.h / 2;
+    expect(at(shown, px, py)).not.toEqual([20, 20, 20]);
+    expect(at(hidden, px, py)).toEqual([20, 20, 20]);
+    // Count non-background pixels in the "to" line.
+    const inked = (c: Awaited<ReturnType<typeof drawCard>>) => {
+      const z = base.text.to;
+      const d = c.getContext("2d").getImageData(Math.round(z.x), Math.round(z.y), Math.round(z.w), Math.round(z.size * 1.25)).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - 20) + Math.abs(d[i + 1] - 20) + Math.abs(d[i + 2] - 20) > 60) n++;
+      return n;
+    };
+    expect(inked(shown)).toBeGreaterThan(100);
+    expect(inked(hidden)).toBe(0);
+  });
+});
+
 describe("layer order", () => {
   it("the overlay is the top layer: it covers the text where it's opaque", async () => {
     const layout = parseLayout(defaultLayout(SEED_THEMES[0].versions[0].look));

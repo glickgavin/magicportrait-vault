@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
+import { isShown } from "@/lib/render/layout";
 import { Button } from "@/components/ui/Button";
 import { StepHeader, StickyFooterBar } from "./StepHeader";
 import { useDraft } from "./useDraft";
@@ -97,7 +98,7 @@ export function ThemeStep({ data, category, entryPoint }: { data: BuilderData; c
       )}
 
       <StickyFooterBar label={t("builder.selected")} value={selected ? `${selected.themeName} · ${selected.name}` : t("builder.nothingSelected")}>
-        <Button size="lg" disabled={!selected} onClick={() => router.push(`/create/portrait?v=${selected!.id}`)} data-testid="next">
+        <Button size="lg" disabled={!selected} onClick={() => router.push(isShown(selected!.layout.photo) ? `/create/portrait?v=${selected!.id}` : `/create/message?v=${selected!.id}`)} data-testid="next">
           {t("builder.next")}
         </Button>
       </StickyFooterBar>

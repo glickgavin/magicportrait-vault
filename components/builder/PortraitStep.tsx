@@ -8,6 +8,7 @@ import { CardPreview } from "@/components/CardPreview";
 import { StepHeader, StickyFooterBar } from "./StepHeader";
 import { useDraft } from "./useDraft";
 import type { BuilderData } from "./types";
+import { isShown } from "@/lib/render/layout";
 import { t } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,8 @@ export function PortraitStep({ data, versionId, imageId }: { data: BuilderData; 
   }, []);
   useEffect(() => {
     if (ready && !version) router.replace("/create?step=theme");
+    // A design without a photo has no Portrait step.
+    else if (ready && version && !isShown(version.layout.photo)) router.replace(`/create/message?v=${version.id}`);
   }, [ready, version, router]);
   if (!version) return null;
 
