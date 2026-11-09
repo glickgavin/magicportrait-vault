@@ -97,8 +97,6 @@ export function drawLayers(ctx: Ctx, input: DrawInput, family: (f: FontName) => 
   }
   ctx.restore();
 
-  if (input.overlay) ctx.drawImage(input.overlay, 0, 0, W, H);
-
   const measure = measurer(ctx, family);
   const texts: [keyof Layout["text"], string][] = [
     ["to", fill(layout.text.to.template, input.to, "to")],
@@ -125,4 +123,8 @@ export function drawLayers(ctx: Ctx, input: DrawInput, family: (f: FontName) => 
     ctx.fillText(input.footerText.toUpperCase(), W / 2, layout.footer.y);
     ctx.restore();
   }
+
+  // The overlay is always the top layer, above the portrait, frame and text (its transparent areas
+  // let everything below show through).
+  if (input.overlay) ctx.drawImage(input.overlay, 0, 0, W, H);
 }

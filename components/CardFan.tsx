@@ -28,7 +28,7 @@ export function CardFan() {
               to={t("signin.sampleTo")}
               from={t("signin.sampleFrom")}
               message={t("signin.sampleMessage")}
-              footerText="Made with Magic Portraits AI"
+              footerText=""
               label=""
               maxWidth={140}
             />

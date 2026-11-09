@@ -110,6 +110,14 @@ test.describe("settings (super users)", () => {
     await expect(page.getByTestId("editor-message")).toContainText("Background checked and saved");
     await page.getByTestId("upload-overlay").setInputFiles(ovFile);
     await expect(page.getByTestId("editor-message")).toContainText("Overlay checked and saved");
+    // Preview hides every box; Edit brings them back.
+    await page.getByTestId("mode-preview").click();
+    await expect(page.getByTestId("zone-photo")).toHaveCount(0);
+    await page.getByTestId("mode-edit").click();
+    await expect(page.getByTestId("zone-photo")).toBeVisible();
+    // Centre the "to" zone horizontally.
+    await page.getByTestId("zone-to").click();
+    await page.getByTestId("centre-zone").click();
     // drag the photo zone a little
     const z = await page.getByTestId("zone-photo").boundingBox();
     await page.mouse.move(z!.x + 20, z!.y + 20);
@@ -123,6 +131,8 @@ test.describe("settings (super users)", () => {
     expect(v.data!.thumbnail_path).toMatch(/^congratulations\/confetti\/thumb-/);
     expect(v.data!.background_path).toMatch(/background-\d+\.jpg$/);
     expect((v.data!.layout as { photo: { x: number } }).photo.x).not.toBe(270);
+    const to = (v.data!.layout as { canvas: { w: number }; text: { to: { x: number; w: number } } });
+    expect(Math.abs(to.text.to.x + to.text.to.w / 2 - to.canvas.w / 2)).toBeLessThanOrEqual(1);
     // A customer with cards sees it in step 1
     await page.context().clearCookies();
     await insertCard("rose@example.com");

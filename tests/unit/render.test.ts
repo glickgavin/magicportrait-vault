@@ -109,6 +109,26 @@ describe("photo window follows the image (photo.fit)", () => {
   });
 });
 
+describe("layer order", () => {
+  it("the overlay is the top layer: it covers the text where it's opaque", async () => {
+    const layout = parseLayout(defaultLayout(SEED_THEMES[0].versions[0].look));
+    const z = layout.text.to;
+    const W = layout.canvas.w;
+    const H = layout.canvas.h;
+    // Transparent overlay with one opaque blue block over the "To" line.
+    const overlay = await sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: { create: { width: z.w, height: Math.round(z.size * 1.3), channels: 4, background: { r: 25, g: 144, b: 198, alpha: 1 } } }, left: Math.round(z.x), top: Math.round(z.y) }])
+      .png()
+      .toBuffer();
+    const canvas = await drawCard({ layout, background: null, overlay, portrait, to: "WWWWWWWW", from: "Sam", message: "Hi", size: { w: W, h: H } });
+    const px = canvas.getContext("2d").getImageData(Math.round(z.x + z.w / 2), Math.round(z.y + z.size * 0.6), 1, 1).data;
+    expect([px[0], px[1], px[2]]).toEqual([25, 144, 198]);
+    // ...and its transparent areas let the card show through (the photo zone isn't blue).
+    const p2 = canvas.getContext("2d").getImageData(Math.round(layout.photo.x + layout.photo.w / 2), Math.round(layout.photo.y + layout.photo.h / 2), 1, 1).data;
+    expect([p2[0], p2[1], p2[2]]).not.toEqual([25, 144, 198]);
+  });
+});
+
 describe("text fitting", () => {
   registerFonts();
   const ctx = createCanvas(10, 10).getContext("2d") as unknown as Ctx;

@@ -204,7 +204,7 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 - `message.valign` is `top` (default) or `middle`; `middle` centres the wrapped lines vertically in the `h` box.
 - `photo.frame` is drawn **inside** the photo box, over the portrait's edge; `width: 0` means no frame (the background art supplies it).
 - **`photo.fit`** (4 Nov review): `"adapt"` or `"cover"`. With `"adapt"`, `photo` (x, y, w, h) is the **maximum photo area**: the portrait is fitted inside it at its own aspect ratio, centred, with no crop, and the frame and shape follow the fitted box (`rect`/`rounded` shrink to it, `arch` keeps its semicircular top across the fitted width, `circle` stays a cover-cropped circle). With `"cover"`, the box stays as designed and the portrait is cover-cropped into it (the old behaviour). When `fit` is missing it is `"cover"` if `frame.width` is 0 (the art draws the frame, so the window must line up with it) and `"adapt"` otherwise. The fitting lives in `lib/render/layout.ts` (`fittedPhoto`), shared by the preview and the server render; both read the portrait's size from the loaded image. The template editor labels the zone "Maximum photo area" and previews and test-renders with a square or a 3:4 sample.
-- Layer order: background, portrait (clipped to `shape`), frame, overlay, text.
+- Layer order: background, frame, portrait (clipped to `shape`), text, optional footer line (`cards.footer_text`, empty by default since 9 Nov), then the **overlay on top of everything** (its transparent areas show what is below).
 
 ## Seed data
 
