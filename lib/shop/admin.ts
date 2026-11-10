@@ -79,6 +79,22 @@ export async function shopOverview(): Promise<ShopOverview> {
   }
 }
 
+export const SHOP_SCOPES = ["read_products", "write_products", "read_discounts", "read_customers"] as const;
+
+/** What the shop needs from Shopify, and what this environment has (Settings › Shop › Shopify access). */
+export async function shopAccess(): Promise<{ scopes: { scope: string; ok: boolean }[] | null; storefront: boolean; fulfilmentSecret: boolean }> {
+  const { env } = await import("@/lib/env");
+  let scopes: { scope: string; ok: boolean }[] | null = null;
+  try {
+    const { getSources } = await import("@/lib/sources");
+    const have = (await (await getSources()).shopify.ping()).scopes;
+    scopes = SHOP_SCOPES.map((scope) => ({ scope, ok: have.includes(scope) || (scope.startsWith("read_") && have.includes(scope.replace("read_", "write_"))) }));
+  } catch {
+    scopes = null;
+  }
+  return { scopes, storefront: env.dataSource === "fixtures" || Boolean(env.optional("SHOPIFY_STOREFRONT_TOKEN") || env.optional("SHOPIFY_STOREFRONT_PRIVATE_TOKEN")), fulfilmentSecret: Boolean(env.optional("SHOP_FULFILMENT_SECRET")) };
+}
+
 export type AdminResult = { ok: true } | { ok: false; status: number; error: string };
 
 /** Sets one product's page and/or occasions in Shopify. The product must be in the Store collection. */

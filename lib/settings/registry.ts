@@ -69,6 +69,8 @@ const shopifyId = (section: Section, d: string, m: Meta): SettingDef<string> => 
 const date = (section: Section, d: string, m: Meta): SettingDef<string> => ({ type: "date", section, default: d, schema: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ...m });
 const json = <T>(section: Section, d: T, schema: z.ZodType<T>, m: Meta): SettingDef<T> => ({ type: "json", section, default: d, schema, ...m });
 
+export type PromoBarSetting = { id: string; on: boolean; text: string; link_label: string; link_url: string; audience: "everyone" | "normal" | "vip"; starts: string; ends: string; style: "tint" | "gradient"; closable: boolean };
+
 const httpUrl = () => z.string().max(2000).regex(/^https:\/\/[^\s]+$/, "Must be an https:// link");
 const numericId = z.string().regex(/^\d{6,20}$/);
 const host = z.string().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i);
@@ -271,9 +273,33 @@ export const REGISTRY = {
   "shop.mirror_images_limit": num("shop", 200, { label: "Most past photos read per person", min: 10, max: 2000 }),
   "shop.template_image_hosts": list("shop", ["cdn.shopify.com"], { label: "Template photo hosts", description: "Where blank product photos and overlays may be loaded from (the product's own Shopify media).", item: host, max: 10 }),
   "shop.preview_width_px": num("shop", 800, { label: "Preview image width (px)", min: 200, max: 2400 }),
+  "shop.currency": text("shop", "USD", { label: "Shop currency (ISO code)", description: "How prices are written on the shop's pages; the cart and checkout use Shopify's own figures.", pattern: /^[A-Z]{3}$/ }),
+  "shop.customer_type_cache_minutes": num("shop", 10, { label: "VIP check cache (minutes)", min: 0, max: 1440 }),
+  "shop.cart_rate_limit_per_hour": num("shop", 120, { label: "Cart changes per person per hour", min: 1, max: 1000000 }),
+  "shop.checkout_rate_limit_per_hour": num("shop", 20, { label: "Checkouts started per person per hour", min: 1, max: 1000000 }),
+  "shop.change_strip_count": num("shop", 12, { label: "Pictures in the Change picture strip", min: 3, max: 48 }),
   "shop.storefront_api_version": text("shop", "2025-07", { label: "Shopify Storefront API version", pattern: /^\d{4}-\d{2}$/ }),
 
   // ---------- site: the whole of My Magic Portraits ----------
+  "site.promo_bars": json(
+    "site",
+    [] as PromoBarSetting[],
+    z.array(
+      z.object({
+        id: z.string().regex(/^[a-z0-9-]{1,40}$/),
+        on: z.boolean(),
+        text: z.string().min(1).max(200),
+        link_label: z.string().max(40).default(""),
+        link_url: z.string().max(300).regex(/^(\/[^\s]*|https:\/\/[^\s]+)$/, "A path like /gifts or an https:// link").or(z.literal("")).default(""),
+        audience: z.enum(["everyone", "normal", "vip"]).default("everyone"),
+        starts: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).default(""),
+        ends: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).default(""),
+        style: z.enum(["tint", "gradient"]).default("tint"),
+        closable: z.boolean().default(true),
+      }),
+    ).max(10) as unknown as z.ZodType<PromoBarSetting[]>,
+    { label: "Promotion bars", description: "Shown above the header while the shop is visible. One for everyone, or one for normal customers and one for VIPs. Dates are business-time days (inclusive). The text is cut at site.promo_bar_max_chars." },
+  ),
   "site.promo_bar_max_chars": num("site", 90, { label: "Promotion bar max characters", min: 20, max: 200 }),
 } as const;
 

@@ -1211,3 +1211,18 @@ On a data-deletion request, call `POST https://a.klaviyo.com/api/data-privacy-de
 
 **Still UNVERIFIED**
 - The revision date to pin: the live site uses `2024-02-15` (server) and `2024-10-15` (client). Test the newest stable revision in Part 0 and save it in `klaviyo.api_revision`.
+
+
+## 11. Source 6: the shop's Shopify reads and writes (`docs/shop.md`)
+
+All behind `lib/shop/sources/` (fixtures + live), separate from `lib/sources/`, so /redeem is unaffected.
+
+**Admin GraphQL** (the r_orders app, same token as §5): the Store collection (`collection(id) { products(sortKey: COLLECTION_DEFAULT) { … metafield(namespace: "mmp_shop", key: …) variants { metafields(namespace: "mmp_shop") } } }`), `metafieldDefinitions(ownerType: PRODUCT | PRODUCTVARIANT, namespace: "mmp_shop")`, `codeDiscountNodeByCode(code)`, `customers(query: "email:…") { tags }`. Writes (CLAUDE.md allowed write 5): `metafieldsSet` / `metafieldsDelete` on `mmp_shop.page`, `mmp_shop.occasions`, `mmp_shop.template`; `metafieldDefinitionUpdate` (occasion choices); `metafieldDefinitionCreate` (missing `mmp_shop` definitions). Needs `read_products`, `read_discounts`, `read_customers`, `write_products`. The read queries were run against the live store on 10 Nov 2026.
+
+**Storefront GraphQL** (allowed write 4), `https://{SHOPIFY_STORE_DOMAIN}/api/{shop.storefront_api_version}/graphql.json` with `SHOPIFY_STOREFRONT_TOKEN` (public, header `X-Shopify-Storefront-Access-Token`) or `SHOPIFY_STOREFRONT_PRIVATE_TOKEN` (header `Shopify-Storefront-Private-Token`), server only: `cartCreate` (lines with attributes, `buyerIdentity.email`, `discountCodes`, cart attributes), `cart(id)`, `cartLinesAdd`, `cartLinesUpdate`, `cartLinesRemove`, `cartDiscountCodesUpdate`, `cartAttributesUpdate`. Every shop product must be published to the token's sales channel. Our cart is kept in step by `_vault_line_id`; prices on the cart page are the Storefront cart's `cost` figures.
+
+**orders/paid** (§5.6, the existing webhook): after the gift-offer handling, `note_attributes` `_source` = `shop` and `_vault_cart_id` mark that cart paid (`shop_order_paid`). A failure there never changes the webhook's reply.
+
+**Fulfilment's fresh links:** `POST /api/shop/fulfilment/image` with `{ "line_id": "<_vault_line_id>" }` and header `x-shop-signature: hex(HMAC-SHA256(SHOP_FULFILMENT_SECRET, line_id))` returns `{ image_url, preview_url, valid_days }` (signed links for new uploads and previews; public pictures as they are). 404 when `SHOP_FULFILMENT_SECRET` isn't set.
+
+**Events mirror** (read-only, `vault_reader`): past portrait uploads (`shop.mirror_upload_event` / `shop.mirror_upload_property`, default `funnel_portrait_generated` / `original_image_url`) and dropped photo tiles (`shop.mirror_tile_event`, default `tile_dropped` with `tile_type` = `photo`), by `email = any($1)` as in §2.4.

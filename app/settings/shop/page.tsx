@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireSuperUser } from "@/lib/auth/session";
 import { settingRows } from "@/lib/admin/data";
 import { env } from "@/lib/env";
-import { shopOverview } from "@/lib/shop/admin";
+import { shopAccess, shopOverview } from "@/lib/shop/admin";
 import { HIDDEN_REASON_TEXT } from "@/lib/shop/catalog";
 import { SettingField } from "@/components/admin/SettingField";
 import { CreateFieldsButton, OccasionsEditor, ProductFieldsEditor } from "@/components/admin/shop/ShopEditors";
@@ -29,7 +29,7 @@ function discountLine(info: DiscountInfo | null, code: string | null, collection
 
 export default async function ShopSettings() {
   await requireSuperUser();
-  const [rows, overview] = await Promise.all([settingRows(), shopOverview()]);
+  const [rows, overview, access] = await Promise.all([settingRows(), shopOverview(), shopAccess()]);
   const pick = (keys: string[]) => keys.map((k) => rows.find((r) => r.key === k)!).filter(Boolean);
   const domain = env.optional("SHOPIFY_STORE_DOMAIN");
   const adminUrl = (legacyId: string) => (domain ? `https://${domain}/admin/products/${legacyId}` : null);
@@ -173,6 +173,49 @@ export default async function ShopSettings() {
               </div>
             </section>
           )}
+
+          <section className={CARD} aria-labelledby="shop-access">
+            <h2 id="shop-access" className="text-[19px] font-extrabold">
+              Shopify access
+            </h2>
+            <ul className="mt-2 flex flex-col gap-1.5 text-[14px]">
+              {access.scopes ? (
+                access.scopes.map((s) => (
+                  <li key={s.scope} className="flex items-center gap-2">
+                    <Badge tone={s.ok ? "green" : "red"}>{s.ok ? "OK" : "MISSING"}</Badge>
+                    <code>{s.scope}</code>
+                  </li>
+                ))
+              ) : (
+                <li className="text-ink-2">Couldn&apos;t read the app&apos;s permissions from Shopify.</li>
+              )}
+              <li className="flex items-center gap-2">
+                <Badge tone={access.storefront ? "green" : "red"}>{access.storefront ? "OK" : "MISSING"}</Badge>
+                Storefront token for carts (<code>SHOPIFY_STOREFRONT_TOKEN</code>)
+              </li>
+              <li className="flex items-center gap-2">
+                <Badge tone={access.fulfilmentSecret ? "green" : "amber"}>{access.fulfilmentSecret ? "OK" : "NOT SET"}</Badge>
+                Fresh links for the fulfilment side (<code>SHOP_FULFILMENT_SECRET</code>)
+              </li>
+            </ul>
+          </section>
+
+          <section className={CARD} aria-labelledby="shop-promo">
+            <h2 id="shop-promo" className="text-[19px] font-extrabold">
+              Promotion bar
+            </h2>
+            <p className="mt-1 text-[14px] text-ink-2">
+              Shown above the header on every page while the shop is visible. A list of bars: each has <code>id</code>, <code>on</code>, <code>text</code>, <code>link_label</code>, <code>link_url</code> (e.g. /gifts), <code>audience</code> (everyone, normal or vip), <code>starts</code> and <code>ends</code> (YYYY-MM-DD, business time), <code>style</code> (tint or gradient) and <code>closable</code>.
+            </p>
+            <div className="mt-3 flex flex-col gap-3">
+              {pick(["site.promo_bars", "site.promo_bar_max_chars"]).map((r) => (
+                <div key={r.key} className="flex flex-col gap-1 rounded-[14px] bg-black/[0.03] p-3">
+                  <p className="text-[14px] font-semibold">{r.label}</p>
+                  <SettingField row={r} compact />
+                </div>
+              ))}
+            </div>
+          </section>
 
           <section className={CARD} aria-labelledby="shop-discounts">
             <h2 id="shop-discounts" className="text-[19px] font-extrabold">

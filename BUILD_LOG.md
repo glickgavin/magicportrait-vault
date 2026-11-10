@@ -326,9 +326,9 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 | Shop 1 | Switches, settings, tables, Store collection reader, Settings › Shop | done (see Not run) |
 | Shop 2 | Images and fit | done (see Not run) |
 | Shop 3 | Templates and previews | done (see Not run) |
-| Shop 4 | Customer screens | not started |
-| Shop 5 | Cart and checkout | not started |
-| Shop 6 | Tracking and docs | not started |
+| Shop 4 | Customer screens | done (see Not run) |
+| Shop 5 | Cart and checkout | done (see Not run) |
+| Shop 6 | Tracking and docs | done, except the PostHog funnel (see below) |
 
 ## Shop 1
 - **Hidden by default.** `shop.enabled` (customers) and `shop.super_user_preview` (super users) are launch switches, both off. `lib/shop/access.ts` decides; `lib/shop/index.ts` › `shopUserOrNull()` is what shop routes will call before anything else.
@@ -355,6 +355,26 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 - **Template editor** (`/settings/shop/template/<product id>`, linked from each product in Settings › Shop): pick the blank photo and an optional overlay from the product's Shopify photos; flat or mug zone; drag the handles (or move them with the arrow keys, Shift for bigger steps); mask, corner size and shading; test renders with square, 3:4 and landscape sample pictures for any size that has rules; the shape warning; the draft kept in the browser; Publish writes `mmp_shop.template` (allowed write 5) and refuses photos that aren't the product's own. Event `admin_shop_template_published`. Tried in Chromium through a stand-alone harness (keyboard, drag, test renders, warning, draft restore; no console errors); not yet inside the app, which needs the local database.
 - **Fixtures:** made-up blank product photos (`scripts/gen-shop-fixtures.ts` → `public/fixtures/shop/`) and their templates (`lib/shop/fixture-scenes.ts`).
 
+## Shop 4
+- **Screens** (`components/shop/`, routes in `docs/shop.md` › Routes): the Gifts and Products pages (chips by occasion or product type, "Start with a picture", sections with the customer's price); Choose a picture (Portraits, My photos with ORDERED / PHOTO TILE / SMALL labels, Upload with progress and every refusal in plain words); Product ideas (the picture with Change picture, the first `shop.top_picks_count` previews drawn live in the browser, See all); the product sheet (big preview, sizes as a radio group with prices, quantity, Add to cart); Adjust (drag or arrow keys, zoom capped so the crop never drops under the size's smallest-picture rule); the cart.
+- **Header and menu:** Gifts and Products (NEW) in the menu, the cart icon with its count only while the cart has items, and the promotion bar above the header (`site.promo_bars`, edited in Settings › Shop; closed bars stay closed for the visit and come back when the text changes). All of it only while the shop is visible to the person (`lib/shop/shell.ts`, kept light because the customer layout calls it on every page).
+- **Existing screens touched** (each only renders shop things while the shop is visible): `Header` (optional `shop` prop), `MenuSheet` (optional `shopVisible`), the customer layout, Home (two tiles after the page, never on the first-time home) and My portraits (a banner).
+- **Checked** in Chromium through a stand-alone harness with the app's own CSS, on fixtures, at 390, 360 and 1280 px: every screen renders with no console errors, axe (WCAG 2.2 AA) is clean on all of them, Adjust (zoom, drag, arrow keys), changing size, the gift-name check and the cart's notices work. Not yet inside the running app (needs the local database).
+
+## Shop 5
+- **Cart** (`lib/shop/cart.ts`, rows in `lib/db/shop.ts`): one open cart per email. Add to cart re-checks on the server that the picture is the person's, the size suits it and an Adjust crop is allowed, then draws the order line's preview on the server and keeps it in `shop-uploads` (`p/<line id>.jpg`). Quantity and removal only touch the person's own open cart. Limits and rate limits come from settings.
+- **Shopify's cart** (`lib/shop/sources/cart*.ts`, Storefront API, allowed write 4): created when the cart is first shown, then kept in step by `_vault_line_id` (add, change, remove), with the customer's discount code and our cart attributes. The cart page shows Shopify's own figures; if Shopify can't be reached it shows our prices and says so, and Checkout says it isn't available.
+- **Checkout:** every line checked again (picture still theirs, product still for sale, rules still pass); the VIP tag read fresh so the code matches who's paying; "Who's it for?" required only when the cart holds a Gifts-page line (name required, message optional, `shop.gift_message_max_chars`), saved as `Gift for` / `Gift message` on Shopify's cart; then Shopify's `checkoutUrl`. The cart stays open, so coming back without paying keeps it.
+- **What goes on the order** is one pure function (`lib/shop/order-lines.ts`) with a test that pins the exact keys, checks none is a portrait key, and runs a shop line through the /redeem parser to prove it isn't read as a portrait, mug or download.
+- **orders/paid:** the existing webhook now also marks a shop cart paid when the order carries `_source` = shop and our `_vault_cart_id` (`shop_order_paid`); any failure there is logged and never changes the webhook's reply. The gift-offer handling is unchanged.
+- **Fulfilment:** `POST /api/shop/fulfilment/image` (shared secret `SHOP_FULFILMENT_SECRET`) hands out fresh signed links for new uploads and previews. Daily cron `/api/cron/shop-carts` (new entry in `vercel.json`) clears carts untouched for `shop.cart_expiry_days`.
+
+## Shop 6
+- **Events** (`docs/analytics.md` › Shop): page views for every screen, picture chosen and uploaded, product opened, added to cart, cart changed, checkout started, order paid, promotion bar tapped and closed. Never a picture URL, gift name or message. `shop_added_to_cart` and `shop_checkout_started` can go to Klaviyo but only once someone adds them to `klaviyo.events`.
+- **Docs:** `docs/shop.md` (switches, routes, order keys), `docs/data.md` §11 (Admin and Storefront calls, webhook, fulfilment endpoint, mirror reads), `docs/schema.md` (tables, bucket), `docs/analytics.md`, `SPEC.md` §22, `.env.example` (`SHOPIFY_STOREFRONT_TOKEN`, `SHOPIFY_STOREFRONT_PRIVATE_TOKEN`, `SHOP_FULFILMENT_SECRET`), CLAUDE.md (allowed writes 4–5, the switch rule).
+- **PostHog funnel not created yet:** none of the shop events exist in PostHog until the shop is used, and a funnel on events PostHog hasn't seen would be empty. Its definition is in `docs/analytics.md`; add it to the dashboard after the first super-user preview.
+- **Settings › Shop › Shopify access** lists the four Admin permissions the shop needs, whether a Storefront token is set and whether the fulfilment secret is set.
+
 ## Decisions (shop)
 - **Shop lines don't reuse portrait keys** (`_tile_id`, `_imagegen_session_id`, `_gelato_product_uid`…); they use `_shop_*` keys, so /redeem and the existing print pipelines can't pick them up. Changed from the first spec draft.
 - **A size with no print rules is dropped, not the whole product;** the product is hidden only when no available size has rules. Settings lists the sizes that need rules.
@@ -364,9 +384,22 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 - **Activity rows** for shop admin events carry the product id in props, not `ref`, so `activity_log`'s ref types stay as they are.
 
 ## Not run (this session)
-- The local Supabase stack can't start here: the network blocks the container registries (ghcr.io, Docker Hub). So the DB-backed unit tests (74 on `main` too) and every e2e, including the new `tests/e2e/shop-settings.spec.ts` and `tests/e2e/shop-pictures.spec.ts`, haven't run. Typecheck, lint and the 147 other unit tests plus the new shop tests pass. Run `pnpm test` and `pnpm e2e` in a session that can reach the registries before merging.
+- The local Supabase stack can't start here: the network blocks the container registries (ghcr.io, Docker Hub). So the DB-backed unit tests (74 on `main` too) and every e2e, including the new `tests/e2e/shop-settings.spec.ts`, `shop-pictures.spec.ts` and `shop-flow.spec.ts`, haven't run. Typecheck, lint and the 147 other unit tests plus the new shop tests pass. Run `pnpm test` and `pnpm e2e` in a session that can reach the registries before merging.
 
 ## Blocked / needed from people (shop)
 - **Fulfilment side** confirms the order-line keys (`docs/shop.md` › What goes on the order) before customers see the shop.
 - **Shopify app access** for the r_orders app: `read_products`, `read_discounts`, `read_customers`, `write_products` (mmp_shop fields), Storefront cart access, and the Store products published to that app's sales channel.
 - **Product data:** product types, the `mmp_shop` fields (Settings › Shop can create the definitions), templates; the spreadsheet's "To fix" list.
+- **Storefront token** (`SHOPIFY_STOREFRONT_TOKEN`) in Vercel, and the Store products published to its sales channel, before carts work live.
+- **Applying the migration** `20261110000002_shop.sql` and the new seed rows to `magic-vault` (`pnpm db:apply-remote`): needs Gavin's OK. Until then every shop path is off, the cron skips quietly and customer deletion skips the shop tables.
+
+## Shop launch checklist
+| # | Step |
+|---|---|
+| 1 | Run `pnpm test` and `pnpm e2e` in a session that can reach the container registries |
+| 2 | Apply the shop migration and seed to `magic-vault` |
+| 3 | Shopify: the r_orders app's permissions, the Storefront token in Vercel, Store products published to its channel, the `mmp_shop` fields (Settings › Shop), templates for each product, product types |
+| 4 | Fulfilment side confirms the order-line keys; set `SHOP_FULFILMENT_SECRET` for them |
+| 5 | Merge `claude/shop`; turn on `shop.super_user_preview` and buy one item end to end (VIP code test, `SITEWIDE OFF` stacking test, the order reaches fulfilment, the cart shows paid) |
+| 6 | Add the shop funnel to the PostHog dashboard |
+| 7 | Turn on `shop.enabled`; add a promotion bar if wanted |

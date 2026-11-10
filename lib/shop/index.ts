@@ -41,14 +41,46 @@ export async function getCatalog(opts: { fresh?: boolean } = {}): Promise<Catalo
 export type CustomerType = "normal" | "vip";
 
 /** VIP when the Shopify customer carries shop.vip_customer_tag (any case). No customer, or Shopify down: normal. */
-export async function customerTypeFor(email: string): Promise<CustomerType> {
-  const tag = (await getSettings(["shop.vip_customer_tag"] as const))["shop.vip_customer_tag"].trim().toLowerCase();
+const typeCache = new Map<string, { at: number; type: CustomerType }>();
+
+export async function customerTypeFor(email: string, opts: { fresh?: boolean } = {}): Promise<CustomerType> {
+  const s = await getSettings(["shop.vip_customer_tag", "shop.customer_type_cache_minutes"] as const);
+  const e = email.trim().toLowerCase();
+  const hit = typeCache.get(e);
+  if (!opts.fresh && hit && Date.now() - hit.at < s["shop.customer_type_cache_minutes"] * 60_000) return hit.type;
+  const tag = s["shop.vip_customer_tag"].trim().toLowerCase();
+  let type: CustomerType = "normal";
   try {
-    const tags = await (await getShopCatalogSource()).customerTags(email);
-    return tags?.some((t) => t.trim().toLowerCase() === tag) ? "vip" : "normal";
+    const tags = await (await getShopCatalogSource()).customerTags(e);
+    type = tags?.some((t) => t.trim().toLowerCase() === tag) ? "vip" : "normal";
   } catch {
-    return "normal";
+    return "normal"; // not cached, so the next request asks Shopify again
   }
+  if (typeCache.size > 5000) typeCache.clear();
+  typeCache.set(e, { at: Date.now(), type });
+  return type;
+}
+
+/** What a customer sees on prices: their code's percentage on Store products, and its label. */
+export async function pricingFor(email: string): Promise<{ customerType: CustomerType; code: string | null; label: string; pct: number | null; currency: string; collectionGid: string }> {
+  const { percentOff } = await import("./money");
+  const s = await getSettings(["shop.currency", "shop.collection_id"] as const);
+  const customerType = await customerTypeFor(email);
+  const { code, label } = await discountSettingFor(customerType);
+  const collectionGid = `gid://shopify/Collection/${s["shop.collection_id"]}`;
+  const pct = percentOff(await discountInfoCached(code), collectionGid);
+  return { customerType, code, label, pct, currency: s["shop.currency"], collectionGid };
+}
+
+const discountCache = new Map<string, { at: number; info: DiscountInfo | null }>();
+async function discountInfoCached(code: string | null): Promise<DiscountInfo | null> {
+  if (!code) return null;
+  const minutes = (await getSettings(["shop.product_cache_minutes"] as const))["shop.product_cache_minutes"];
+  const hit = discountCache.get(code);
+  if (hit && Date.now() - hit.at < minutes * 60_000) return hit.info;
+  const info = await discountInfo(code);
+  discountCache.set(code, { at: Date.now(), info });
+  return info;
 }
 
 /** The code and label for a customer type; an empty VIP code falls back to the normal one. */

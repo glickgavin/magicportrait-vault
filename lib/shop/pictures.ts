@@ -124,7 +124,7 @@ export async function ensureSize(email: string, img: ShopImage): Promise<ShopIma
     }
   }
   if (!size) return img;
-  await rememberExternalImage(email, { kind: img.kind, url: img.source.url, ref: img.ref, width: size.width, height: size.height });
+  await rememberExternalImage(email, { kind: img.kind, url: img.source.url, ref: img.ref, session: img.sessionId, width: size.width, height: size.height });
   return { ...img, ...size };
 }
 
@@ -151,4 +151,27 @@ export async function saveUpload(email: string, body: Buffer): Promise<SaveUploa
   const row = await insertNewUpload(email, { id, storagePath, width: r.width, height: r.height });
   await track("shop_image_uploaded", { ok: true, width: r.width, height: r.height }, { email });
   return { ok: true, image: { id: `n_${row.id}`, kind: "new_upload", source: { storagePath }, width: r.width, height: r.height, createdAt: row.created_at, ordered: false, ref: null, sessionId: null } };
+}
+
+/** The full picture, for drawing the order line's preview on the server (allowed hosts, capped). */
+export async function pictureBytes(img: ShopImage): Promise<Buffer | null> {
+  if ("storagePath" in img.source) {
+    const { getObject } = await import("@/lib/storage");
+    return getObject("shop-uploads", img.source.storagePath);
+  }
+  const s = await getSettings(["redeem.allowed_image_hosts", "shop.image_fetch_timeout_ms", "shop.image_fetch_max_mb"] as const);
+  if (!isAllowedUrl(img.source.url, s["redeem.allowed_image_hosts"])) return null;
+  if (env.dataSource === "fixtures") {
+    // Fixture pictures aren't fetched: a made-up 2048 × 2048 picture stands in.
+    const sharp = (await import("sharp")).default;
+    return sharp({ create: { width: 2048, height: 2048, channels: 3, background: "#9bb7a0" } }).jpeg().toBuffer();
+  }
+  try {
+    const r = await fetch(img.source.url, { signal: AbortSignal.timeout(s["shop.image_fetch_timeout_ms"] * 2), cache: "no-store" });
+    if (!r.ok) return null;
+    const b = Buffer.from(await r.arrayBuffer());
+    return b.length <= s["shop.image_fetch_max_mb"] * 1024 * 1024 ? b : null;
+  } catch {
+    return null;
+  }
 }

@@ -225,6 +225,7 @@ Every shop line carries everything the fulfilment system needs to make the print
 | `_shop_maker_sku` | The maker's product code |  |
 | `_shop_print_px` | e.g. `2400x3000` | The print area |
 | `_shop_placement` | `cover` · `contain` · `wrap_zone` |  |
+| `_shop_zone_px` | e.g. `1155x1155` | `wrap_zone` only: the part of the wrap the picture fills |
 | `_shop_crop` | `x,y,w,h` in source pixels | What the customer chose with Adjust, or the default crop |
 | `_shop_background` | A hex colour | Only for `contain` |
 | `_shop_extra` | The product's free-form JSON | Passed through untouched |
@@ -236,7 +237,7 @@ The Shopify cart also carries `_vault_cart_id` and `_source` = `shop`.
 
 **Gift details.** When the cart holds Gifts-page lines, it also carries `Gift for` (the person's name) and `Gift message`, up to `shop.gift_message_max_chars` (default 200). They have no `_`, so the buyer sees them in checkout and can check them. Makers that support packing slips can print the message and leave the prices off. Each line also carries `_shop_page` = `gifts` or `products`, the page it was added from.
 
-**New uploads** stay private. Their `_image_url` is a signed link valid for `shop.fulfilment_link_days` (default 90). The fulfilment system can ask for a fresh one through an endpoint protected by a shared secret.
+**New uploads** stay private. Their `_image_url` is a signed link valid for `shop.fulfilment_link_days` (default 90). The fulfilment system can ask for a fresh one through an endpoint protected by a shared secret. That endpoint is `POST /api/shop/fulfilment/image` with `{ "line_id": "<_vault_line_id>" }` and `x-shop-signature: hex(HMAC-SHA256(SHOP_FULFILMENT_SECRET, line_id))` (`docs/data.md` §11).
 
 This list is the contract with whoever builds the fulfilment side. They should confirm it before we build (see Open questions).
 
@@ -287,6 +288,22 @@ The first three need answers before the build starts; the rest can be settled du
 - [ ] **VIP code at checkout.** Shopify only applies a customer-limited code when it knows the buyer is that customer. Test whether the email on the cart is enough, or whether VIPs need to be signed in to Shopify at checkout.
 - [ ] **Discount stacking.** SITEWIDE OFF combines with other discounts. Test that a second code entered at checkout, such as MAGIC DISCOUNT, can't take a Store product below the intended price.
 - [ ] **Main site.** Should the main site link into the shop, e.g. after a portrait is made?
+
+## Routes (as built)
+
+| Address | Screen |
+|---|---|
+| `/gifts`, `/products` (`?filter=` an occasion or product type) | The Gifts or Products page |
+| `/gifts/choose`, `/products/choose` (`?tab=photos\|upload`, `?product=<handle>`) | Choose a picture |
+| `/gifts/i/<picture id>`, `/products/i/<picture id>` (`?product=<handle>` opens its sheet) | Product ideas, with the product sheet and Adjust as dialogs |
+| `/cart` | The cart, "Who's it for?" when it holds a gift, Checkout |
+| `/settings/shop`, `/settings/shop/template/<product id>` | Settings › Shop and the template editor |
+| `GET /api/shop/pictures`, `POST /api/shop/uploads`, `POST /api/shop/cart/lines`, `PATCH`/`DELETE /api/shop/cart/lines/<id>`, `POST /api/shop/checkout` | Customer APIs, all 404 while the shop is hidden from the person |
+| `/api/admin/shop/*` | Settings › Shop writes (super users only) |
+| `POST /api/shop/fulfilment/image` | Fresh links for the fulfilment side (shared secret) |
+| `/api/cron/shop-carts` (daily) | Clears carts untouched for `shop.cart_expiry_days` |
+
+Ways in: Gifts and Products in the menu (NEW), two tiles under Home (not on the first-time home), a banner on My portraits, and product cards on both pages. A link from each order is not built yet.
 
 ## Build parts
 

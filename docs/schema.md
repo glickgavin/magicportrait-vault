@@ -174,7 +174,7 @@ A data-deletion request deletes the person's rows here too, and calls Klaviyo's 
 `source text pk`, `ok`, `checked_at`, `last_ok_at`, `ms`, `detail jsonb` (counts and timings only), `checked_by`. Powers the status cards in Settings › Data sources.
 
 ### shop_images
-The shop (`docs/shop.md`). One row per picture a customer has used in the shop: `id uuid pk`, `owner_email`, `kind` (`portrait` · `upload` · `photo_tile` · `new_upload`), `source_url` (external pictures, referenced, never copied), `storage_path` (new uploads in `shop-uploads`), `source_ref` (Imagen image id or tile id), `width`, `height`, `created_at`, `updated_at`. Unique `(owner_email, source_url)`.
+The shop (`docs/shop.md`). One row per picture a customer has used in the shop: `id uuid pk`, `owner_email`, `kind` (`portrait` · `upload` · `photo_tile` · `new_upload`), `source_url` (external pictures, referenced, never copied), `storage_path` (new uploads in `shop-uploads`), `source_ref` (Imagen image id or tile id), `source_session` (Imagen session id, portraits), `width`, `height`, `created_at`, `updated_at`. Unique `(owner_email, source_url)`.
 
 ### shop_carts
 `id uuid pk`, `owner_email`, `status` (`open` · `checked_out` · `paid` · `expired`; one `open` per email), `customer_type` (`normal` · `vip`), `discount_code`, `shopify_cart_id`, `shopify_checkout_url`, `gift_for`, `gift_message` (private: never in analytics or logs), `paid_order_id`, `checked_out_at`, `paid_at`, `created_at`, `updated_at`.

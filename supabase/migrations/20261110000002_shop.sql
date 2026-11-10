@@ -17,6 +17,7 @@ create table public.shop_images (
   source_url text,
   storage_path text,
   source_ref text,
+  source_session text,
   width int check (width > 0),
   height int check (height > 0),
   created_at timestamptz not null default now(),

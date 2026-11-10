@@ -21,5 +21,12 @@ export async function POST(req: Request) {
   const parsed = orderPaidSchema.safeParse(JSON.parse(raw));
   if (!parsed.success) return Response.json({ ok: true, ignored: "unrecognised payload" });
   const r = await recordPaidOrder(parsed.data);
+  // The shop (docs/shop.md): an order from a shop cart marks that cart paid. It never changes the reply.
+  try {
+    const { recordShopOrderPaid } = await import("@/lib/shop/cart");
+    await recordShopOrderPaid(JSON.parse(raw));
+  } catch (e) {
+    console.error(`[webhook] shop cart match failed: ${(e as Error).message}`);
+  }
   return Response.json({ ok: true, created: r.created, status: r.status });
 }

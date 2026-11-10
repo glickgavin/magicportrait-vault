@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, Gift, Mail, Image as ImageIcon, Package, MessageCircle, Headphones, Info } from "lucide-react";
+import { Menu, X, Gift, Mail, Image as ImageIcon, Package, MessageCircle, Headphones, Info, ShoppingBag } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/types";
 import { Avatar } from "@/components/Avatar";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -15,17 +15,24 @@ import { trackClient } from "@/lib/track-client";
 
 const MAGENTA = "#DD07C4";
 
-export function MenuSheet({ user, mainSiteUrl, thumbnails = [], cardsEnabled = true }: { user: SessionUser | null; mainSiteUrl: string; thumbnails?: string[]; cardsEnabled?: boolean }) {
+export function MenuSheet({ user, mainSiteUrl, thumbnails = [], cardsEnabled = true, shopVisible = false }: { user: SessionUser | null; mainSiteUrl: string; thumbnails?: string[]; cardsEnabled?: boolean; shopVisible?: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const close = () => setOpen(false);
 
   const mine = [
     ...(cardsEnabled ? [{ href: "/create", label: t("ui.menu.createCard"), Icon: Gift, isNew: true }] : []),
+    // The shop (docs/shop.md): only while it's visible to this person.
+    ...(shopVisible
+      ? [
+          { href: "/gifts", label: t("ui.menu.gifts"), Icon: Gift, isNew: false, badge: true },
+          { href: "/products", label: t("ui.menu.products"), Icon: ShoppingBag, isNew: false, badge: true },
+        ]
+      : []),
     { href: "/cards", label: t("ui.menu.myCards"), Icon: Mail, isNew: false },
     { href: "/portraits", label: t("ui.menu.myPortraits"), Icon: ImageIcon, isNew: false },
     { href: "/orders", label: t("ui.menu.orders"), Icon: Package, isNew: false },
-  ];
+  ] as { href: string; label: string; Icon: typeof Gift; isNew: boolean; badge?: boolean }[];
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -53,7 +60,7 @@ export function MenuSheet({ user, mainSiteUrl, thumbnails = [], cardsEnabled = t
 
           <div className="mx-6 mt-4 border-t border-black/[0.08] pt-5 text-xs font-bold uppercase tracking-[0.12em] text-ink-2">{t("ui.menu.myGroup")}</div>
           <nav aria-label={t("ui.menu.myGroup")} className="flex flex-col px-6 pb-4 pt-2">
-            {mine.map(({ href, label, Icon, isNew }) => (
+            {mine.map(({ href, label, Icon, isNew, badge }) => (
               <Link
                 key={href}
                 href={href}
@@ -68,7 +75,7 @@ export function MenuSheet({ user, mainSiteUrl, thumbnails = [], cardsEnabled = t
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span className={`flex-1 text-[17px] ${isNew ? "font-bold" : "font-medium"} text-ink`}>{label}</span>
-                {isNew && <span className="rounded-full bg-pink-tint px-2 py-0.5 text-[11px] font-extrabold text-pink-dark">{t("ui.menu.new")}</span>}
+                {(isNew || badge) && <span className="rounded-full bg-pink-tint px-2 py-0.5 text-[11px] font-extrabold text-pink-dark">{t("ui.menu.new")}</span>}
               </Link>
             ))}
           </nav>
