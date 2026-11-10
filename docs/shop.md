@@ -237,7 +237,7 @@ The Shopify cart also carries `_vault_cart_id` and `_source` = `shop`.
 
 **Gift details.** When the cart holds Gifts-page lines, it also carries `Gift for` (the person's name) and `Gift message`, up to `shop.gift_message_max_chars` (default 200). They have no `_`, so the buyer sees them in checkout and can check them. Makers that support packing slips can print the message and leave the prices off. Each line also carries `_shop_page` = `gifts` or `products`, the page it was added from.
 
-**New uploads** stay private. Their `_image_url` is a signed link valid for `shop.fulfilment_link_days` (default 90). The fulfilment system can ask for a fresh one through an endpoint protected by a shared secret. That endpoint is `POST /api/shop/fulfilment/image` with `{ "line_id": "<_vault_line_id>" }` and `x-shop-signature: hex(HMAC-SHA256(SHOP_FULFILMENT_SECRET, line_id))` (`docs/data.md` §11).
+**New uploads** stay private. Their `_image_url` is a signed link valid for `shop.fulfilment_link_days` (default 90). The fulfilment system can ask for a fresh one through an endpoint protected by a shared secret. Not needed today: the print system takes orders straight from Shopify (Gavin, 10 Nov), so `SHOP_FULFILMENT_SECRET` stays unset and the endpoint answers 404. If it's ever wanted, the endpoint is `POST /api/shop/fulfilment/image` with `{ "line_id": "<_vault_line_id>" }` and `x-shop-signature: hex(HMAC-SHA256(SHOP_FULFILMENT_SECRET, line_id))` (`docs/data.md` §11).
 
 This list is the contract with whoever builds the fulfilment side. They should confirm it before we build (see Open questions).
 

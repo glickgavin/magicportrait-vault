@@ -387,19 +387,42 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 - The local Supabase stack can't start here: the network blocks the container registries (ghcr.io, Docker Hub). So the DB-backed unit tests (74 on `main` too) and every e2e, including the new `tests/e2e/shop-settings.spec.ts`, `shop-pictures.spec.ts` and `shop-flow.spec.ts`, haven't run. Typecheck, lint and the 147 other unit tests plus the new shop tests pass. Run `pnpm test` and `pnpm e2e` in a session that can reach the registries before merging.
 
 ## Blocked / needed from people (shop)
-- **Fulfilment side** confirms the order-line keys (`docs/shop.md` › What goes on the order) before customers see the shop.
-- **Shopify app access** for the r_orders app: `read_products`, `read_discounts`, `read_customers`, `write_products` (mmp_shop fields), Storefront cart access, and the Store products published to that app's sales channel.
-- **Product data:** product types, the `mmp_shop` fields (Settings › Shop can create the definitions), templates; the spreadsheet's "To fix" list.
-- **Storefront token** (`SHOPIFY_STOREFRONT_TOKEN`) in Vercel, and the Store products published to its sales channel, before carts work live.
-- **Applying the migration** `20261110000002_shop.sql` and the new seed rows to `magic-vault` (`pnpm db:apply-remote`): needs Gavin's OK. Until then every shop path is off, the cron skips quietly and customer deletion skips the shop tables.
+- **Shopify app permissions.** The r_orders app has `read_orders`, `read_all_orders`, `write_orders` and `read_customers` (Settings › Data sources, 8 Nov). The shop also needs `read_products` (the Store collection), `read_discounts` (SITEWIDE OFF / VIP code) and `write_products` (Settings › Shop and the template editor save `mmp_shop` fields). Until then the shop can't read its products and stays empty for super users.
+- **Storefront token** for carts: `SHOPIFY_STOREFRONT_PRIVATE_TOKEN` (or the public `SHOPIFY_STOREFRONT_TOKEN`) in Vercel, Preview and Production, with the 10 Store products published to that token's sales channel.
+- **Preview templates** for all 10 products (Settings › Shop › template editor). Every product is hidden until it has one. This session can't open Shopify's product photos (cdn.shopify.com isn't reachable), so they weren't drawn here.
+- **Smallest picture.** 95% of portraits made in the last 60 days are 512 × 512 px (the rest 1024 × 1024). With `shop.default_min_short_side_px` at 1000 every size is hidden for them. Today's tiles already print from the same 512 px pictures; Gavin to choose the minimum.
+- **Magic Puzzle** has no print rules yet (its print area for 30 / 252 / 500 pieces isn't known), so it stays hidden.
+- **Print system.** It takes orders from Shopify on its own (Gavin, 10 Nov), so there's no fulfilment secret or endpoint to set up. It must take the picture from `_image_url` on shop lines, the same key today's portrait lines use. Adjust is off on every size (`mmp_shop.adjustable = false`), so what prints is the centred crop the preview shows, whether or not it reads `_shop_crop`.
+- **Tests** still can't run here: the image downloads come from `pkg-containers.githubusercontent.com` (GitHub) and `production.cloudfront.docker.com` (Docker Hub), which are blocked, and Docker Hub rate-limits. `api.supabase.com` is now blocked too, so `pnpm db:apply-remote` can't run from this session.
+
+## Done on the live systems (10 Nov, with Gavin's OK)
+- **magic-vault:** migration `20261110000002_shop.sql` applied through the Supabase connection (recorded in `supabase_migrations.schema_migrations` under the same version, so `db:apply-remote` skips it) and the 41 `shop.*` / `site.*` seed rows added (insert-only). Checked: 3 shop tables with RLS on, private `shop-uploads` bucket, `shop.enabled` and `shop.super_user_preview` off. The rows show in main's Settings › Variables as extra rows; nothing else on main reads them.
+- **Shopify:** the 14 `mmp_shop` metafield definitions (occasions: Christmas, Birthday, New Year, For Mom, For Dad, Pet lovers) and 111 values on the Store collection, through the Shopify connection. No other product field was changed (product types were left as they are; they only group the Products page).
+
+| Product | Page | Occasions | Maker · print area per size |
+|---|---|---|---|
+| Magic Xmas Ornaments (set of 2) | Gifts | Christmas, New Year | Gelato · 900×900 |
+| Magic Mug with Photo | All | Christmas, Birthday, For Mom, For Dad, Pet lovers | Gelato (from the SKU's form) · 2475×1155 wrap, 1155×1155 picture |
+| Magic Pillow with Photo | All | Christmas, Birthday, For Mom, Pet lovers | Prodigi `GLOBAL-CUSH-12X12-LIN` · 3600×3600 |
+| Magic Puzzle | All | Christmas, Birthday, For Dad | **not set** |
+| Acrylic Block | All | Christmas, Birthday, For Mom, For Dad | Prodigi · 4×6 1200×1800, 5×7 1500×2100, 6×8 1800×2400 |
+| Acrylic Square Block | All | Birthday, For Mom, For Dad, Pet lovers | Prodigi · 4×4, 6×6, 8×8 at 300 dpi |
+| Masterpiece | All | Christmas, Birthday, For Mom, For Dad | In-house · 8×12, 12×16, 16×24, 20×30 at 300 dpi |
+| Magic Poster | Products | | Prodigi · 8×10, 12×16, 18×24, 24×36 at 300 dpi |
+| Acrylic Print | Products | | Gelato (from the SKU's form) · 8×12, 12×16, 16×20 at 300 dpi |
+| Magic Portrait Tile | Products | | In-house · 8×8, 12×12, 16×16 at 300 dpi |
+
+Every size: maker's code = the variant's SKU, Adjust off, placement cover (the mug: wrap_zone). Smallest picture and most crop are left to the settings (`shop.default_min_short_side_px`, `shop.default_max_crop_pct` 30%), so a square portrait won't be offered on 2:3 sizes (4×6, 8×12, 16×24, 20×30, 24×36), which would lose a third of it.
 
 ## Shop launch checklist
-| # | Step |
-|---|---|
-| 1 | Run `pnpm test` and `pnpm e2e` in a session that can reach the container registries |
-| 2 | Apply the shop migration and seed to `magic-vault` |
-| 3 | Shopify: the r_orders app's permissions, the Storefront token in Vercel, Store products published to its channel, the `mmp_shop` fields (Settings › Shop), templates for each product, product types |
-| 4 | Fulfilment side confirms the order-line keys; set `SHOP_FULFILMENT_SECRET` for them |
-| 5 | Merge `claude/shop`; turn on `shop.super_user_preview` and buy one item end to end (VIP code test, `SITEWIDE OFF` stacking test, the order reaches fulfilment, the cart shows paid) |
-| 6 | Add the shop funnel to the PostHog dashboard |
-| 7 | Turn on `shop.enabled`; add a promotion bar if wanted |
+| # | Step | Status |
+|---|---|---|
+| 1 | Apply the shop migration and seed to `magic-vault` | Done 10 Nov |
+| 2 | `mmp_shop` field definitions and values on the Store products | Done 10 Nov, except the puzzle's print areas |
+| 3 | Shopify: add `read_products`, `read_discounts`, `write_products` to the r_orders app; Storefront token in Vercel; Store products published to its channel; redeploy | Needed |
+| 4 | Choose the smallest picture (`shop.default_min_short_side_px`) | Needed |
+| 5 | Templates for each product in Settings › Shop on the branch preview | Needed |
+| 6 | Turn on `shop.super_user_preview`, test on the branch preview, buy one item end to end (VIP code, `SITEWIDE OFF`, the order prints, the cart shows paid) | |
+| 7 | Run `pnpm test` and `pnpm e2e` in a session that can reach the container registries | |
+| 8 | Merge `claude/shop`; add the shop funnel to the PostHog dashboard | |
+| 9 | Turn on `shop.enabled`; add a promotion bar if wanted | |
