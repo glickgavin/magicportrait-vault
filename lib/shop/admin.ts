@@ -199,6 +199,9 @@ export async function publishTemplate(actor: { email: string }, input: { product
   }
   const entry = entries.find((e) => e.product.id === input.productId);
   if (!entry) return { ok: false, status: 404, error: "That product isn't in the Store collection." };
+  if (input.template.overlay && input.template.overlay.media_id === input.template.background.media_id) {
+    return { ok: false, status: 422, error: "The overlay is the same photo as the background, so it would cover the customer's picture. Choose no overlay." };
+  }
   const media = new Map(entry.product.media.map((m) => [m.id, m]));
   for (const [what, m] of [["background", input.template.background], ["overlay", input.template.overlay]] as const) {
     if (!m) continue;

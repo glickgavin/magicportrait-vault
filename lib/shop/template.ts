@@ -39,7 +39,9 @@ export function parseTemplate(value: string | null | undefined): Template | null
   if (!value) return null;
   try {
     const r = templateSchema.safeParse(JSON.parse(value));
-    return r.success ? r.data : null;
+    if (!r.success) return null;
+    // An overlay that is the background photo itself would cover the picture completely: ignore it.
+    return r.data.overlay && r.data.overlay.media_id === r.data.background.media_id ? { ...r.data, overlay: null } : r.data;
   } catch {
     return null;
   }

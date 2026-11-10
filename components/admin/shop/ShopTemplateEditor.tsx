@@ -46,6 +46,32 @@ const SAMPLES = [
   ["Landscape", 1500, 1000],
 ] as const;
 
+/** Share of an image's pixels that are at least partly see-through, or null when it can't be read. */
+export async function seeThroughShare(url: string): Promise<number | null> {
+  const img = await new Promise<HTMLImageElement | null>((resolve) => {
+    const i = new Image();
+    i.crossOrigin = "anonymous";
+    i.onload = () => resolve(i);
+    i.onerror = () => resolve(null);
+    i.src = url;
+  });
+  if (!img) return null;
+  try {
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 64;
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, 64, 64);
+    const d = ctx.getImageData(0, 0, 64, 64).data;
+    let clear = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 250) clear++;
+    return clear / (64 * 64);
+  } catch {
+    return null;
+  }
+}
+
 function loadImg(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const i = new Image();
@@ -74,6 +100,24 @@ export function ShopTemplateEditor({ productId, media, published, sizes }: { pro
   const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
   const size = sizes.find((s) => s.id === sizeId) ?? null;
   const dirty = JSON.stringify(t) !== JSON.stringify(startFrom);
+  const [overlayClear, setOverlayClear] = useState<number | null>(null);
+  const overlayUrl = t.overlay?.url ?? null;
+  useEffect(() => {
+    let cancelled = false;
+    setOverlayClear(null);
+    if (overlayUrl) void seeThroughShare(overlayUrl).then((v) => !cancelled && setOverlayClear(v));
+    return () => {
+      cancelled = true;
+    };
+  }, [overlayUrl]);
+  // An overlay is drawn over the customer's picture, so a photo with no see-through part hides it.
+  const overlayProblem = !t.overlay
+    ? null
+    : t.overlay.media_id === t.background.media_id
+      ? "The overlay is the same photo as the background, so it covers the customer's picture. Choose None."
+      : overlayClear !== null && overlayClear < 0.02
+        ? "This overlay has no see-through part, so it covers the customer's picture. Choose None, or a PNG that is clear where the picture goes."
+        : null;
 
   // Draft: kept in this browser only, until Publish.
   useEffect(() => {
@@ -199,7 +243,7 @@ export function ShopTemplateEditor({ productId, media, published, sizes }: { pro
 
   const mediaField = (which: "background" | "overlay") => (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-[14px] font-bold">{which === "background" ? "Photo of the blank product" : "Overlay on top (optional, a transparent PNG)"}</legend>
+      <legend className="mb-1 text-[14px] font-bold">{which === "background" ? "Photo of the blank product" : "Overlay drawn over the picture (optional): only a PNG that is see-through where the picture goes, e.g. shine or a handle. Leave as None if unsure."}</legend>
       <div role="radiogroup" aria-label={which === "background" ? "Blank product photo" : "Overlay"} className="flex flex-wrap gap-2">
         {which === "overlay" && (
           <label className={cn("grid h-16 w-16 cursor-pointer place-items-center rounded-[10px] border text-[13px] focus-within:ring-2 focus-within:ring-[#DD07C4]", !t.overlay ? "border-[#DD07C4] bg-pink-tint font-bold" : "border-line bg-white")}>
@@ -339,8 +383,13 @@ export function ShopTemplateEditor({ productId, media, published, sizes }: { pro
             Let the product&apos;s shading show through the picture
           </label>
           {mediaField("overlay")}
+          {overlayProblem && (
+            <p role="alert" className="rounded-[12px] bg-[#fff4f2] px-3 py-2 text-[14px] font-bold text-[#a1251b]" data-testid="overlay-problem">
+              {overlayProblem}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
-            <Button disabled={busy || (!dirty && Boolean(published))} onClick={() => void publish()}>
+            <Button disabled={busy || Boolean(overlayProblem) || (!dirty && Boolean(published))} onClick={() => void publish()}>
               {busy ? "Publishing…" : "Publish to Shopify"}
             </Button>
             {dirty && (

@@ -154,3 +154,13 @@ describe("seamless triangles", () => {
     expect(Math.min(g[0].y, g[1].y)).toBeCloseTo(-1, 6);
   });
 });
+
+describe("overlays that would cover the picture", () => {
+  it("ignores an overlay that is the background photo itself", () => {
+    const bg = { media_id: "gid://shopify/MediaImage/1", url: "https://cdn.shopify.com/a.png", w: 1000, h: 1000 };
+    const raw = { v: 1, background: bg, zone: { kind: "corners", points: [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]] }, overlay: bg, mask: { kind: "none", radius: 0 }, blend: "normal" };
+    expect(parseTemplate(JSON.stringify(raw))?.overlay).toBeNull();
+    const other = { ...bg, media_id: "gid://shopify/MediaImage/2", url: "https://cdn.shopify.com/shine.png" };
+    expect(parseTemplate(JSON.stringify({ ...raw, overlay: other }))?.overlay?.media_id).toBe("gid://shopify/MediaImage/2");
+  });
+});
