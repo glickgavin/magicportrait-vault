@@ -71,7 +71,7 @@ All four kinds of image can be found from the customer's email.
 Rules for every image:
 
 - **One list.** My photos shows past uploads and photo-tile photos together, newest first, with duplicates (the same URL) shown once.
-- **New uploads.** JPEG, PNG, WEBP or HEIC up to 20 MB. We convert to JPEG, remove location and camera data, and check the size with `sharp`. Anything under 1,000 px on the short side is refused with a friendly message.
+- **New uploads.** JPEG, PNG, WEBP or HEIC up to 20 MB (HEIC only where the server's image library can decode it; iPhone browsers usually send JPEG anyway, and a refusal says to save the photo as JPEG). We convert to JPEG, remove location and camera data, and check the size with `sharp`. Anything under 1,000 px on the short side is refused with a friendly message.
 - **Size is known.** We record each image's width and height, because the fit rules depend on them. Imagen rows mostly have them; for the others we read them once and keep them.
 - **Owner only.** An image is only shown to, and only accepted in a cart from, the email it belongs to. The server checks this on every request.
 - **Photo tiles never ordered.** The mirror event gives the tile id but not the file's extension, so we check once which file exists (.jpg, .jpeg or .png) and keep it.
@@ -112,6 +112,7 @@ Each Shopify variant carries its rules as metafields in the namespace mmp_shop. 
 | Maker's product code | Gelato `mug_product_msz_11-oz_mmat_ceramic-black_cl_4-0`, a Prodigi SKU, or an in-house code | The order line |
 | Print area, in pixels | From the maker's spec, e.g. the mug's wrap | Cropping, the preview and the order line |
 | Placement | Fill and crop (default), fit whole on a background colour, or a zone inside a wrap | How the image sits in the print area |
+| Picture zone, in pixels (`zone_px`) | For a zone inside a wrap, e.g. 1155x1155 on one side of a mug | The shape the picture fills; crop and fit are measured against it instead of the whole wrap |
 | Smallest image | Short side at least 1,000 px | Hides the variant for images that would print blurry |
 | Most it may crop | 30% of the image | Hides the variant when the image's shape is too far from the print area's |
 | Can customers adjust | Yes or no | Shows or hides Adjust on the Product sheet |
@@ -279,6 +280,7 @@ The first three need answers before the build starts; the rest can be settled du
 - [ ] **Gifts and Products.** Beyond how each page is browsed and the gift question, what else differs between them? Should the Gifts page use the same occasions as the greeting card themes (New Year, Christmas, Birthday)?
 - [ ] **Free offers.** Should a shop order unlock the free greeting card, as other orders do today? Assumed yes for now (10 Nov), so the offer's behaviour doesn't change; leaving shop orders out would be a new setting. Shop orders never include the free mug, which the main site's checkout adds.
 - [ ] **New uploads.** Is a 90-day signed link enough for the fulfilment system, or must those images be public and permanent like today's portraits?
+- [ ] **Landscape pictures.** The fit rules measure a picture against the print area as it is. A landscape photo on a portrait-shaped print loses too much and that size is hidden, so landscape photos see fewer ideas. Should some sizes also print turned (a `rotatable` rule), or should the Store collection carry landscape sizes?
 - [ ] **Header.** OK for the cart icon to come back, shown only while the cart has items?
 - [ ] **VIP code at checkout.** Shopify only applies a customer-limited code when it knows the buyer is that customer. Test whether the email on the cart is enough, or whether VIPs need to be signed in to Shopify at checkout.
 - [ ] **Discount stacking.** SITEWIDE OFF combines with other discounts. Test that a second code entered at checkout, such as MAGIC DISCOUNT, can't take a Store product below the intended price.

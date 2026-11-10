@@ -136,6 +136,17 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('shop.fulfilment_link_days', '90'::jsonb, 'number', 'shop', 'New-upload link for fulfilment (days)', null, null, 'seed', now()),
   ('shop.upload_max_mb', '20'::jsonb, 'number', 'shop', 'Largest upload (MB)', null, null, 'seed', now()),
   ('shop.upload_min_short_side_px', '1000'::jsonb, 'number', 'shop', 'Smallest upload (short side, px)', null, null, 'seed', now()),
+  ('shop.upload_jpeg_quality', '92'::jsonb, 'number', 'shop', 'Upload JPEG quality', null, null, 'seed', now()),
+  ('shop.upload_rate_limit_per_hour', '20'::jsonb, 'number', 'shop', 'Uploads per person per hour', null, null, 'seed', now()),
+  ('shop.image_link_seconds', '600'::jsonb, 'number', 'shop', 'New-upload preview link lifetime (s)', null, null, 'seed', now()),
+  ('shop.image_fetch_timeout_ms', '8000'::jsonb, 'number', 'shop', 'Reading a picture''s size: timeout (ms)', null, null, 'seed', now()),
+  ('shop.image_fetch_max_mb', '30'::jsonb, 'number', 'shop', 'Reading a picture''s size: largest file (MB)', null, null, 'seed', now()),
+  ('shop.photo_tile_base_url', '"https://afqxjwizbmpzmvzzkzdb.supabase.co/storage/v1/object/public/tiles-uploads/order-uploads/"'::jsonb, 'text', 'shop', 'Photo-tile uploads folder', 'Where the main site keeps photo-tile photos; a mirror tile_id is the file name here.', null, 'seed', now()),
+  ('shop.photo_tile_extensions', '["jpg","jpeg","png"]'::jsonb, 'list', 'shop', 'Photo-tile file extensions to try', null, null, 'seed', now()),
+  ('shop.mirror_upload_event', '"funnel_portrait_generated"'::jsonb, 'text', 'shop', 'Mirror event for portrait uploads', null, null, 'seed', now()),
+  ('shop.mirror_upload_property', '"original_image_url"'::jsonb, 'text', 'shop', 'Mirror property: uploaded photo URL', null, null, 'seed', now()),
+  ('shop.mirror_tile_event', '"tile_dropped"'::jsonb, 'text', 'shop', 'Mirror event for photo tiles', null, null, 'seed', now()),
+  ('shop.mirror_images_limit', '200'::jsonb, 'number', 'shop', 'Most past photos read per person', null, null, 'seed', now()),
   ('shop.storefront_api_version', '"2025-07"'::jsonb, 'text', 'shop', 'Shopify Storefront API version', null, null, 'seed', now()),
   ('site.promo_bar_max_chars', '90'::jsonb, 'number', 'site', 'Promotion bar max characters', null, null, 'seed', now())
 on conflict (key) do nothing;

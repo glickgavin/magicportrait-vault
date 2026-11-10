@@ -6,6 +6,8 @@ export type VariantRules = {
   maker: (typeof MAKERS)[number];
   makerSku: string;
   printPx: { w: number; h: number };
+  /** wrap_zone only: the part of the print area the picture fills (e.g. one side of a mug). */
+  zonePx: { w: number; h: number } | null;
   placement: (typeof PLACEMENTS)[number];
   minShortSidePx: number;
   maxCropPct: number;
@@ -50,6 +52,10 @@ export function parseVariantRules(metafields: RawMetafield[], defaults: RuleDefa
   const printPx = parsePx(m.get("print_px"));
   if (m.get("print_px")?.trim() && !printPx) invalid.push("print_px");
 
+  const zoneRaw = m.get("zone_px");
+  const zonePx = zoneRaw?.trim() ? parsePx(zoneRaw) : null;
+  if (zoneRaw?.trim() && !zonePx) invalid.push("zone_px");
+
   const placementRaw = m.get("placement");
   const placement = placementRaw?.trim() ? oneOf(PLACEMENTS, placementRaw) : "cover";
   if (!placement) invalid.push("placement");
@@ -91,10 +97,10 @@ export function parseVariantRules(metafields: RawMetafield[], defaults: RuleDefa
   }
 
   if (missing.length || invalid.length || !maker || !printPx || !placement || !imageKinds) return { ok: false, missing, invalid };
-  const ruleKeys = new Set(["maker", "maker_sku", "print_px", "placement", "min_short_side_px", "max_crop_pct", "adjustable", "image_kinds", "background", "extra"]);
+  const ruleKeys = new Set(["maker", "maker_sku", "print_px", "zone_px", "placement", "min_short_side_px", "max_crop_pct", "adjustable", "image_kinds", "background", "extra"]);
   const version = metafields.filter((f) => ruleKeys.has(f.key) && f.updatedAt).map((f) => f.updatedAt as string).sort().at(-1) ?? null;
   return {
     ok: true,
-    rules: { maker, makerSku: (m.get("maker_sku") ?? "").trim(), printPx, placement, minShortSidePx, maxCropPct, adjustable, imageKinds, background, extra, version },
+    rules: { maker, makerSku: (m.get("maker_sku") ?? "").trim(), printPx, zonePx: placement === "wrap_zone" ? zonePx : null, placement, minShortSidePx, maxCropPct, adjustable, imageKinds, background, extra, version },
   };
 }

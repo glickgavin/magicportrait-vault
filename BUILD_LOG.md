@@ -324,7 +324,7 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 | Part | Name | Status |
 |---|---|---|
 | Shop 1 | Switches, settings, tables, Store collection reader, Settings › Shop | done (see Not run) |
-| Shop 2 | Images and fit | not started |
+| Shop 2 | Images and fit | done (see Not run) |
 | Shop 3 | Templates and previews | not started |
 | Shop 4 | Customer screens | not started |
 | Shop 5 | Cart and checkout | not started |
@@ -339,14 +339,25 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 - **Events:** `admin_shop_product_updated`, `admin_shop_occasions_updated`, `admin_shop_fields_created` (business, Settings).
 - **Live store on 10 Nov (read-only check):** 10 products in the Store collection, none with any `mmp_shop` metafield yet and no `mmp_shop` definitions, so all 10 show as hidden until set up. `SITEWIDE OFF` is active: 50% off, limited to the Store collection, combines with product, order and shipping discounts, no end date. The shop's mug is its own product (`magic-mug-with-photo-copy-1`), not the free-gift mug that /redeem uses.
 
+## Shop 2
+- **Pictures** (`lib/shop/pictures.ts`, pure merge in `lib/shop/images.ts`): portraits from the existing profile lookup; photo tiles on the person's paid orders (`_tile_type` = photo, allowed hosts only, never signed links); past portrait uploads and dropped photo tiles from the events mirror through their own read-only source (`lib/shop/sources/images*.ts`, same index rules as docs/data.md §2.4); and new uploads. My photos lists them together, newest first, each URL once (an ordered tile keeps its label). Photo-tile file extensions are checked once with HEAD and remembered.
+- **Opaque ids:** a hash of kind and URL (`p_`, `u_`, `t_`) or `n_<row id>` for new uploads. An id is only resolved against the signed-in person's own list, so it can't reach anyone else's picture.
+- **Sizes:** read once per picture (allowed hosts, timeout and size cap from settings) and kept in `shop_images`.
+- **Uploads** (`lib/shop/upload.ts`): checked by content with `sharp` (JPEG, PNG, WEBP, HEIC where the server can decode it), turned upright, converted to JPEG with camera and location data removed, transparent areas on white, refused under `shop.upload_min_short_side_px`. Stored in the private `shop-uploads` bucket as `u/<uuid>.jpg` (no email in the path) and shown through short-lived signed links. Rate-limited per email and IP.
+- **Fit rules** (`lib/shop/fit.ts`, pure): picture kind, smallest short side, most it may crop, contain never crops, and for mugs the picture zone (`zone_px`, new variant field) rather than the whole wrap. `ideasFor` keeps the collection's order and only the sizes that pass; `cropAllowed` checks an Adjust crop. Tests cover square, 3:4, landscape and small pictures.
+- **Routes:** `GET /api/shop/pictures`, `POST /api/shop/uploads`, both 404 unless the person can see the shop. Event `shop_image_uploaded`.
+- **Deletion:** Settings › Customers › delete now also removes the person's shop carts, remembered pictures and uploads; it skips quietly if the shop migration isn't applied yet.
+
 ## Decisions (shop)
 - **Shop lines don't reuse portrait keys** (`_tile_id`, `_imagegen_session_id`, `_gelato_product_uid`…); they use `_shop_*` keys, so /redeem and the existing print pipelines can't pick them up. Changed from the first spec draft.
 - **A size with no print rules is dropped, not the whole product;** the product is hidden only when no available size has rules. Settings lists the sizes that need rules.
 - **Shop orders unlock the free card offer** like any paid order (unchanged behaviour), until Gavin says otherwise.
+- **Mugs fill a zone, not the wrap.** Measuring a square portrait against a whole 2475 × 1155 mug wrap hid every mug; the new `zone_px` rule is the shape the picture fills.
+- **Landscape photos** see fewer ideas on portrait-shaped prints (open question in docs/shop.md).
 - **Activity rows** for shop admin events carry the product id in props, not `ref`, so `activity_log`'s ref types stay as they are.
 
 ## Not run (this session)
-- The local Supabase stack can't start here: the network blocks the container registries (ghcr.io, Docker Hub). So the DB-backed unit tests (74 on `main` too) and every e2e, including the new `tests/e2e/shop-settings.spec.ts`, haven't run. Typecheck, lint and the 147 other unit tests plus the new shop tests pass. Run `pnpm test` and `pnpm e2e` in a session that can reach the registries before merging.
+- The local Supabase stack can't start here: the network blocks the container registries (ghcr.io, Docker Hub). So the DB-backed unit tests (74 on `main` too) and every e2e, including the new `tests/e2e/shop-settings.spec.ts` and `tests/e2e/shop-pictures.spec.ts`, haven't run. Typecheck, lint and the 147 other unit tests plus the new shop tests pass. Run `pnpm test` and `pnpm e2e` in a session that can reach the registries before merging.
 
 ## Blocked / needed from people (shop)
 - **Fulfilment side** confirms the order-line keys (`docs/shop.md` › What goes on the order) before customers see the shop.

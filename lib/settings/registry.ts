@@ -258,6 +258,17 @@ export const REGISTRY = {
   "shop.fulfilment_link_days": num("shop", 90, { label: "New-upload link for fulfilment (days)", min: 1, max: 365 }),
   "shop.upload_max_mb": num("shop", 20, { label: "Largest upload (MB)", min: 1, max: 20 }),
   "shop.upload_min_short_side_px": num("shop", 1000, { label: "Smallest upload (short side, px)", min: 200, max: 6000 }),
+  "shop.upload_jpeg_quality": num("shop", 92, { label: "Upload JPEG quality", min: 60, max: 100 }),
+  "shop.upload_rate_limit_per_hour": num("shop", 20, { label: "Uploads per person per hour", min: 1, max: 1000000 }),
+  "shop.image_link_seconds": num("shop", 600, { label: "New-upload preview link lifetime (s)", min: 60, max: 86400 }),
+  "shop.image_fetch_timeout_ms": num("shop", 8000, { label: "Reading a picture's size: timeout (ms)", min: 1000, max: 30000 }),
+  "shop.image_fetch_max_mb": num("shop", 30, { label: "Reading a picture's size: largest file (MB)", min: 1, max: 100 }),
+  "shop.photo_tile_base_url": url("shop", "https://afqxjwizbmpzmvzzkzdb.supabase.co/storage/v1/object/public/tiles-uploads/order-uploads/", { label: "Photo-tile uploads folder", description: "Where the main site keeps photo-tile photos; a mirror tile_id is the file name here." }),
+  "shop.photo_tile_extensions": list("shop", ["jpg", "jpeg", "png"], { label: "Photo-tile file extensions to try", max: 6, item: z.string().regex(/^[a-z0-9]{2,5}$/) }),
+  "shop.mirror_upload_event": text("shop", "funnel_portrait_generated", { label: "Mirror event for portrait uploads", allowEmpty: false, max: 80 }),
+  "shop.mirror_upload_property": text("shop", "original_image_url", { label: "Mirror property: uploaded photo URL", allowEmpty: false, max: 80 }),
+  "shop.mirror_tile_event": text("shop", "tile_dropped", { label: "Mirror event for photo tiles", allowEmpty: false, max: 80 }),
+  "shop.mirror_images_limit": num("shop", 200, { label: "Most past photos read per person", min: 10, max: 2000 }),
   "shop.storefront_api_version": text("shop", "2025-07", { label: "Shopify Storefront API version", pattern: /^\d{4}-\d{2}$/ }),
 
   // ---------- site: the whole of My Magic Portraits ----------

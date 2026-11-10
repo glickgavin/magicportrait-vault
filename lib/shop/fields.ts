@@ -17,6 +17,7 @@ export function fieldSpecs(occasionChoices: string[]): FieldDefinitionSpec[] {
     { ownerType: "PRODUCTVARIANT", key: "maker", name: "Shop maker", type: "single_line_text_field", description: "Who makes it: gelato, prodigi or in_house.", choices: [...MAKERS] },
     { ownerType: "PRODUCTVARIANT", key: "maker_sku", name: "Shop maker's product code", type: "single_line_text_field", description: "The maker's product code, e.g. a Gelato product uid or a Prodigi SKU." },
     { ownerType: "PRODUCTVARIANT", key: "print_px", name: "Shop print area (px)", type: "single_line_text_field", description: "Width x height in pixels, e.g. 2400x3000." },
+    { ownerType: "PRODUCTVARIANT", key: "zone_px", name: "Shop picture zone (px)", type: "single_line_text_field", description: "wrap_zone only: the part of the print area the picture fills, e.g. 1155x1155 on one side of a mug." },
     { ownerType: "PRODUCTVARIANT", key: "placement", name: "Shop placement", type: "single_line_text_field", description: "cover (fill and crop), contain (fit on a background) or wrap_zone.", choices: [...PLACEMENTS] },
     { ownerType: "PRODUCTVARIANT", key: "min_short_side_px", name: "Shop smallest image (px)", type: "number_integer", description: "The picture's short side must be at least this many pixels." },
     { ownerType: "PRODUCTVARIANT", key: "max_crop_pct", name: "Shop most it may crop (%)", type: "number_integer", description: "Hide this size for pictures whose shape would lose more than this." },

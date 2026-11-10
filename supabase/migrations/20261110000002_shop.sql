@@ -22,9 +22,10 @@ create table public.shop_images (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check ((kind = 'new_upload') = (storage_path is not null)),
-  check (kind = 'new_upload' or source_url is not null)
+  check (kind = 'new_upload' or source_url is not null),
+  -- New uploads have no source_url; nulls are distinct, so they never collide.
+  constraint shop_images_owner_source_key unique (owner_email, source_url)
 );
-create unique index shop_images_owner_source_idx on public.shop_images (owner_email, source_url) where source_url is not null;
 create index shop_images_owner_idx on public.shop_images (owner_email, created_at desc);
 create trigger shop_images_updated_at before update on public.shop_images for each row execute function public.set_updated_at();
 

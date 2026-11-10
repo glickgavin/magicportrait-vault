@@ -113,6 +113,9 @@ export const EVENTS = {
   account_menu_opened: ui,
   vault_signed_out: bizBrowser,
 
+  // Shop (docs/shop.md)
+  shop_image_uploaded: biz,
+
   // Settings
   settings_viewed: ui,
   setting_changed: biz,
