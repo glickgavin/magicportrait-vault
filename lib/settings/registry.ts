@@ -15,7 +15,7 @@ const isTimeZone = (tz: string) => {
  * `supabase/seed.sql` is generated from this file (scripts/gen-seed.ts); a test keeps them in sync.
  * Secrets never go here (CLAUDE.md).
  */
-export const SECTIONS = ["cards", "gift", "redeem", "auth", "vault", "themes", "brand", "email", "links", "tracking", "klaviyo"] as const;
+export const SECTIONS = ["cards", "gift", "redeem", "auth", "vault", "themes", "brand", "email", "links", "tracking", "klaviyo", "shop", "site"] as const;
 export type Section = (typeof SECTIONS)[number];
 export const SETTING_TYPES = ["text", "number", "boolean", "choice", "list", "json", "shopify_id", "date"] as const;
 export type SettingType = (typeof SETTING_TYPES)[number];
@@ -237,6 +237,31 @@ export const REGISTRY = {
   "klaviyo.profile_properties": bool("klaviyo", true, { label: "Update profile properties" }),
   "klaviyo.delete_on_request": bool("klaviyo", true, { label: "Klaviyo deletion on data requests" }),
   "klaviyo.max_attempts": num("klaviyo", 8, { label: "Outbox attempts before giving up", min: 1, max: 30 }),
+  // ---------- shop: Gifts and Products pages (docs/shop.md) ----------
+  "shop.enabled": bool("shop", false, { label: "Shop on for customers", description: "Off: /gifts, /products and /cart are 404 for customers and no shop menu item, tile, cart icon or promotion bar shows. Turning it on is the shop's launch." }),
+  "shop.super_user_preview": bool("shop", false, { label: "Shop preview for super users", description: "On: super users see the shop on the live site while it is still off for customers." }),
+  "shop.collection_id": shopifyId("shop", "328021508292", { label: "Store collection id", description: "Every shop product sits in this Shopify collection; its manual order is the order on both pages." }),
+  "shop.metafield_namespace": text("shop", "mmp_shop", { label: "Shop metafield namespace", description: "The only product fields the app may write (CLAUDE.md).", readOnly: true }),
+  "shop.top_picks_count": num("shop", 5, { label: "Product ideas per picture", min: 1, max: 12 }),
+  "shop.product_cache_minutes": num("shop", 5, { label: "Product cache (minutes)", min: 0, max: 60 }),
+  "shop.discount_code_normal": text("shop", "SITEWIDE OFF", { label: "Discount code: normal customers", description: "A Shopify discount code limited to the Store collection. Empty: no discount.", max: 60 }),
+  "shop.discount_code_vip": text("shop", "", { label: "Discount code: VIP customers", description: "Empty: VIPs get the normal code.", max: 60 }),
+  "shop.vip_customer_tag": text("shop", "VIP", { label: "VIP customer tag", description: "The Shopify customer tag that marks a VIP.", allowEmpty: false, max: 60 }),
+  "shop.discount_label_normal": text("shop", "Member price", { label: "Discount label: normal", allowEmpty: false, max: 40 }),
+  "shop.discount_label_vip": text("shop", "VIP price", { label: "Discount label: VIP", allowEmpty: false, max: 40 }),
+  "shop.default_min_short_side_px": num("shop", 1000, { label: "Default smallest picture for a size (short side, px)", description: "Used when a variant has no mmp_shop.min_short_side_px.", min: 100, max: 20000 }),
+  "shop.default_max_crop_pct": num("shop", 30, { label: "Default most a size may crop (%)", description: "Used when a variant has no mmp_shop.max_crop_pct.", min: 0, max: 90 }),
+  "shop.cart_max_lines": num("shop", 20, { label: "Most lines in a cart", min: 1, max: 100 }),
+  "shop.cart_line_max_qty": num("shop", 10, { label: "Most of one item", min: 1, max: 100 }),
+  "shop.cart_expiry_days": num("shop", 30, { label: "Clear an untouched cart after (days)", min: 1, max: 365 }),
+  "shop.gift_message_max_chars": num("shop", 200, { label: "Gift message max characters", min: 20, max: 1000 }),
+  "shop.fulfilment_link_days": num("shop", 90, { label: "New-upload link for fulfilment (days)", min: 1, max: 365 }),
+  "shop.upload_max_mb": num("shop", 20, { label: "Largest upload (MB)", min: 1, max: 20 }),
+  "shop.upload_min_short_side_px": num("shop", 1000, { label: "Smallest upload (short side, px)", min: 200, max: 6000 }),
+  "shop.storefront_api_version": text("shop", "2025-07", { label: "Shopify Storefront API version", pattern: /^\d{4}-\d{2}$/ }),
+
+  // ---------- site: the whole of My Magic Portraits ----------
+  "site.promo_bar_max_chars": num("site", 90, { label: "Promotion bar max characters", min: 20, max: 200 }),
 } as const;
 
 export type Registry = typeof REGISTRY;
@@ -266,4 +291,4 @@ export function validateSetting(key: string, value: unknown): ValidationResult<u
 }
 
 /** Keys that must stay off on the live project until launch (BUILD.md). */
-export const LAUNCH_SWITCHES: SettingKey[] = ["cards.enabled", "gift.offer_email_enabled", "gift.popup_enabled", "gift.popup_email_later_enabled", "gift.reminder_email_enabled", "klaviyo.enabled", "redeem.mug_reminder_enabled"];
+export const LAUNCH_SWITCHES: SettingKey[] = ["cards.enabled", "gift.offer_email_enabled", "gift.popup_enabled", "gift.popup_email_later_enabled", "gift.reminder_email_enabled", "klaviyo.enabled", "redeem.mug_reminder_enabled", "shop.enabled", "shop.super_user_preview"];

@@ -151,7 +151,7 @@ New ones:
 On sign-out call `posthog.reset()` so the next person on the device starts fresh.
 
 ### Settings (super users, internal)
-`settings_viewed`, `setting_changed` (`key`, `section`; never the value), `super_user_added` / `super_user_removed`, `admin_theme_created`, `admin_version_published`, `admin_version_archived`, `data_source_tested` (`source`, `ok`). Super users sit in the existing test-account cohort so they never count as customers.
+`settings_viewed`, `setting_changed` (`key`, `section`; never the value), `super_user_added` / `super_user_removed`, `admin_theme_created`, `admin_version_published`, `admin_version_archived`, `data_source_tested` (`source`, `ok`), `admin_shop_product_updated` (`product_id`, `fields`: which of page and occasions changed; never their values), `admin_shop_occasions_updated` (`count`, `added`, `removed`), `admin_shop_fields_created` (`created`, `failed`). Super users sit in the existing test-account cohort so they never count as customers.
 
 Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 

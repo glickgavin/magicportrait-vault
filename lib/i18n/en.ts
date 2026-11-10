@@ -109,7 +109,7 @@ export const en = {
   admin: {
     title: "Settings",
     back: "Back to My Magic Portraits",
-    groups: { insights: "Insights", setup: "Setup", cards: "Greeting cards", redeem: "Redeem", system: "System" },
+    groups: { insights: "Insights", setup: "Setup", cards: "Greeting cards", redeem: "Redeem", shop: "Shop", system: "System" },
     nav: {
       dashboard: "Dashboard",
       customers: "Customers",
@@ -118,6 +118,7 @@ export const en = {
       themes: "Theme library",
       template: "Template editor",
       redeem: "Downloads & mugs",
+      shop: "Products & discounts",
       emails: "Emails",
       tracking: "Tracking (PostHog)",
       dataSources: "Data sources",

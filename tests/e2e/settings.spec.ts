@@ -9,7 +9,7 @@ import { expectNoAxeViolations } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
-const PAGES = ["/settings/insights", "/settings/customers", "/settings/cards", "/settings", "/settings/themes", "/settings/template", "/settings/redeem", "/settings/emails", "/settings/tracking", "/settings/data-sources", "/settings/super-users", "/settings/activity"];
+const PAGES = ["/settings/insights", "/settings/customers", "/settings/cards", "/settings", "/settings/themes", "/settings/template", "/settings/redeem", "/settings/shop", "/settings/emails", "/settings/tracking", "/settings/data-sources", "/settings/super-users", "/settings/activity"];
 
 test.describe("settings (super users)", () => {
   test.afterAll(async () => {
@@ -32,6 +32,9 @@ test.describe("settings (super users)", () => {
       ["post", "/api/admin/customers/search"],
       ["post", "/api/admin/cards/list"],
       ["post", "/api/admin/cards/export"],
+      ["post", "/api/admin/shop/products"],
+      ["post", "/api/admin/shop/occasions"],
+      ["post", "/api/admin/shop/fields"],
     ] as const) {
       const r = await page.request[method](url, { data: {} });
       expect(r.status(), url).toBe(404);

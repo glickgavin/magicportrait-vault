@@ -115,7 +115,29 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('klaviyo.include_signin_link', 'true'::jsonb, 'boolean', 'klaviyo', 'Include one-tap link in events (SPEC Q11)', null, null, 'seed', now()),
   ('klaviyo.profile_properties', 'true'::jsonb, 'boolean', 'klaviyo', 'Update profile properties', null, null, 'seed', now()),
   ('klaviyo.delete_on_request', 'true'::jsonb, 'boolean', 'klaviyo', 'Klaviyo deletion on data requests', null, null, 'seed', now()),
-  ('klaviyo.max_attempts', '8'::jsonb, 'number', 'klaviyo', 'Outbox attempts before giving up', null, null, 'seed', now())
+  ('klaviyo.max_attempts', '8'::jsonb, 'number', 'klaviyo', 'Outbox attempts before giving up', null, null, 'seed', now()),
+  ('shop.enabled', 'false'::jsonb, 'boolean', 'shop', 'Shop on for customers', 'Off: /gifts, /products and /cart are 404 for customers and no shop menu item, tile, cart icon or promotion bar shows. Turning it on is the shop''s launch.', null, 'seed', now()),
+  ('shop.super_user_preview', 'false'::jsonb, 'boolean', 'shop', 'Shop preview for super users', 'On: super users see the shop on the live site while it is still off for customers.', null, 'seed', now()),
+  ('shop.collection_id', '"328021508292"'::jsonb, 'shopify_id', 'shop', 'Store collection id', 'Every shop product sits in this Shopify collection; its manual order is the order on both pages.', null, 'seed', now()),
+  ('shop.metafield_namespace', '"mmp_shop"'::jsonb, 'text', 'shop', 'Shop metafield namespace', 'The only product fields the app may write (CLAUDE.md).', null, 'seed', now()),
+  ('shop.top_picks_count', '5'::jsonb, 'number', 'shop', 'Product ideas per picture', null, null, 'seed', now()),
+  ('shop.product_cache_minutes', '5'::jsonb, 'number', 'shop', 'Product cache (minutes)', null, null, 'seed', now()),
+  ('shop.discount_code_normal', '"SITEWIDE OFF"'::jsonb, 'text', 'shop', 'Discount code: normal customers', 'A Shopify discount code limited to the Store collection. Empty: no discount.', null, 'seed', now()),
+  ('shop.discount_code_vip', '""'::jsonb, 'text', 'shop', 'Discount code: VIP customers', 'Empty: VIPs get the normal code.', null, 'seed', now()),
+  ('shop.vip_customer_tag', '"VIP"'::jsonb, 'text', 'shop', 'VIP customer tag', 'The Shopify customer tag that marks a VIP.', null, 'seed', now()),
+  ('shop.discount_label_normal', '"Member price"'::jsonb, 'text', 'shop', 'Discount label: normal', null, null, 'seed', now()),
+  ('shop.discount_label_vip', '"VIP price"'::jsonb, 'text', 'shop', 'Discount label: VIP', null, null, 'seed', now()),
+  ('shop.default_min_short_side_px', '1000'::jsonb, 'number', 'shop', 'Default smallest picture for a size (short side, px)', 'Used when a variant has no mmp_shop.min_short_side_px.', null, 'seed', now()),
+  ('shop.default_max_crop_pct', '30'::jsonb, 'number', 'shop', 'Default most a size may crop (%)', 'Used when a variant has no mmp_shop.max_crop_pct.', null, 'seed', now()),
+  ('shop.cart_max_lines', '20'::jsonb, 'number', 'shop', 'Most lines in a cart', null, null, 'seed', now()),
+  ('shop.cart_line_max_qty', '10'::jsonb, 'number', 'shop', 'Most of one item', null, null, 'seed', now()),
+  ('shop.cart_expiry_days', '30'::jsonb, 'number', 'shop', 'Clear an untouched cart after (days)', null, null, 'seed', now()),
+  ('shop.gift_message_max_chars', '200'::jsonb, 'number', 'shop', 'Gift message max characters', null, null, 'seed', now()),
+  ('shop.fulfilment_link_days', '90'::jsonb, 'number', 'shop', 'New-upload link for fulfilment (days)', null, null, 'seed', now()),
+  ('shop.upload_max_mb', '20'::jsonb, 'number', 'shop', 'Largest upload (MB)', null, null, 'seed', now()),
+  ('shop.upload_min_short_side_px', '1000'::jsonb, 'number', 'shop', 'Smallest upload (short side, px)', null, null, 'seed', now()),
+  ('shop.storefront_api_version', '"2025-07"'::jsonb, 'text', 'shop', 'Shopify Storefront API version', null, null, 'seed', now()),
+  ('site.promo_bar_max_chars', '90'::jsonb, 'number', 'site', 'Promotion bar max characters', null, null, 'seed', now())
 on conflict (key) do nothing;
 
 insert into public.super_users (email, added_by) values ('gavin@storyboards.io', 'seed'), ('gideon@storyboards.io', 'seed') on conflict (email) do nothing;

@@ -314,3 +314,41 @@ From Gavin and Gideon's walk-through (`review-fixes-2026-11-04.md`), reviewed ag
 | 6 | Klaviyo: turn on `klaviyo.enabled`, send one test event of each kind; later build the flows and turn on `gift.popup_email_later_enabled` | ⬜ Outbox, events and Data sources card ready |
 | 7 | Privacy policy line about stored cards and staff access | ⬜ Outside this repo |
 | 8 | Turn on `cards.enabled`, then `gift.popup_enabled` and `gift.offer_email_enabled`; watch Insights and PostHog | ⬜ All off in `magic-vault` (verified) |
+
+---
+
+# Shop (Gifts and Products), from 10 Nov 2026
+
+Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mockups" design canvas.
+
+| Part | Name | Status |
+|---|---|---|
+| Shop 1 | Switches, settings, tables, Store collection reader, Settings › Shop | done (see Not run) |
+| Shop 2 | Images and fit | not started |
+| Shop 3 | Templates and previews | not started |
+| Shop 4 | Customer screens | not started |
+| Shop 5 | Cart and checkout | not started |
+| Shop 6 | Tracking and docs | not started |
+
+## Shop 1
+- **Hidden by default.** `shop.enabled` (customers) and `shop.super_user_preview` (super users) are launch switches, both off. `lib/shop/access.ts` decides; `lib/shop/index.ts` › `shopUserOrNull()` is what shop routes will call before anything else.
+- **Settings:** 24 `shop.*` keys and `site.promo_bar_max_chars`; sections `shop` and `site`. Discount codes default to `SITEWIDE OFF` for normal customers and empty for VIPs (falls back to normal). Rule defaults (`shop.default_min_short_side_px` 1000, `shop.default_max_crop_pct` 30) are settings, not code.
+- **Tables:** `shop_images`, `shop_carts`, `shop_cart_lines`, RLS on with no policies; private bucket `shop-uploads`. Migration `20261110000002_shop.sql` (not applied to `magic-vault`).
+- **Shopify:** `lib/shop/sources/` (its own interface, fixtures and live), so `lib/sources` is unchanged. Reads the Store collection (products, media, variants, `mmp_shop` metafields), the `mmp_shop` definitions, a discount by code and a customer's tags. Writes only `mmp_shop.page`, `mmp_shop.occasions`, the occasions definition's choices and missing `mmp_shop` definitions (CLAUDE.md allowed write 5). The product and definition queries and the discount query were run read-only against the live store on 10 Nov and match the code's types.
+- **Settings › Shop** (`/settings/shop`, new SHOP group in the sidebar): the two switches; each product in the collection's order with Shown/Hidden and why, sizes ready, page and occasions saved to Shopify; the occasion list (add, rename, reorder, remove; refuses to remove one a product still uses); "Create N shop fields in Shopify" when definitions are missing; both discount codes with what Shopify says about them.
+- **Events:** `admin_shop_product_updated`, `admin_shop_occasions_updated`, `admin_shop_fields_created` (business, Settings).
+- **Live store on 10 Nov (read-only check):** 10 products in the Store collection, none with any `mmp_shop` metafield yet and no `mmp_shop` definitions, so all 10 show as hidden until set up. `SITEWIDE OFF` is active: 50% off, limited to the Store collection, combines with product, order and shipping discounts, no end date. The shop's mug is its own product (`magic-mug-with-photo-copy-1`), not the free-gift mug that /redeem uses.
+
+## Decisions (shop)
+- **Shop lines don't reuse portrait keys** (`_tile_id`, `_imagegen_session_id`, `_gelato_product_uid`…); they use `_shop_*` keys, so /redeem and the existing print pipelines can't pick them up. Changed from the first spec draft.
+- **A size with no print rules is dropped, not the whole product;** the product is hidden only when no available size has rules. Settings lists the sizes that need rules.
+- **Shop orders unlock the free card offer** like any paid order (unchanged behaviour), until Gavin says otherwise.
+- **Activity rows** for shop admin events carry the product id in props, not `ref`, so `activity_log`'s ref types stay as they are.
+
+## Not run (this session)
+- The local Supabase stack can't start here: the network blocks the container registries (ghcr.io, Docker Hub). So the DB-backed unit tests (74 on `main` too) and every e2e, including the new `tests/e2e/shop-settings.spec.ts`, haven't run. Typecheck, lint and the 147 other unit tests plus the new shop tests pass. Run `pnpm test` and `pnpm e2e` in a session that can reach the registries before merging.
+
+## Blocked / needed from people (shop)
+- **Fulfilment side** confirms the order-line keys (`docs/shop.md` › What goes on the order) before customers see the shop.
+- **Shopify app access** for the r_orders app: `read_products`, `read_discounts`, `read_customers`, `write_products` (mmp_shop fields), Storefront cart access, and the Store products published to that app's sales channel.
+- **Product data:** product types, the `mmp_shop` fields (Settings › Shop can create the definitions), templates; the spreadsheet's "To fix" list.
