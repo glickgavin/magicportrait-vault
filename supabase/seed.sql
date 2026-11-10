@@ -147,6 +147,8 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('shop.mirror_upload_property', '"original_image_url"'::jsonb, 'text', 'shop', 'Mirror property: uploaded photo URL', null, null, 'seed', now()),
   ('shop.mirror_tile_event', '"tile_dropped"'::jsonb, 'text', 'shop', 'Mirror event for photo tiles', null, null, 'seed', now()),
   ('shop.mirror_images_limit', '200'::jsonb, 'number', 'shop', 'Most past photos read per person', null, null, 'seed', now()),
+  ('shop.template_image_hosts', '["cdn.shopify.com"]'::jsonb, 'list', 'shop', 'Template photo hosts', 'Where blank product photos and overlays may be loaded from (the product''s own Shopify media).', null, 'seed', now()),
+  ('shop.preview_width_px', '800'::jsonb, 'number', 'shop', 'Preview image width (px)', null, null, 'seed', now()),
   ('shop.storefront_api_version', '"2025-07"'::jsonb, 'text', 'shop', 'Shopify Storefront API version', null, null, 'seed', now()),
   ('site.promo_bar_max_chars', '90'::jsonb, 'number', 'site', 'Promotion bar max characters', null, null, 'seed', now())
 on conflict (key) do nothing;

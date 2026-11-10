@@ -325,7 +325,7 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 |---|---|---|
 | Shop 1 | Switches, settings, tables, Store collection reader, Settings › Shop | done (see Not run) |
 | Shop 2 | Images and fit | done (see Not run) |
-| Shop 3 | Templates and previews | not started |
+| Shop 3 | Templates and previews | done (see Not run) |
 | Shop 4 | Customer screens | not started |
 | Shop 5 | Cart and checkout | not started |
 | Shop 6 | Tracking and docs | not started |
@@ -347,6 +347,13 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 - **Fit rules** (`lib/shop/fit.ts`, pure): picture kind, smallest short side, most it may crop, contain never crops, and for mugs the picture zone (`zone_px`, new variant field) rather than the whole wrap. `ideasFor` keeps the collection's order and only the sizes that pass; `cropAllowed` checks an Adjust crop. Tests cover square, 3:4, landscape and small pictures.
 - **Routes:** `GET /api/shop/pictures`, `POST /api/shop/uploads`, both 404 unless the person can see the shop. Event `shop_image_uploaded`.
 - **Deletion:** Settings › Customers › delete now also removes the person's shop carts, remembered pictures and uploads; it skips quietly if the shop migration isn't applied yet.
+
+## Shop 3
+- **Templates** (`lib/shop/template.ts`): one schema for `mmp_shop.template`; four-corner zones use a projective map, mug wraps a cylinder map with curve and spread. `zoneAspect` measures the zone so the editor can warn when it doesn't match a size's print shape.
+- **One drawing routine** (`lib/shop/preview.ts`) for the browser and the server: the picture is cropped (or fitted, for contain) to the print shape on a flat canvas with the mask, then warped onto the blank product photo as a mesh of small triangles (8 × 8 flat, 32 × 12 for a wrap) with plain affine transforms. Each triangle is grown along its edges so no seams show; multiply is applied to the finished warp in one go, for the same reason. Server rendering in `lib/shop/render.ts` (`@napi-rs/canvas`), template photos only from `shop.template_image_hosts` (Shopify's CDN) or, in fixtures, `public/fixtures/shop/`.
+- **Golden images** (`tests/fixtures/golden/shop/`): poster, tile and mug, each with a square and a 3:4 picture, plus a landscape picture on a poster with contain. Checked by eye before they were saved.
+- **Template editor** (`/settings/shop/template/<product id>`, linked from each product in Settings › Shop): pick the blank photo and an optional overlay from the product's Shopify photos; flat or mug zone; drag the handles (or move them with the arrow keys, Shift for bigger steps); mask, corner size and shading; test renders with square, 3:4 and landscape sample pictures for any size that has rules; the shape warning; the draft kept in the browser; Publish writes `mmp_shop.template` (allowed write 5) and refuses photos that aren't the product's own. Event `admin_shop_template_published`. Tried in Chromium through a stand-alone harness (keyboard, drag, test renders, warning, draft restore; no console errors); not yet inside the app, which needs the local database.
+- **Fixtures:** made-up blank product photos (`scripts/gen-shop-fixtures.ts` → `public/fixtures/shop/`) and their templates (`lib/shop/fixture-scenes.ts`).
 
 ## Decisions (shop)
 - **Shop lines don't reuse portrait keys** (`_tile_id`, `_imagegen_session_id`, `_gelato_product_uid`…); they use `_shop_*` keys, so /redeem and the existing print pipelines can't pick them up. Changed from the first spec draft.

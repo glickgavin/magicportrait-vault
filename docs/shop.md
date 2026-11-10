@@ -144,7 +144,9 @@ How it's drawn:
 - The browser draws previews with that module, so changing the image or the crop redraws the 4 or 5 previews without a round trip.
 - The server draws the same thing with `@napi-rs/canvas` for cart thumbnails and for a preview image on the order line.
 
-The template editor in Settings works like the card template editor. A draft stays in the app until Publish writes it to Shopify. It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
+The template is one JSON value (`lib/shop/template.ts`): `background` and `overlay` (a product photo's media id, URL and size), `zone` (`corners` with four points, or `wrap` with left, right, top, bottom, curve and spread), `mask` (none, rounded with a radius, circle) and `blend` (normal, or multiply to let the product's shading show through). Coordinates are fractions of the background photo.
+
+The template editor in Settings works like the card template editor. A draft stays in the browser until Publish writes it to Shopify; Publish refuses any background or overlay that isn't one of the product's own Shopify photos. It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
 
 ## Cart and checkout
 

@@ -269,6 +269,8 @@ export const REGISTRY = {
   "shop.mirror_upload_property": text("shop", "original_image_url", { label: "Mirror property: uploaded photo URL", allowEmpty: false, max: 80 }),
   "shop.mirror_tile_event": text("shop", "tile_dropped", { label: "Mirror event for photo tiles", allowEmpty: false, max: 80 }),
   "shop.mirror_images_limit": num("shop", 200, { label: "Most past photos read per person", min: 10, max: 2000 }),
+  "shop.template_image_hosts": list("shop", ["cdn.shopify.com"], { label: "Template photo hosts", description: "Where blank product photos and overlays may be loaded from (the product's own Shopify media).", item: host, max: 10 }),
+  "shop.preview_width_px": num("shop", 800, { label: "Preview image width (px)", min: 200, max: 2400 }),
   "shop.storefront_api_version": text("shop", "2025-07", { label: "Shopify Storefront API version", pattern: /^\d{4}-\d{2}$/ }),
 
   // ---------- site: the whole of My Magic Portraits ----------

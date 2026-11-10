@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSuperUser } from "@/lib/auth/session";
 import { settingRows } from "@/lib/admin/data";
 import { env } from "@/lib/env";
@@ -116,6 +117,10 @@ export default async function ShopSettings() {
                               </p>
                               <p className="text-[13px] text-ink-2">
                                 {p.productType || "No product type"} · {e.sellable.length} of {p.variants.length} size{p.variants.length === 1 ? "" : "s"} ready
+                                {" · "}
+                                <Link href={`/settings/shop/template/${p.legacyId}`} className="link">
+                                  {e.hidden.includes("no_template") ? "Make the preview template" : "Edit the preview template"}
+                                </Link>
                                 {link && (
                                   <>
                                     {" · "}

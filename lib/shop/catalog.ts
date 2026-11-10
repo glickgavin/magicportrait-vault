@@ -1,6 +1,7 @@
 import { normalisePage } from "./fields";
 import { parseVariantRules, type RuleDefaults, type VariantRules } from "./rules";
 import type { ShopProduct, ShopVariant } from "./sources/types";
+import { parseTemplate } from "./template";
 
 /** Why a product in the Store collection isn't shown in the shop (Settings › Shop lists these). */
 export const HIDDEN_REASONS = ["not_active", "no_page", "sold_out", "no_rules", "no_template"] as const;
@@ -26,15 +27,9 @@ export type CatalogEntry = {
   warnings: string[];
 };
 
-/** A template is usable once it's a JSON object (its shape is checked by the preview module). */
+/** A template is usable once it parses (lib/shop/template.ts): a background photo and a zone. */
 export function templateUsable(t: ShopProduct["template"]): boolean {
-  if (!t?.value) return false;
-  try {
-    const v = JSON.parse(t.value) as unknown;
-    return Boolean(v) && typeof v === "object" && !Array.isArray(v);
-  } catch {
-    return false;
-  }
+  return parseTemplate(t?.value) !== null;
 }
 
 /** Pure: what the shop may show from one product, and why not when it can't. */

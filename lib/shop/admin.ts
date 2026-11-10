@@ -7,6 +7,7 @@ import { fieldSpecs, normalisePage, pageLabel } from "./fields";
 import { discountInfo, discountSettingFor, getCatalog, invalidateCatalog } from "./index";
 import { getShopCatalogSource } from "./sources";
 import type { DiscountInfo, ShopFieldDefinition } from "./sources/types";
+import { templateSchema, type Template } from "./template";
 
 /** Settings › Shop (docs/shop.md). Every write here is CLAUDE.md allowed write 5: `mmp_shop` only. */
 
@@ -164,4 +165,34 @@ export async function createMissingFields(actor: { email: string }): Promise<Adm
   invalidateCatalog();
   await track("admin_shop_fields_created", { created: r.created.length, failed: r.failed.length }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true, created: r.created, failed: r.failed };
+}
+
+export const templatePublishSchema = z.object({ productId: z.string().regex(/^gid:\/\/shopify\/Product\/\d{1,20}$/), template: templateSchema });
+
+/**
+ * The template editor's Publish: writes `mmp_shop.template`. The background and overlay must be the
+ * product's own Shopify photos (same media id and URL), so a template can't point anywhere else.
+ */
+export async function publishTemplate(actor: { email: string }, input: { productId: string; template: Template }): Promise<AdminResult> {
+  const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
+  let entries: CatalogEntry[];
+  try {
+    entries = await getCatalog({ fresh: true });
+  } catch (e) {
+    return { ok: false, status: 502, error: errorText(e) };
+  }
+  const entry = entries.find((e) => e.product.id === input.productId);
+  if (!entry) return { ok: false, status: 404, error: "That product isn't in the Store collection." };
+  const media = new Map(entry.product.media.map((m) => [m.id, m]));
+  for (const [what, m] of [["background", input.template.background], ["overlay", input.template.overlay]] as const) {
+    if (!m) continue;
+    const own = media.get(m.media_id);
+    if (!own || own.url !== m.url) return { ok: false, status: 400, error: `The ${what} must be one of this product's photos in Shopify.` };
+  }
+  const t: Template = { ...input.template, updated_at: new Date().toISOString() };
+  const r = await (await getShopCatalogSource()).setProductTemplate(input.productId, ns, JSON.stringify(t));
+  if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the template (${r.reason}).` };
+  invalidateCatalog();
+  await track("admin_shop_template_published", { product_id: entry.product.legacyId, zone: t.zone.kind }, { email: actor.email, actor: `super_user:${actor.email}` });
+  return { ok: true };
 }

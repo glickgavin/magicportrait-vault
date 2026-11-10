@@ -219,6 +219,13 @@ export class ShopCatalogLive implements ShopCatalogSource {
     return { ok: true };
   }
 
+  async setProductTemplate(productId: string, namespace: string, templateJson: string): Promise<WriteResult> {
+    if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId)) return { ok: false, reason: "bad_product_id" };
+    const d = await this.gql<{ metafieldsSet: { userErrors: { message: string; code?: string }[] } }>(M_SET, { metafields: [{ ownerId: productId, namespace, key: "template", type: "json", value: templateJson }] });
+    const errs = d.metafieldsSet.userErrors;
+    return errs.length ? { ok: false, reason: errs.map((e) => e.code || e.message).join(",").slice(0, 200) } : { ok: true };
+  }
+
   async setOccasionChoices(namespace: string, choices: string[]): Promise<WriteResult> {
     const d = await this.gql<{ metafieldDefinitionUpdate: { userErrors: { message: string; code?: string }[] } }>(M_DEF_UPDATE, {
       definition: { namespace, key: "occasions", ownerType: "PRODUCT", validations: [{ name: "choices", value: JSON.stringify(choices) }] },

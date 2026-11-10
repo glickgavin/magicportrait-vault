@@ -69,6 +69,8 @@ export interface ShopCatalogSource {
   fieldDefinitions(namespace: string): Promise<ShopFieldDefinition[]>;
   /** Allowed write 5 (CLAUDE.md): only `mmp_shop.page` and `mmp_shop.occasions` on one product. */
   setProductFields(productId: string, namespace: string, fields: { page?: string | null; occasions?: string[] }): Promise<WriteResult>;
+  /** Allowed write 5: `mmp_shop.template` on one product (the template editor's Publish). */
+  setProductTemplate(productId: string, namespace: string, templateJson: string): Promise<WriteResult>;
   /** Allowed write 5: the occasions definition's choices. */
   setOccasionChoices(namespace: string, choices: string[]): Promise<WriteResult>;
   /** Allowed write 5: creates whichever `mmp_shop` definitions are missing. */
