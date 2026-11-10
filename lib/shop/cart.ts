@@ -7,7 +7,8 @@ import { track } from "@/lib/track";
 import { maskEmail } from "@/lib/utils";
 import type { CatalogEntry, SellableVariant } from "./catalog";
 import { cropAllowed, fitVariant, target, type Rect } from "./fit";
-import { customerTypeFor, discountSettingFor, getCatalog, type CustomerType } from "./index";
+import { discounted } from "./money";
+import { customerTypeFor, discountSettingFor, getCatalog, pricingFor, type CustomerType } from "./index";
 import { cartAttributes, cartIdFromOrder, lineAttributes, sameAttrs } from "./order-lines";
 import { ensureSize, pictureBytes, pictureFor } from "./pictures";
 import { renderPreview } from "./render";
@@ -143,6 +144,10 @@ export type CartLineView = {
   quantity: number;
   previewUrl: string | null;
   unitPrice: string;
+  /** Price × quantity before any discount. */
+  listTotal: string;
+  /** The customer's discount worked out by us (the same as on the product pages), or null with no discount. */
+  ourTotal: string | null;
   /** Shopify's figures when the cart is in step with Shopify; null otherwise. */
   shopify: { subtotal: string; total: string } | null;
   problem: LineProblem | null;
@@ -158,6 +163,8 @@ export type CartView = {
   /** Shopify's own figures, or null when Shopify can't be reached (prices then show without the discount). */
   figures: { subtotal: string; total: string; discount: string; codeApplied: boolean } | null;
   customerType: CustomerType;
+  /** The customer's discount (0–1) on Store products, or null. */
+  pct: number | null;
 };
 
 type Checked = { line: ShopLineRow; entry: CatalogEntry | null; sv: SellableVariant | null; image: ShopImageRow | null; problem: LineProblem | null };
@@ -233,7 +240,8 @@ export async function cartView(email: string): Promise<CartView> {
   const s = await getSettings(["shop.currency", "shop.image_link_seconds"] as const);
   const cart = await openCartFor(email);
   const customerType = await customerTypeFor(email);
-  const empty: CartView = { cartId: null, lines: [], count: 0, hasGift: false, giftFor: "", giftMessage: "", currency: s["shop.currency"], figures: null, customerType };
+  const pct = (await pricingFor(email).catch(() => null))?.pct ?? null;
+  const empty: CartView = { cartId: null, lines: [], count: 0, hasGift: false, giftFor: "", giftMessage: "", currency: s["shop.currency"], figures: null, customerType, pct };
   if (!cart) return empty;
   const lines = await cartLines(cart.id);
   if (!lines.length) return { ...empty, cartId: cart.id, giftFor: cart.gift_for ?? "", giftMessage: cart.gift_message ?? "" };
@@ -255,6 +263,7 @@ export async function cartView(email: string): Promise<CartView> {
   const views: CartLineView[] = [];
   for (const c of checked) {
     const r = byVault.get(c.line.id);
+    const listTotal = ((Math.round(Number(c.sv?.variant.price ?? "0") * 100) * c.line.quantity) / 100).toFixed(2);
     views.push({
       id: c.line.id,
       page: c.line.page,
@@ -263,6 +272,8 @@ export async function cartView(email: string): Promise<CartView> {
       quantity: c.line.quantity,
       previewUrl: c.line.preview_path ? await signedUrl("shop-uploads", c.line.preview_path, s["shop.image_link_seconds"]) : null,
       unitPrice: c.sv?.variant.price ?? "0",
+      listTotal,
+      ourTotal: c.sv ? discounted(listTotal, pct) : null,
       shopify: r ? { subtotal: r.subtotal.amount, total: r.total.amount } : null,
       problem: c.problem,
     });
@@ -280,6 +291,7 @@ export async function cartView(email: string): Promise<CartView> {
     currency: remote?.subtotal.currency ?? s["shop.currency"],
     figures,
     customerType,
+    pct,
   };
 }
 

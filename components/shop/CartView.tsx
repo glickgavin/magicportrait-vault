@@ -9,6 +9,23 @@ import { t, tn } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { TrackPageView } from "@/components/TrackPageView";
 
+type Line = Cart["lines"][number];
+
+/**
+ * A line's price: Shopify's own when its line total includes a discount, otherwise ours (the same
+ * percentage as on the product pages), so the discount shows on every item either way.
+ */
+export function linePrice(l: Line): { was: string | null; now: string; pct: number | null } {
+  if (l.shopify && Number(l.shopify.subtotal) > Number(l.shopify.total)) {
+    const pct = Math.round((1 - Number(l.shopify.total) / Number(l.shopify.subtotal)) * 100);
+    return { was: l.shopify.subtotal, now: l.shopify.total, pct };
+  }
+  if (l.ourTotal !== null && Number(l.ourTotal) < Number(l.listTotal)) {
+    return { was: l.listTotal, now: l.ourTotal, pct: Math.round((1 - Number(l.ourTotal) / Number(l.listTotal)) * 100) };
+  }
+  return { was: null, now: l.shopify?.total ?? l.listTotal, pct: null };
+}
+
 /** The cart: lines with their previews, "Who's it for?" only when it holds a gift, Shopify's figures, Checkout. */
 export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQty: number; maxMessage: number; label: string }) {
   const router = useRouter();
@@ -61,7 +78,14 @@ export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQ
     );
   }
 
-  const ourTotal = cart.lines.reduce((n, l) => n + Number(l.unitPrice) * l.quantity, 0);
+  // Shopify's figures when they include the discount; otherwise our own, so the discount always shows.
+  const shopifyDiscounted = Boolean(cart.figures && Number(cart.figures.discount) > 0);
+  const cents = (a: string) => Math.round(Number(a) * 100);
+  const listSum = cart.lines.reduce((n, l) => n + cents(l.listTotal), 0) / 100;
+  const ourSum = cart.lines.reduce((n, l) => n + cents(linePrice(l).now), 0) / 100;
+  const summary = shopifyDiscounted && cart.figures
+    ? { items: cart.figures.subtotal, discount: cart.figures.discount, total: cart.figures.total, atCheckout: false }
+    : { items: (cart.figures?.subtotal ?? listSum).toString(), discount: (listSum - ourSum).toFixed(2), total: ourSum.toString(), atCheckout: listSum - ourSum > 0 };
   return (
     <div className="mx-auto flex max-w-[1120px] flex-col gap-4">
       <TrackPageView event="page_view_cart" props={{ lines: cart.lines.length, has_gift: cart.hasGift, subtotal: cart.figures?.subtotal ?? null, customer_type: cart.customerType }} />
@@ -74,27 +98,29 @@ export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQ
       </div>
       <div className="flex flex-wrap items-start gap-6">
         <ul aria-label={t("shop.items")} className="min-w-0 flex-[999_1_420px] rounded-[20px] bg-white px-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-          {cart.lines.map((l, i) => (
+          {cart.lines.map((l, i) => {
+            const price = linePrice(l);
+            return (
             <li key={l.id} className={cn("flex gap-3 py-4", i > 0 && "border-t border-black/[0.07]")}>
               {l.previewUrl ? <img src={l.previewUrl} alt={t("shop.previewAlt", { product: l.productTitle })} className="ph-no-capture h-[76px] w-[76px] flex-none rounded-[12px] object-cover lg:h-[112px] lg:w-[112px]" /> : <span className="h-[76px] w-[76px] flex-none rounded-[12px] bg-black/5 lg:h-[112px] lg:w-[112px]" aria-hidden="true" />}
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[16px] font-bold lg:text-[18px]">{l.productTitle}</span>
-                  <span className="flex flex-none flex-col items-end">
-                    {l.shopify ? (
-                      <>
-                        {Number(l.shopify.subtotal) > Number(l.shopify.total) && <s className="text-[12px] text-ink-2">{money(l.shopify.subtotal)}</s>}
-                        <span className="text-[15px] font-extrabold text-pink-dark">{money(l.shopify.total)}</span>
-                      </>
-                    ) : (
-                      <span className="text-[15px] font-extrabold">{money(Number(l.unitPrice) * l.quantity)}</span>
+                  <span className="flex flex-none flex-col items-end" data-testid="line-price">
+                    {price.was && (
+                      <s className="text-[12px] text-ink-2">
+                        <span className="sr-only">{t("shop.was")} </span>
+                        {money(price.was)}
+                      </s>
                     )}
+                    <span className={cn("text-[15px] font-extrabold", price.was && "text-pink-dark")}>{money(price.now)}</span>
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink-2">
                   {l.page === "gifts" && <span className="rounded-[6px] bg-pink-tint px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-pink-dark">{t("shop.gift").toUpperCase()}</span>}
                   <span>{[l.variantTitle, t(l.page === "gifts" ? "shop.fromGifts" : "shop.fromProducts")].filter(Boolean).join(" · ")}</span>
                 </div>
+                {price.was && price.pct !== null && <span className="text-[12px] font-bold text-pink-dark">{t("shop.lineDiscount", { label, pct: price.pct })}</span>}
                 {l.problem && (
                   <p role="alert" className="text-[13px] font-bold text-[#a1251b]">
                     {t(`shop.problems.${l.problem}`)}
@@ -118,7 +144,8 @@ export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQ
                 </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
 
         <aside className="flex w-full flex-col gap-4 lg:max-w-[400px] lg:flex-[1_1_340px]">
@@ -153,19 +180,20 @@ export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQ
           <section aria-label={t("shop.subtotal")} className="flex flex-col gap-1.5 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
             <div className="flex justify-between text-[14px] text-ink-2">
               <span>{t("shop.items")}</span>
-              <span>{money(cart.figures?.subtotal ?? ourTotal)}</span>
+              <span>{money(summary.items)}</span>
             </div>
-            {cart.figures && Number(cart.figures.discount) > 0 && (
-              <div className="flex justify-between text-[14px] font-bold text-pink-dark">
+            {Number(summary.discount) > 0 && (
+              <div className="flex justify-between text-[14px] font-bold text-pink-dark" data-testid="cart-discount">
                 <span>{label}</span>
-                <span>−{money(cart.figures.discount)}</span>
+                <span>−{money(summary.discount)}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-black/[0.08] pt-2 text-[17px] font-extrabold">
               <span>{t("shop.subtotal")}</span>
-              <span>{money(cart.figures?.total ?? ourTotal)}</span>
+              <span>{money(summary.total)}</span>
             </div>
-            <span className="text-[13px] text-ink-2">{cart.figures ? t("shop.shippingNote") : t("shop.pricesNote")}</span>
+            {summary.atCheckout && <span className="text-[13px] font-bold text-pink-dark">{t("shop.discountAtCheckout", { label })}</span>}
+            <span className="text-[13px] text-ink-2">{cart.figures || cart.pct ? t("shop.shippingNote") : t("shop.pricesNote")}</span>
             <button type="button" disabled={state.busy || blocked} onClick={() => void checkout()} className="bg-primary-gradient shadow-primary mt-3 h-13 rounded-[12px] py-3.5 text-[16px] font-extrabold text-white disabled:opacity-50">
               {state.busy ? t("shop.checkingOut") : t("shop.checkout")}
             </button>
