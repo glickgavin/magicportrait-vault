@@ -16,13 +16,16 @@ const STEPS: [string, string][] = [
   ["delivered", "Sent, shared or downloaded"],
 ];
 
-export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
-  const r = (await searchParams).range;
+export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ range?: string; staff?: string }> }) {
+  const sp = await searchParams;
+  const r = sp.range;
+  // Super users' own activity and cards are left out unless "Include super users" is on.
+  const staff = sp.staff === "1";
   const range: Range = r && r in RANGES ? (r as Range) : "7d";
   const s = await getSettings(["tracking.posthog_project_id", "tracking.posthog_ui_host", "tracking.entry_links", "brand.timezone"] as const);
   const tz = s["brand.timezone"];
   const now = new Date();
-  const [tiles, perDay, themes, steps, feed, actions, arrivals] = await Promise.all([kpis(range, now, tz), cardsPerDay(range, now, tz), topThemes(range, now, tz), funnel(range, now, tz), liveFeed(), cardActions(range, now, tz), entries(range, s["tracking.entry_links"], now, tz)]);
+  const [tiles, perDay, themes, steps, feed, actions, arrivals] = await Promise.all([kpis(range, now, tz, staff), cardsPerDay(range, now, tz, staff), topThemes(range, now, tz, staff), funnel(range, now, tz, staff), liveFeed(20, staff), cardActions(range, now, tz, staff), entries(range, s["tracking.entry_links"], now, tz, staff)]);
   const zoneLabel = zoneName(tz, now);
   const ACTIONS: [keyof Omit<typeof actions, "made" | "not_yet">, string][] = [
     ["emailed", "Emailed"],
@@ -40,16 +43,28 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight">Dashboard</h1>
           <p className="text-[15px] text-ink-2">
-            All numbers come from our own database. Days and times are in business time ({zoneLabel}, <code>brand.timezone</code>).
+            All numbers come from our own database. Days and times are in business time ({zoneLabel}, <code>brand.timezone</code>). {staff ? "Super users' own activity and cards are included." : "Super users' own activity and cards are left out."}
           </p>
         </div>
         <nav aria-label="Date range" className="flex gap-1 rounded-[12px] bg-white p-1 shadow-sm">
           {(Object.keys(RANGES) as Range[]).map((k) => (
-            <Link key={k} href={`/settings/insights?range=${k}`} aria-current={k === range ? "page" : undefined} className={`rounded-[10px] px-3 py-1.5 text-[14px] font-semibold ${k === range ? "bg-[#2b2b2b] text-white" : ""}`}>
+            <Link key={k} href={`/settings/insights?range=${k}${staff ? "&staff=1" : ""}`} aria-current={k === range ? "page" : undefined} className={`rounded-[10px] px-3 py-1.5 text-[14px] font-semibold ${k === range ? "bg-[#2b2b2b] text-white" : ""}`}>
               {RANGES[k]}
             </Link>
           ))}
         </nav>
+        <Link
+          href={`/settings/insights?range=${range}${staff ? "" : "&staff=1"}`}
+          role="switch"
+          aria-checked={staff}
+          className="flex min-h-[40px] items-center gap-2 rounded-[12px] bg-white px-3 text-[14px] font-semibold shadow-sm"
+          data-testid="include-staff"
+        >
+          <span className={`relative h-5 w-9 rounded-full ${staff ? "bg-[#1a7f37]" : "bg-black/25"}`} aria-hidden="true">
+            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow ${staff ? "left-[18px]" : "left-0.5"}`} />
+          </span>
+          Include super users
+        </Link>
       </div>
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tiles.map((k) => (
