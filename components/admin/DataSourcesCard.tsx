@@ -3,10 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { fmtBiz } from "@/lib/biztime";
+import { useBizTz } from "./BizTime";
 
 export type SourceStatus = { source: string; label: string; sub: string; ok: boolean | null; checkedAt: string | null; lastOkAt: string | null; ms: number | null; detail: Record<string, unknown> | null };
 
 export function DataSourcesCard({ sources, full }: { sources: SourceStatus[]; full?: boolean }) {
+  const tz = useBizTz();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   async function test(source: string) {
@@ -37,8 +40,8 @@ export function DataSourcesCard({ sources, full }: { sources: SourceStatus[]; fu
               )}
               {full && (
                 <p className="mt-1 text-[12px] text-ink-2">
-                  {s.checkedAt ? `Checked ${new Date(s.checkedAt).toLocaleString("en-GB")}${s.ms ? ` · ${s.ms} ms` : ""}` : "Not tested yet"}
-                  {s.lastOkAt ? ` · last success ${new Date(s.lastOkAt).toLocaleString("en-GB")}` : ""}
+                  {s.checkedAt ? `Checked ${fmtBiz(s.checkedAt, tz)}${s.ms ? ` · ${s.ms} ms` : ""}` : "Not tested yet"}
+                  {s.lastOkAt ? ` · last success ${fmtBiz(s.lastOkAt, tz)}` : ""}
                 </p>
               )}
             </div>

@@ -4,10 +4,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SettingField, saveSetting, type SettingRowLite } from "./SettingField";
 import { Button } from "@/components/ui/Button";
+import { fmtBiz } from "@/lib/biztime";
+import { useBizTz } from "./BizTime";
 
 export type TableRow = SettingRowLite & { section: string; updatedBy: string | null; updatedAt: string | null };
 
 export function SettingsTable({ rows, sections }: { rows: TableRow[]; sections?: string[] }) {
+  const tz = useBizTz();
   const router = useRouter();
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
@@ -102,7 +105,7 @@ export function SettingsTable({ rows, sections }: { rows: TableRow[]; sections?:
                 <td className="py-2.5 pr-3 text-ink-2">{r.type}</td>
                 <td className="py-2.5 text-[13px] text-ink-2">
                   {r.updatedBy ?? "—"}
-                  {r.updatedAt ? ` · ${new Date(r.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}
+                  {r.updatedAt ? ` · ${fmtBiz(r.updatedAt, tz, "short")}` : ""}
                 </td>
               </tr>
             ))}

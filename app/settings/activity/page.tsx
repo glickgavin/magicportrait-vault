@@ -2,6 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db/client";
 import { TrackPageView } from "@/components/TrackPageView";
+import { fmtBiz } from "@/lib/biztime";
+import { getSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Activity log" };
@@ -10,6 +12,7 @@ type SP = Promise<{ email?: string; event?: string; source?: string; actor?: str
 
 /** The full activity log, filterable by email, event, source and who did it. The email filter travels in a cookie, never the URL. */
 export default async function ActivityPage({ searchParams }: { searchParams: SP }) {
+  const tz = await getSetting("brand.timezone");
   const sp = { ...(await searchParams), email: (await cookies()).get("vault_activity_email")?.value || undefined };
   let q = db().from("activity_log").select("id, occurred_at, email, event, source, ref_type, ref_id, props, actor").order("id", { ascending: false }).limit(100);
   if (sp.event) q = q.eq("event", sp.event);
@@ -50,7 +53,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: SP 
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-line align-top">
-                <td className="whitespace-nowrap py-1.5 pr-2">{new Date(r.occurred_at).toLocaleString("en-GB")}</td>
+                <td className="whitespace-nowrap py-1.5 pr-2">{fmtBiz(r.occurred_at, tz)}</td>
                 <td className="pr-2 font-mono">{r.event}</td>
                 <td className="pr-2">{r.email ?? "—"}</td>
                 <td className="pr-2">{r.source}</td>

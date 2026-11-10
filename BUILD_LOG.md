@@ -188,6 +188,8 @@ From Gavin and Gideon's walk-through (`review-fixes-2026-11-04.md`), reviewed ag
 
 ## Decisions
 
+- **Business time is Pacific (9 Nov, requested by Gavin):** setting `brand.timezone` (default `America/Los_Angeles`; PST/PDT handled by Intl, no fixed offsets). The dashboard's ranges start at Pacific midnight ("7 days" = today plus the 6 days before), "Cards per day" buckets by Pacific day (`insights_cards_per_day_tz`, migration `20261109000003_insights_business_tz.sql`), and every date/time in Settings is shown in that zone with its label (e.g. "9 Nov 2026, 14:52 PST"), server and client components alike (`lib/biztime.ts`, `BizTimeProvider`). Customer-facing pages keep the customer's own local time.
+
 - **Show / hide per item (9 Nov, requested by Gavin):** `show` on `layout.photo` and each text zone, switched in the template editor ("Show … on this design"; hidden boxes stay editable, greyed and labelled "(hidden)"). Not drawn when off (shared draw routine). Builder: no photo → the Portrait step is skipped and the card has no portrait (`imageId` optional on the server only for such designs); no message → no message box, stored empty; hidden To/From are still asked ("not printed on this design") because the email and My cards use them.
 
 - **Placeholder image per design (9 Nov, requested by Gavin):** `theme_versions.sample_portrait_path` (migration `20261109000002_version_placeholder.sql`). The template editor can upload (JPEG/PNG/WebP, stored as a ≤1200 px JPEG) and remove it; when set it's the default sample in the editor preview ("Your placeholder"), the test render and the published thumbnail. None, or a missing file: the built-in square sample. Customers' cards always use their own portrait.

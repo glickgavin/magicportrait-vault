@@ -91,6 +91,7 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('vault.include_recommendation_children', 'true'::jsonb, 'boolean', 'vault', 'Include recommendation child sessions', null, null, 'seed', now()),
   ('vault.mirror_expand_by_browser_session', 'false'::jsonb, 'boolean', 'vault', 'Expand by browser session (shared-device risk)', null, null, 'seed', now()),
   ('themes.in_season_days_before', '45'::jsonb, 'number', 'themes', 'In season (days before start)', null, null, 'seed', now()),
+  ('brand.timezone', '"America/Los_Angeles"'::jsonb, 'text', 'brand', 'Business time zone', 'Settings and reports use it: the dashboard''s days (Today, 7 and 30 days, cards per day) and every date and time shown in Settings. Pacific time switches between PST and PDT on its own.', null, 'seed', now()),
   ('brand.support_email', '""'::jsonb, 'text', 'brand', 'Support email', null, null, 'seed', now()),
   ('email.from_cards', '"{from} via Magic Portraits <cards@magicportraitspartners.com>"'::jsonb, 'text', 'email', 'Card sender', 'The address must be the AgentMail inbox.', null, 'seed', now()),
   ('email.from_system', '"My Magic Portraits <cards@magicportraitspartners.com>"'::jsonb, 'text', 'email', 'System sender (codes, links, confirmations)', null, null, 'seed', now()),

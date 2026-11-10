@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cardActions, cardsPerDay, entries, funnel, kpis, liveFeed, RANGES, topThemes, type Range } from "@/lib/admin/insights";
 import { env } from "@/lib/env";
+import { fmtBiz, zoneName } from "@/lib/biztime";
 import { getSettings } from "@/lib/settings";
 import { TrackPageView } from "@/components/TrackPageView";
 
@@ -18,8 +19,11 @@ const STEPS: [string, string][] = [
 export default async function InsightsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const r = (await searchParams).range;
   const range: Range = r && r in RANGES ? (r as Range) : "7d";
-  const s = await getSettings(["tracking.posthog_project_id", "tracking.posthog_ui_host", "tracking.entry_links"] as const);
-  const [tiles, perDay, themes, steps, feed, actions, arrivals] = await Promise.all([kpis(range), cardsPerDay(range), topThemes(range), funnel(range), liveFeed(), cardActions(range), entries(range, s["tracking.entry_links"])]);
+  const s = await getSettings(["tracking.posthog_project_id", "tracking.posthog_ui_host", "tracking.entry_links", "brand.timezone"] as const);
+  const tz = s["brand.timezone"];
+  const now = new Date();
+  const [tiles, perDay, themes, steps, feed, actions, arrivals] = await Promise.all([kpis(range, now, tz), cardsPerDay(range, now, tz), topThemes(range, now, tz), funnel(range, now, tz), liveFeed(), cardActions(range, now, tz), entries(range, s["tracking.entry_links"], now, tz)]);
+  const zoneLabel = zoneName(tz, now);
   const ACTIONS: [keyof Omit<typeof actions, "made" | "not_yet">, string][] = [
     ["emailed", "Emailed"],
     ["shared", "Shared"],
@@ -35,7 +39,9 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[30px] font-extrabold tracking-tight">Dashboard</h1>
-          <p className="text-[15px] text-ink-2">All numbers come from our own database.</p>
+          <p className="text-[15px] text-ink-2">
+            All numbers come from our own database. Days and times are in business time ({zoneLabel}, <code>brand.timezone</code>).
+          </p>
         </div>
         <nav aria-label="Date range" className="flex gap-1 rounded-[12px] bg-white p-1 shadow-sm">
           {(Object.keys(RANGES) as Range[]).map((k) => (
@@ -209,7 +215,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                 <span className="font-mono">{f.event}</span>
                 <span className="truncate text-ink-2">
                   {f.ref_type ? `${f.ref_type}:${f.ref_id} · ` : ""}
-                  {new Date(f.occurred_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                  {fmtBiz(f.occurred_at, tz, "time")}
                 </span>
               </li>
             ))}

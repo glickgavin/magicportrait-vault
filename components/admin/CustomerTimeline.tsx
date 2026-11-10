@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { TimelineItem } from "@/lib/admin/customers";
 import { cn } from "@/lib/utils";
+import { fmtBiz } from "@/lib/biztime";
+import { useBizTz } from "./BizTime";
 
 const CHIPS = [
   ["all", "All"],
@@ -14,6 +16,7 @@ const CHIPS = [
 const TONE: Record<string, string> = { vault: "bg-pink-tint text-pink-dark", shopify: "bg-[#e3f4e8] text-[#1f6b35]", imagen: "bg-[#e5ecf8] text-[#23427a]", email: "bg-[#fff1d6] text-[#7a4a00]" };
 
 export function CustomerTimeline({ items }: { items: TimelineItem[] }) {
+  const tz = useBizTz();
   const [f, setF] = useState<string>("all");
   const shown = items.filter((i) => f === "all" || i.source === f);
   return (
@@ -34,7 +37,7 @@ export function CustomerTimeline({ items }: { items: TimelineItem[] }) {
         {shown.map((i, n) => (
           <li key={n} className="flex gap-3 border-b border-line py-2 text-[14px]" data-source={i.source}>
             <time className="w-[130px] shrink-0 text-[12px] text-ink-2" dateTime={i.at}>
-              {new Date(i.at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              {fmtBiz(i.at, tz)}
             </time>
             <span className={cn("h-fit shrink-0 rounded-full px-2 text-[11px] font-bold", TONE[i.source])}>{CHIPS.find((c) => c[0] === i.source)?.[1]}</span>
             <span className="min-w-0">

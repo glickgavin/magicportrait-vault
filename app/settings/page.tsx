@@ -7,6 +7,8 @@ import { SettingsTable } from "@/components/admin/SettingsTable";
 import { SuperUsersCard } from "@/components/admin/SuperUsersCard";
 import { DataSourcesCard } from "@/components/admin/DataSourcesCard";
 import { TrackPageView } from "@/components/TrackPageView";
+import { fmtBiz } from "@/lib/biztime";
+import { getSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "General & variables" };
@@ -16,6 +18,7 @@ const REDEEM_KEYS = ["redeem.downloads_enabled", "redeem.mug_offer_active", "red
 const TEST_KEYS = ["auth.test_signin_enabled"];
 
 export default async function GeneralSettings() {
+  const tz = await getSetting("brand.timezone");
   const user = await requireSuperUser();
   const [rows, users, sources, changes] = await Promise.all([settingRows(), superUsers(), sourceStatuses(), recentAdminChanges()]);
   const pick = (keys: string[]) => keys.map((k) => rows.find((r) => r.key === k)!).filter(Boolean);
@@ -57,7 +60,7 @@ export default async function GeneralSettings() {
               {changes.map((c) => (
                 <li key={c.id}>
                   <strong>{c.actor.replace("super_user:", "")}</strong> {c.event.replace(/_/g, " ")} {c.ref_id ? <code className="text-[12px]">{c.ref_id}</code> : null}
-                  <span className="text-ink-2"> · {new Date(c.occurred_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
+                  <span className="text-ink-2"> · {fmtBiz(c.occurred_at, tz, "short")}</span>
                 </li>
               ))}
               {!changes.length && <li className="text-ink-2">No changes yet.</li>}

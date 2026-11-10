@@ -8,6 +8,8 @@ import { SettingField } from "@/components/admin/SettingField";
 import { giftOfferEmailStats } from "@/lib/gift/offers";
 import { SendTestButton } from "@/components/admin/EmailTools";
 import { TrackPageView } from "@/components/TrackPageView";
+import { fmtBiz } from "@/lib/biztime";
+import { getSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Emails" };
@@ -16,6 +18,7 @@ const NAMES: Record<string, string> = { "card-delivery": "Card to the recipient"
 const OFFER_KEYS = ["gift.offer_email_enabled", "gift.offer_email_channel", "gift.offer_email_subject", "gift.offer_email_delay_minutes", "gift.link_valid_days"];
 
 export default async function EmailsPage() {
+  const tz = await getSetting("brand.timezone");
   const all = await settingRows();
   const rows = all.filter((r) => r.section === "email" || r.key === "cards.email_sender_name");
   const offerRows = OFFER_KEYS.map((k) => all.find((r) => r.key === k)!).filter(Boolean);
@@ -114,7 +117,7 @@ export default async function EmailsPage() {
                 <td className="py-1.5">{s.email}</td>
                 <td>{s.scope === "card_emails" ? "Card emails" : s.scope === "offer_emails" ? "Offer emails" : "All"}</td>
                 <td>{s.reason}</td>
-                <td>{new Date(s.created_at).toLocaleDateString("en-GB")}</td>
+                <td>{fmtBiz(s.created_at, tz, "date")}</td>
               </tr>
             ))}
             {!sup.length && (

@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { AdminCardRow } from "@/lib/admin/cards";
 import { cn } from "@/lib/utils";
+import { fmtBiz } from "@/lib/biztime";
+import { useBizTz } from "./BizTime";
 
 type Filters = { q: string; category: string; status: string; from: string; to: string; page: number };
 type Detail = {
@@ -17,6 +19,7 @@ type Detail = {
 const STATUSES = ["", "ready", "scheduled", "emailed", "opened", "failed", "cancelled"];
 
 export function AdminCards({ categories }: { categories: { slug: string; name: string }[] }) {
+  const tz = useBizTz();
   const router = useRouter();
   const sp = useSearchParams();
   const open = sp.get("card");
@@ -133,7 +136,7 @@ export function AdminCards({ categories }: { categories: { slug: string; name: s
                       {c.public_id}
                     </Link>
                   </td>
-                  <td>{new Date(c.created_at).toLocaleDateString("en-GB")}</td>
+                  <td>{fmtBiz(c.created_at, tz, "date")}</td>
                   <td className="max-w-[200px] truncate">{c.sender_email}</td>
                   <td>{c.to_name}</td>
                   <td>
@@ -190,7 +193,7 @@ export function AdminCards({ categories }: { categories: { slug: string; name: s
               <dt className="text-ink-2">Delivery</dt>
               <dd>
                 {detail.card.delivery} · {detail.card.status}
-                {detail.card.scheduled_for ? ` · ${new Date(detail.card.scheduled_for).toLocaleString("en-GB")}` : ""}
+                {detail.card.scheduled_for ? ` · ${fmtBiz(detail.card.scheduled_for, tz)}` : ""}
               </dd>
               <dt className="text-ink-2">Portrait</dt>
               <dd className="font-mono text-[12px]">{detail.card.imagen_image_id}</dd>
@@ -217,7 +220,7 @@ export function AdminCards({ categories }: { categories: { slug: string; name: s
                 <li key={i}>
                   {d.type}
                   {d.channel ? `/${d.channel}` : ""} · {d.status}
-                  {d.error ? ` (${d.error})` : ""} · {new Date(d.created_at).toLocaleString("en-GB")}
+                  {d.error ? ` (${d.error})` : ""} · {fmtBiz(d.created_at, tz)}
                 </li>
               ))}
             </ul>
@@ -225,7 +228,7 @@ export function AdminCards({ categories }: { categories: { slug: string; name: s
             <ul className="text-[13px]">
               {detail.timeline.map((t, i) => (
                 <li key={i}>
-                  {new Date(t.occurred_at).toLocaleString("en-GB")} · <code>{t.event}</code> · {t.actor}
+                  {fmtBiz(t.occurred_at, tz)} · <code>{t.event}</code> · {t.actor}
                 </li>
               ))}
             </ul>

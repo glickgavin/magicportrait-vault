@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+/** IANA time zone check (kept here, not imported, so scripts/gen-seed.ts runs under plain Node). */
+const isTimeZone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Every setting the app reads, declared once: type, section, default and validation.
  * `supabase/seed.sql` is generated from this file (scripts/gen-seed.ts); a test keeps them in sync.
@@ -177,6 +187,14 @@ export const REGISTRY = {
   "themes.in_season_days_before": num("themes", 45, { label: "In season (days before start)", min: 0, max: 180 }),
 
   // ---------- brand ----------
+  "brand.timezone": {
+    type: "text",
+    section: "brand",
+    default: "America/Los_Angeles",
+    schema: z.string().refine(isTimeZone, "Must be a time zone name such as America/Los_Angeles"),
+    label: "Business time zone",
+    description: "Settings and reports use it: the dashboard's days (Today, 7 and 30 days, cards per day) and every date and time shown in Settings. Pacific time switches between PST and PDT on its own.",
+  },
   "brand.support_email": text("brand", "", { label: "Support email", max: 200 }),
 
   // ---------- email ----------
