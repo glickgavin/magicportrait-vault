@@ -180,6 +180,12 @@ test.describe("settings (super users)", () => {
     await expect(page.getByTestId("card-actions")).toContainText("Emailed");
     await expect(page.getByTestId("card-actions")).toContainText("Made, nothing done yet");
     await expect(page.getByTestId("arrivals")).toContainText("Free gift offer email");
+    // The date ranges, including Yesterday and MTD.
+    for (const label of ["Today", "Yesterday", "7 days", "MTD", "30 days", "All time"]) {
+      await page.getByRole("navigation", { name: "Date range" }).getByRole("link", { name: label, exact: true }).click();
+      await expect(page.getByRole("navigation", { name: "Date range" }).getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
+      await expect(page.getByTestId("kpi-cards_created")).toBeVisible();
+    }
     // Super users are left out by default; the switch includes them.
     await expect(page.getByTestId("include-staff")).toHaveAttribute("aria-checked", "false");
     await page.getByTestId("include-staff").click();

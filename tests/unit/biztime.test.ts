@@ -28,6 +28,25 @@ describe("business time (Pacific)", () => {
     expect(week.prevFrom!.toISOString()).toBe("2026-10-27T07:00:00.000Z"); // before the switch: PDT
     expect(week.prevTo!.toISOString()).toBe(week.from.toISOString());
   });
+  it("Yesterday is the whole previous Pacific day, compared with the day before", () => {
+    const now = new Date("2026-11-09T20:00:00Z"); // 12:00 PST on 9 Nov
+    const y = periods("yesterday", now, LA);
+    expect(y.from.toISOString()).toBe("2026-11-08T08:00:00.000Z");
+    expect(y.to.toISOString()).toBe("2026-11-09T08:00:00.000Z");
+    expect(y.prevFrom!.toISOString()).toBe("2026-11-07T08:00:00.000Z");
+    expect(y.prevTo!.toISOString()).toBe(y.from.toISOString());
+  });
+  it("MTD is the 1st until now, compared with the same stretch of last month", () => {
+    const now = new Date("2026-11-09T20:00:00Z"); // 9 Nov, 12:00 PST
+    const m = periods("mtd", now, LA);
+    expect(m.from.toISOString()).toBe("2026-11-01T07:00:00.000Z"); // 1 Nov midnight was still PDT
+    expect(m.to.toISOString()).toBe(now.toISOString());
+    expect(m.prevFrom!.toISOString()).toBe("2026-10-01T07:00:00.000Z");
+    expect(m.prevTo!.toISOString()).toBe("2026-10-09T19:00:00.000Z"); // 9 Oct, 12:00 PDT
+    // On the 31st, last month (30 days) is compared whole, never spilling into this month.
+    const late = periods("mtd", new Date("2026-12-31T20:00:00Z"), LA);
+    expect(late.prevTo!.toISOString()).toBe(late.from.toISOString());
+  });
   it("labels times with the zone, and validates zone names", () => {
     expect(fmtBiz("2026-11-09T22:52:00Z", LA)).toMatch(/9 Nov 2026, 14:52 PST/);
     expect(fmtBiz("2026-07-01T22:52:00Z", LA, "time")).toMatch(/15:52 PDT/);
