@@ -186,3 +186,25 @@ describe("where people came from", () => {
     ]);
   });
 });
+
+describe("super users are left out by default", () => {
+  const NOW4 = new Date(Date.UTC(YEAR, 10, 10, 12));
+  const d4 = (d: number, h = 18) => new Date(Date.UTC(YEAR, 10, d, h)).toISOString();
+  it("their cards and events don't count unless staff is included", async () => {
+    const customer = `cust-${randomBytes(3).toString("hex")}@example.com`;
+    await db().from("super_users").upsert({ email: "staff-test@example.com", added_by: "test" }, { onConflict: "email", ignoreDuplicates: true });
+    await card(customer, d4(8));
+    await card("staff-test@example.com", d4(8));
+    await card("staff-test@example.com", d4(9));
+    await event("vault_signed_in", customer, d4(8));
+    await event("vault_signed_in", "staff-test@example.com", d4(8));
+    const without = Object.fromEntries((await kpis("7d", NOW4, "UTC")).map((x) => [x.key, x.value]));
+    const withStaff = Object.fromEntries((await kpis("7d", NOW4, "UTC", true)).map((x) => [x.key, x.value]));
+    expect(without).toMatchObject({ cards_created: 1, people_creating: 1, sign_ins: 1 });
+    expect(withStaff).toMatchObject({ cards_created: 3, people_creating: 2, sign_ins: 2 });
+    const perDay = (await cardsPerDay("7d", NOW4, "UTC")).reduce((n, d) => n + d.n, 0);
+    expect(perDay).toBe(1);
+    expect((await funnel("7d", NOW4, "UTC")).signed_in).toBe(1);
+    expect((await funnel("7d", NOW4, "UTC", true)).signed_in).toBe(2);
+  });
+});

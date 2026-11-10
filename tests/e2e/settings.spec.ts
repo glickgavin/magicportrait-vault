@@ -180,6 +180,11 @@ test.describe("settings (super users)", () => {
     await expect(page.getByTestId("card-actions")).toContainText("Emailed");
     await expect(page.getByTestId("card-actions")).toContainText("Made, nothing done yet");
     await expect(page.getByTestId("arrivals")).toContainText("Free gift offer email");
+    // Super users are left out by default; the switch includes them.
+    await expect(page.getByTestId("include-staff")).toHaveAttribute("aria-checked", "false");
+    await page.getByTestId("include-staff").click();
+    await expect(page).toHaveURL(/staff=1/);
+    await expect(page.getByTestId("include-staff")).toHaveAttribute("aria-checked", "true");
     await expect(page.getByTestId("arrivals-invoice")).toContainText("/from/invoice");
     await expect(page.getByTestId("cards-per-day").getByTestId("bar-value").filter({ hasText: /^\d+$/ }).first()).toBeAttached();
     await page.goto("/settings/customers");
