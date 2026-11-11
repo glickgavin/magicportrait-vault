@@ -13,6 +13,6 @@ async function view(i: ShopImage) {
 export async function GET() {
   const u = await shopUserOrNull();
   if (!u) return notFoundJson();
-  const list = await listPictures(u.email);
+  const list = await listPictures(u.email, true);
   return json({ portraits: await Promise.all(list.portraits.map(view)), photos: await Promise.all(list.photos.map(view)), partial: list.partial });
 }

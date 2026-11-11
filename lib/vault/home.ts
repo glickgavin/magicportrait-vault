@@ -33,7 +33,7 @@ export function mugPendingCount(profile: VaultProfile): number {
   }).length;
 }
 
-export async function loadHome(email: string): Promise<HomeData> {
+export async function loadHome(email: string, opts: { all?: boolean } = {}): Promise<HomeData> {
   const now = new Date();
   const s = await getSettings([
     "cards.enabled",
@@ -47,7 +47,7 @@ export async function loadHome(email: string): Promise<HomeData> {
     "vault.mirror_session_since",
   ] as const);
   const [profile, cards, cardsThisMonth, catalog] = await Promise.all([
-    getVaultProfile(email),
+    getVaultProfile(email, opts.all ? { all: true } : undefined),
     listCardsBySender(email, 50),
     countCardsBySender(email, monthStart(now)),
     getCatalog(now, s["themes.in_season_days_before"]),

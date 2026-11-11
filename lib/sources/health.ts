@@ -58,7 +58,7 @@ export async function testSource(name: SourceName, by: string): Promise<CheckRes
       const cold = await getVaultProfile(by, { refresh: true });
       const coldMs = Date.now() - t0;
       const t1 = Date.now();
-      const warm = await getVaultProfile(by, { refresh: false, createdVia: "sign_in", memory: false });
+      const warm = await getVaultProfile(by, { refresh: false, createdVia: "sign_in", memory: false, all: true });
       const warmMs = Date.now() - t1;
       detail = { cold_ms: coldMs, warm_ms: warmMs, sessions: warm.sessions.length, portraits: cold.portraitCount, orders: cold.orders.length, under_target: warmMs < 1500 };
       // A lookup that ran with a source down is not a pass.

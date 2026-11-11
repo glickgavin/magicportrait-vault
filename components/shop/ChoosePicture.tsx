@@ -13,7 +13,7 @@ type Tab = "portraits" | "photos" | "upload";
 type Upload = { name: string; pct: number; error: string | null; preview: string | null };
 
 /** Choose a picture: Portraits, My photos (past uploads and photo tiles) and Upload (docs/shop.md). */
-export function ChoosePicture({ page, product, tab: initialTab, portraits, photos, partial, maxMb, minPx }: { page: ShopPage; product: string | null; tab: Tab; portraits: PictureView[]; photos: PictureView[]; partial: boolean; maxMb: number; minPx: number }) {
+export function ChoosePicture({ page, product, tab: initialTab, portraits, photos, partial, moreSessions = 0, maxMb, minPx }: { page: ShopPage; product: string | null; tab: Tab; portraits: PictureView[]; photos: PictureView[]; partial: boolean; moreSessions?: number; maxMb: number; minPx: number }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [selected, setSelected] = useState<string | null>(null);
@@ -108,6 +108,16 @@ export function ChoosePicture({ page, product, tab: initialTab, portraits, photo
           <div className="flex flex-col gap-2">
             {portraits.length > 0 && <p className="text-[13px] font-semibold text-ink-2">{tn("shop.portraitsCount", portraits.length)}</p>}
             {grid(portraits, t("shop.noPortraits"))}
+            {moreSessions > 0 && (
+              <Link
+                href={`${base}/choose?${new URLSearchParams({ ...(product ? { product } : {}), all: "1" }).toString()}`}
+                scroll={false}
+                className="mt-2 flex h-12 items-center justify-center self-center rounded-[14px] border border-black/15 bg-white px-5 text-[15px] font-bold"
+                data-testid="portraits-more"
+              >
+                {tn("ui.showMoreSessions", moreSessions)}
+              </Link>
+            )}
           </div>
         )}
         {tab === "photos" && (

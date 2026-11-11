@@ -98,8 +98,10 @@ export class ImagenLive implements ImagenSource {
   readonly kind = "live" as const;
   constructor(private url: string) {}
 
-  async portraits(sessionIds: string[], opts: { includeChildren: boolean; imageBaseUrl: string }): Promise<ImagenPortraitRow[]> {
+  async portraits(sessionIds: string[], opts: { includeChildren: boolean; imageBaseUrl: string; newestSessions?: number }): Promise<ImagenPortraitRow[]> {
     if (!sessionIds.length) return [];
+    // LIMIT NULL is no limit.
+    const newest = opts.newestSessions && opts.newestSessions > 0 ? opts.newestSessions : null;
     const sql = pool(this.url);
     // docs/data.md §3.6
     const rows = await sql<
@@ -133,6 +135,14 @@ export class ImagenLive implements ImagenSource {
         select sr.child_session_id from public.session_recommendations sr
         join input on sr.session_id = input.id
         where ${opts.includeChildren} and sr.child_session_id is not null
+      ),
+      picked as (
+        select a.id from all_sessions a
+        join public.sessions s on s.id = a.id
+        where coalesce((s.metadata->>'is_test')::boolean, false) = false
+          and exists (select 1 from public.images i where i.session_id = a.id and i.is_grid = false and i.visibility = 'customer')
+        order by s.created_at desc
+        limit ${newest}
       )
       select i.id as image_id, i.session_id, s.created_at as session_created_at, s.status as session_status,
              coalesce((s.metadata->>'is_recommendation_child')::boolean, false) as is_recommendation_child,
@@ -141,7 +151,7 @@ export class ImagenLive implements ImagenSource {
              i.created_at, i.tile_index, i.width, i.height, i.format, i.image_path,
              (r.image_id is not null) as ordered, r.shopify_order_ids, r.shopify_line_item_ids, r.first_ordered_at
       from public.images i
-      join all_sessions a on a.id = i.session_id
+      join picked a on a.id = i.session_id
       join public.sessions s on s.id = i.session_id
       left join public.themes t on t.id = s.theme_id
       left join lateral (
@@ -175,6 +185,31 @@ export class ImagenLive implements ImagenSource {
       shopifyLineItemIds: r.shopify_line_item_ids ?? [],
       firstOrderedAt: r.first_ordered_at ? new Date(r.first_ordered_at).toISOString() : null,
     }));
+  }
+
+  async portraitTotals(sessionIds: string[], opts: { includeChildren: boolean }) {
+    if (!sessionIds.length) return { sessions: 0, portraits: 0, ordered: 0 };
+    const sql = pool(this.url);
+    // The same pictures as portraits() counts (customer-visible, not grids, not test sessions).
+    const r = await sql<{ sessions: number; portraits: number; ordered: number }[]>`
+      with input as (select unnest(${sessionIds}::uuid[]) as id),
+      all_sessions as (
+        select id from input
+        union
+        select sr.child_session_id from public.session_recommendations sr
+        join input on sr.session_id = input.id
+        where ${opts.includeChildren} and sr.child_session_id is not null
+      ),
+      visible as (
+        select i.id, i.session_id from public.images i
+        join all_sessions a on a.id = i.session_id
+        join public.sessions s on s.id = i.session_id
+        where i.is_grid = false and i.visibility = 'customer' and coalesce((s.metadata->>'is_test')::boolean, false) = false
+      )
+      select (select count(distinct session_id) from visible)::int as sessions,
+             (select count(*) from visible)::int as portraits,
+             (select count(distinct re.image_id) from public.revenue_events re join visible v on v.id = re.image_id where re.source = 'shopify')::int as ordered`;
+    return r[0] ?? { sessions: 0, portraits: 0, ordered: 0 };
   }
 
   async sessions(sessionIds: string[]) {

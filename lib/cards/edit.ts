@@ -23,7 +23,9 @@ export async function editScheduledCard(email: string, cardId: string, raw: unkn
   const version = catalog.versions.find((v) => v.id === input.versionId) ?? (input.versionId === card.version_id ? { id: card.version_id, themeId: card.theme_id, messageMaxChars: null } : null);
   if (!version) throw new CardError("bad_version");
   if (input.message.length > (version.messageMaxChars ?? s["cards.message_max_chars"])) throw new CardError("too_long");
-  const profile = await getVaultProfile(email);
+  let profile = await getVaultProfile(email);
+  // A portrait from an older session (Show more) isn't in the newest ones: look through them all.
+  if (!profile.sessions.some((g) => g.portraits.some((p) => p.imageId === input.imageId)) && profile.more.sessions > 0) profile = await getVaultProfile(email, { all: true });
   const session = profile.sessions.find((g) => g.portraits.some((p) => p.imageId === input.imageId));
   const portrait = session?.portraits.find((p) => p.imageId === input.imageId);
   if (!session || !portrait) throw new CardError("bad_portrait", 404);

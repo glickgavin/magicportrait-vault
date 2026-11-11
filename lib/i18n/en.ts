@@ -8,6 +8,9 @@ export const en = {
     back: "Back",
     skip: "Skip to content",
     loading: "Loading…",
+    showMoreSessions_one: "Show {count} more session",
+    showMoreSessions_other: "Show {count} more sessions",
+    showingNewest: "Showing your newest {shown} of {total} sessions.",
     footer: {
       products: "Products:",
       petPortraits: "Pet Portraits",

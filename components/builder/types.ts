@@ -26,6 +26,8 @@ export type BuilderData = {
   versions: ClientVersion[];
   categories: { slug: string; name: string; inSeason: boolean; count: number }[];
   sessions: ClientSession[];
+  /** Older sessions not in `sessions` yet (Show more loads them from /api/portraits). */
+  moreSessions: number;
   firstName: string;
   footerText: string;
   maxChars: number;

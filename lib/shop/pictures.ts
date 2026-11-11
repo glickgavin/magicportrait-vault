@@ -15,7 +15,8 @@ import type { MirrorImageProps, ShopImagesSource } from "./sources/images";
 import type { UploadRefusal } from "./upload";
 
 /** The signed-in person's pictures for the shop: portraits, past photos, photo tiles and new uploads. */
-export type PictureList = { portraits: ShopImage[]; photos: ShopImage[]; partial: boolean };
+/** `moreSessions`: older Imagen sessions not listed (the newest are shown first; `all` lists them too). */
+export type PictureList = { portraits: ShopImage[]; photos: ShopImage[]; partial: boolean; moreSessions: number };
 
 const tileUrlCache = new Map<string, string | null>();
 const TILE_CACHE_MAX = 5000;
@@ -62,8 +63,8 @@ function portraitsOf(profile: { sessions: Awaited<ReturnType<typeof getVaultProf
   return profile.sessions.flatMap((g) => g.portraits.map((p) => ({ imageId: p.imageId, sessionId: p.sessionId, imageUrl: p.imageUrl, width: p.width, height: p.height, createdAt: p.createdAt, ordered: p.ordered })));
 }
 
-/** Everything one person can pick from. Memoised per request; the outside reads run side by side. */
-export const listPictures = cache(async (email: string): Promise<PictureList> => {
+/** Everything one person can pick from (portraits from the newest sessions unless `all`). Memoised per request; the outside reads run side by side. */
+export const listPictures = cache(async (email: string, all = false): Promise<PictureList> => {
   const s = await getSettings([
     "redeem.allowed_image_hosts",
     "shop.photo_tile_base_url",
@@ -80,7 +81,7 @@ export const listPictures = cache(async (email: string): Promise<PictureList> =>
   let partial = false;
   const props = { uploadEvent: s["shop.mirror_upload_event"], uploadProperty: s["shop.mirror_upload_property"], tileEvent: s["shop.mirror_tile_event"], limit: s["shop.mirror_images_limit"] };
   const [profile, [past, tiles], rows] = await Promise.all([
-    getVaultProfile(email),
+    getVaultProfile(email, all ? { all: true } : undefined),
     mirrorPictures(e, props, s["vault.profile_memory_seconds"] * 1000).catch((err: unknown) => {
       partial = true;
       console.error(`[shop] mirror pictures unavailable (${maskEmail(email)}): ${(err as Error).message}`);
@@ -118,7 +119,7 @@ export const listPictures = cache(async (email: string): Promise<PictureList> =>
       if (k) [i.width, i.height] = [k.width, k.height];
     }
   }
-  return { ...list, partial };
+  return { ...list, partial, moreSessions: profile.more.sessions };
 });
 
 /** One of the signed-in person's own pictures, or null. Never looks anywhere but their own list. */
@@ -133,7 +134,7 @@ export async function pictureFor(email: string, id: string): Promise<ShopImage |
     // usually not for Shopify either (the sessions we already know); the full profile only if it's not there.
     const find = (sessions: Awaited<ReturnType<typeof getVaultProfile>>["sessions"]) => buildImageList({ portraits: portraitsOf({ sessions }), pastUploads: [], photoTiles: [], newUploads: [] }).portraits.find((i) => i.id === id);
     const quick = await knownPortraits(email);
-    const found = (quick && find(quick)) || find((await getVaultProfile(email)).sessions);
+    const found = (quick && find(quick)) || find((await getVaultProfile(email, { all: true })).sessions);
     if (!found) return null;
     if ((!found.width || !found.height) && "url" in found.source) {
       const k = (await knownSizes(email, [found.source.url])).get(found.source.url);
@@ -141,6 +142,7 @@ export async function pictureFor(email: string, id: string): Promise<ShopImage |
     }
     return found;
   }
+  // Photos aren't limited to the newest sessions; portraits were found above.
   const list = await listPictures(email);
   return [...list.portraits, ...list.photos].find((i) => i.id === id) ?? null;
 }

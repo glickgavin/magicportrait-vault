@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { withPending, type PendingLines } from "@/components/shop/CartView";
 import { afterResponse, mapLimit, opName } from "@/lib/perf";
 import { sameCrop } from "@/lib/shop/cart";
+import { ImagenFixtures, ShopifyFixtures } from "@/lib/sources/fixtures";
+import { needsOlderOrders } from "@/lib/vault/profile";
+import { buildProfile } from "@/lib/vault/profile-core";
 
 type Cart = Parameters<typeof withPending>[0];
 const line = (o: Partial<Cart["lines"][number]> = {}) =>
@@ -67,5 +70,43 @@ describe("adding the same thing again adds to its line", () => {
     expect(sameCrop(fromDb, { x: 62, y: 1, w: 900, h: 900 })).toBe(false);
     expect(sameCrop(null, null)).toBe(true);
     expect(sameCrop(null, { x: 0, y: 0, w: 1, h: 1 })).toBe(false);
+  });
+});
+
+describe("the newest sessions and orders first (Show more for the rest)", () => {
+  const S = (p: string, n: number) => `${p}-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const sam = [S("5e550001", 1), S("5e550001", 2)];
+
+  it("Shopify: the newest orders and whether older ones exist", async () => {
+    const shopify = new ShopifyFixtures();
+    const one = await shopify.recentOrdersByEmail("sam@example.com", 1);
+    expect(one.orders.map((o) => o.name)).toEqual(["#1002"]);
+    expect(one.more).toBe(true);
+    const all = await shopify.recentOrdersByEmail("sam@example.com", 3);
+    expect(all.orders.map((o) => o.name)).toEqual(["#1002", "#1001"]);
+    expect(all.more).toBe(false);
+  });
+
+  it("Imagen: only the newest sessions (children count as sessions), with totals for all of them", async () => {
+    const imagen = new ImagenFixtures();
+    const opts = { includeChildren: true, imageBaseUrl: "" };
+    const allRows = await imagen.portraits(sam, opts);
+    expect(new Set(allRows.map((r) => r.sessionId)).size).toBe(3);
+    const newest = await imagen.portraits(sam, { ...opts, newestSessions: 2 });
+    // 1 Nov (cozy) and 20 Oct 10:20 (the space child), not the 20 Oct 10:00 parent.
+    expect([...new Set(newest.map((r) => r.sessionId))].sort()).toEqual([S("5e550001", 2), S("5e550001", 3)].sort());
+    expect(await imagen.portraitTotals(sam, { includeChildren: true })).toEqual({ sessions: 3, portraits: 12, ordered: allRows.filter((r) => r.ordered).length });
+  });
+
+  it("older orders are read only when the newest don't show the free gift", () => {
+    expect(needsOlderOrders({ hasFreeGift: false }, true)).toBe(true);
+    expect(needsOlderOrders({ hasFreeGift: true }, true)).toBe(false);
+    expect(needsOlderOrders({ hasFreeGift: false }, false)).toBe(false);
+  });
+
+  it("a profile built from everything says nothing more is waiting", () => {
+    const p = buildProfile({ email: "x@example.com", orders: [], mirrorSessions: [], rows: [], unlockRule: "any_paid_order", qualifyingProductIds: [], orderUrlTemplate: "", startPortraitUrl: "" });
+    expect(p.more).toEqual({ sessions: 0, orders: false });
+    expect(p.sessionCount).toBe(0);
   });
 });

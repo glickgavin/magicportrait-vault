@@ -33,7 +33,7 @@ export type TimelineItem = { at: string; source: "vault" | "email" | "shopify" |
 /** One timeline merged by time: activity_log (My MP, Email) + live Shopify orders + live Imagen sessions. */
 export async function customerTimeline(email: string): Promise<{ items: TimelineItem[]; profile: Awaited<ReturnType<typeof getVaultProfile>> }> {
   const [profile, act] = await Promise.all([
-    getVaultProfile(email, { createdVia: "admin_lookup" }),
+    getVaultProfile(email, { createdVia: "admin_lookup", all: true }),
     db().from("activity_log").select("occurred_at, event, source, ref_type, ref_id, props").eq("email", email).order("occurred_at", { ascending: false }).limit(300),
   ]);
   const items: TimelineItem[] = [];

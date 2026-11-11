@@ -262,6 +262,8 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `vault.first_order_offer` | "" |
 | `vault.lookup_cache_minutes` | 10 |
 | `vault.profile_memory_seconds` | 60 (each server keeps a person's Shopify orders and Imagen portraits in memory this long between pages; never stored; 0 = read live every page) |
+| `vault.recent_sessions` | 3 (pages show the newest this many Imagen sessions, with Show more; 0 = all) |
+| `vault.recent_orders` | 3 (pages read the newest this many Shopify orders, the rest only when these don't show the free gift; 0 = all) |
 | `vault.slow_call_log_ms` | 500 (`[perf]` log line for slower outside calls; 0 = off) |
 | `themes.in_season_days_before` | 45 |
 | `brand.support_email` | "" |

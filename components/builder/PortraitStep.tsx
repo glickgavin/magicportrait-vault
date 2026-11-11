@@ -8,8 +8,9 @@ import { CardPreview } from "@/components/CardPreview";
 import { StepHeader, StickyFooterBar } from "./StepHeader";
 import { useDraft } from "./useDraft";
 import type { BuilderData } from "./types";
+import { useMoreSessions } from "./useMoreSessions";
 import { isShown } from "@/lib/render/layout";
-import { t } from "@/lib/i18n";
+import { t, tn } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +18,8 @@ export function PortraitStep({ data, versionId, imageId }: { data: BuilderData; 
   const router = useRouter();
   const { draft, update, ready } = useDraft((d) => ({ ...d, versionId: versionId ?? d.versionId, imageId: imageId ?? d.imageId ?? data.defaults.imageId }));
   const version = data.versions.find((v) => v.id === draft.versionId) ?? null;
-  const all = data.sessions.flatMap((s) => s.portraits);
+  const { sessions, more, loading, failed, loadMore } = useMoreSessions(data);
+  const all = sessions.flatMap((s) => s.portraits);
   const portrait = all.find((p) => p.imageId === draft.imageId) ?? null;
   const [adjust, setAdjust] = useState(false);
 
@@ -25,6 +27,10 @@ export function PortraitStep({ data, versionId, imageId }: { data: BuilderData; 
     trackClient("page_view_card_portrait", { portrait_count: all.length });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // The draft's portrait may be in an older session: fetch them all once so it shows as chosen.
+  useEffect(() => {
+    if (ready && draft.imageId && !portrait && more > 0) void loadMore();
+  }, [ready, draft.imageId, portrait, more, loadMore]);
   useEffect(() => {
     if (ready && !version) router.replace("/create?step=theme");
     // A design without a photo has no Portrait step.
@@ -32,11 +38,11 @@ export function PortraitStep({ data, versionId, imageId }: { data: BuilderData; 
   }, [ready, version, router]);
   if (!version) return null;
 
-  const session = data.sessions.find((s) => s.sessionId === portrait?.sessionId);
+  const session = sessions.find((s) => s.sessionId === portrait?.sessionId);
   const label = portrait && session ? `${[session.petName, session.themeName].filter(Boolean).join(", ")} ${session.portraits.indexOf(portrait) + 1}` : t("builder.nothingSelected");
 
   // One grid, newest first (sessions arrive newest first), each labelled by its session.
-  const items = data.sessions.flatMap((s) => {
+  const items = sessions.flatMap((s) => {
     const title = [s.themeName, s.petName].filter(Boolean).join(" · ") || t("portraits.untitled");
     return s.portraits.map((p, i) => ({ p, s, label: t("builder.portraitN", { theme: title, n: i + 1 }) }));
   });
@@ -101,6 +107,19 @@ export function PortraitStep({ data, versionId, imageId }: { data: BuilderData; 
           </button>
         ))}
       </div>
+
+      {more > 0 && (
+        <div className="mt-4 flex flex-col items-center gap-1">
+          <button type="button" onClick={() => void loadMore()} disabled={loading} aria-busy={loading || undefined} className="flex h-12 items-center justify-center rounded-[14px] border border-black/15 bg-white px-5 text-[15px] font-bold disabled:opacity-60" data-testid="portraits-more">
+            {loading ? t("ui.loading") : tn("ui.showMoreSessions", more)}
+          </button>
+          {failed && (
+            <p role="alert" className="text-[13px] text-[#a1251b]">
+              {t("shop.checkoutErrors.other")}
+            </p>
+          )}
+        </div>
+      )}
 
       <StickyFooterBar label={t("builder.selected")} value={label}>
         <Button size="lg" disabled={!portrait} onClick={() => router.push(`/create/message?v=${version.id}&image=${portrait!.imageId}`)} data-testid="next">

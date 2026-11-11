@@ -53,8 +53,12 @@ export type VaultProfile = {
   orders: OrderSummary[];
   rawOrders: ShopifyOrder[];
   sessions: SessionGroup[];
+  /** All of the person's sessions, portraits and ordered portraits, also when only the newest are in `sessions`. */
+  sessionCount: number;
   portraitCount: number;
   orderedCount: number;
+  /** What isn't loaded: sessions not in `sessions`, and whether older orders weren't read. */
+  more: { sessions: number; orders: boolean };
   state: "customer" | "creator" | "nobody";
   lookupMs: number;
   /** Sources that failed during this lookup; the profile is partial when non-empty. */
@@ -172,8 +176,10 @@ export function buildProfile(input: BuildInput): VaultProfile {
     })),
     rawOrders: orders,
     sessions,
+    sessionCount: sessions.length,
     portraitCount,
     orderedCount,
+    more: { sessions: 0, orders: false },
     state: isCustomer ? "customer" : portraitCount > 0 ? "creator" : "nobody",
     lookupMs: 0,
     unavailable: [],

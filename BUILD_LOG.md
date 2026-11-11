@@ -470,3 +470,13 @@ Measured on the branch preview from Gavin's browser (same data as live):
 | Cart + / − / Remove | nothing until the reload | 0.04 s on screen; saved within 4 s | |
 
 Still slow, and why: Shopify's orders search is 1.1–1.4 s per read, the mirror (us-west-1) 0.6 s on a new connection, and Storefront cart mutations 0.9–1.7 s each. A server only remembers what it read itself, and Vercel spreads one person's requests (pages and their prefetches) across several servers, so the 60-second memory often misses.
+
+## Newest first, Show more (11 Nov)
+Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show more" in the gallery. The data before building: 292 of 307 members (95%) have 3 or fewer sessions (about 6 portraits each); 9 have 4–10 and 6 have 11+ (about 300 portraits each). Gavin's own account has 73 sessions (77 with recommendation children) and 482 portraits, which is why the app was much slower for the team than for a typical customer (PostHog: sign-in lookup p50 0.8 s for 1–3 orders and ≤3 sessions, 3.7 s for 11+ of both).
+- `vault.recent_sessions` (3) and `vault.recent_orders` (3), both 0 = everything. Pages get the newest sessions (Imagen `portraits(…, { newestSessions })`, children counted as sessions) plus `portraitTotals` for the counts, and the newest orders (`recentOrdersByEmail`).
+- **Free gift:** when the newest orders don't show it and older ones exist, the rest are read (`needsOlderOrders`), so nobody loses card access because their qualifying order is older.
+- `VaultProfile` gains `sessionCount` and `more { sessions, orders }`; `portraitCount`/`orderedCount` are the totals. The member cache keeps `is_customer` / `first_order_at` from the last full read when older orders weren't read.
+- **Show more:** Portraits (`?all=1`, kept when the filter changes), the card builder's portrait step and first-card photo sheet (`GET /api/portraits`, own sessions only, rate-limited like lookups), and the shop's Choose a picture (`?all=1`). Card create/edit, a builder link to an older portrait, and shop `pictureFor` look through everything when the picture isn't in the newest.
+- Everything else reads all: Settings › Customers, sign-in (refresh, which also feeds Klaviyo), the health check, `/api/shop/pictures`.
+- Known limits of the newest-only view: the home page's "choose your mug photo" count covers the newest orders only (the Orders page lists them all), and a portrait whose only order is an older, cancelled one on the same email can show "Ordered" until Show more.
+

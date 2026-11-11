@@ -82,6 +82,8 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('vault.lookup_cache_minutes', '10'::jsonb, 'number', 'vault', 'Portrait lookup cache (minutes)', null, null, 'seed', now()),
   ('vault.lookup_rate_limit_per_hour', '120'::jsonb, 'number', 'vault', 'Lookups per person per hour', null, null, 'seed', now()),
   ('vault.profile_memory_seconds', '60'::jsonb, 'number', 'vault', 'Keep a person''s orders and portraits between pages (seconds)', 'Each server keeps what it read from Shopify and Imagen for this long, so moving between pages doesn''t read it all again. Never stored in the database. 0 reads them live on every page.', null, 'seed', now()),
+  ('vault.recent_sessions', '3'::jsonb, 'number', 'vault', 'Sessions shown at first', 'Portraits, the card builder and the shop''s picture lists show the newest this many Imagen sessions, with Show more for the rest. 0 shows them all.', null, 'seed', now()),
+  ('vault.recent_orders', '3'::jsonb, 'number', 'vault', 'Orders read at first', 'Pages read the newest this many Shopify orders; older ones are read only when these don''t show the free gift. 0 reads them all.', null, 'seed', now()),
   ('vault.slow_call_log_ms', '500'::jsonb, 'number', 'vault', 'Log calls slower than (ms)', 'Server logs a [perf] line (step and time only) for any outside call that takes longer. 0 turns it off.', null, 'seed', now()),
   ('vault.shopify_api_version', '"2025-07"'::jsonb, 'text', 'vault', 'Shopify Admin API version', null, null, 'seed', now()),
   ('vault.order_search_page_size', '25'::jsonb, 'number', 'vault', 'Orders per page', null, null, 'seed', now()),
