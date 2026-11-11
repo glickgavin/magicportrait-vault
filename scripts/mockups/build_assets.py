@@ -192,7 +192,8 @@ def main():
     inside = g[binm]
     # Behind acrylic the whole face carries a faint haze of reflection: keep only the clear highlights.
     floor = float(np.percentile(inside, 45 if info.get("behind_glass") else 30)) if inside.size else 0.0
-    a_gloss = np.clip((g - floor) * (1.5 if info.get("behind_glass") else 1.25), 0, 0.85)
+    # Acrylic keeps crisp reflections; glazed ceramic gets a softer cap so the shine never greys the picture.
+    a_gloss = np.clip((g - floor) * (1.5 if info.get("behind_glass") else 1.0), 0, 0.85 if info.get("behind_glass") else 0.42)
     # Drop the faint render noise (invisible, but it makes the file ten times bigger) and soften what's left.
     a_gloss = np.where(a_gloss < 0.035, 0, a_gloss)
     a_gloss = cv2.GaussianBlur(a_gloss.astype(np.float32), (0, 0), 1.2) * m
