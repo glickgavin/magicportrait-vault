@@ -31,8 +31,9 @@ export function ShopLanding({ page, data, recent }: { page: ShopPage; data: Data
   return (
     <div className="mx-auto flex max-w-[1120px] flex-col gap-8">
       <TrackPageView event={gifts ? "page_view_gifts" : "page_view_products"} props={{ filter: data.chosen ?? "all", customer_type: data.pricing.customerType, products: data.total }} />
-      <div className="flex flex-wrap items-stretch gap-6">
-        <section aria-labelledby="shop-title" className="flex min-w-0 flex-[999_1_420px] flex-col justify-center gap-3">
+      {/* Title, filters, then "Start with a picture" right under the filters (a single row on wider screens). */}
+      <div className="flex flex-col gap-5">
+        <section aria-labelledby="shop-title" className="flex min-w-0 flex-col gap-3">
           <h1 id="shop-title" className="text-[28px] font-extrabold leading-tight tracking-tight lg:text-[42px]">
             {t(gifts ? "shop.giftsTitle" : "shop.productsTitle")}
           </h1>
@@ -55,14 +56,14 @@ export function ShopLanding({ page, data, recent }: { page: ShopPage; data: Data
             </nav>
           )}
         </section>
-        <aside aria-labelledby="start-title" className="flex flex-[1_1_300px] flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] lg:max-w-[380px]">
-          <div>
+        <aside aria-labelledby="start-title" className="flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] md:flex-row md:items-center md:gap-5 md:p-5">
+          <div className="md:min-w-0 md:flex-1">
             <h2 id="start-title" className="text-[18px] font-extrabold">
               {t("shop.startTitle")}
             </h2>
             <p className="text-[14px] text-ink-2">{t(gifts ? "shop.startSubGifts" : "shop.startSubProducts", { count: data.topPicks })}</p>
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-2 md:w-[296px] md:flex-none">
             <Suspense fallback={tileSkeleton}>
               <RecentTiles recent={recent} base={base} />
             </Suspense>
@@ -70,7 +71,7 @@ export function ShopLanding({ page, data, recent }: { page: ShopPage; data: Data
               {t("shop.more")}
             </Link>
           </div>
-          <Link href={choose()} className="bg-primary-gradient shadow-primary flex h-12 items-center justify-center rounded-[12px] text-[16px] font-extrabold text-white">
+          <Link href={choose()} className="bg-primary-gradient shadow-primary flex h-12 items-center justify-center rounded-[12px] px-5 text-[16px] font-extrabold text-white md:w-[220px] md:flex-none">
             {t(gifts ? "shop.seeGiftIdeas" : "shop.seeProductIdeas")}
           </Link>
         </aside>
