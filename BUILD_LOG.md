@@ -395,7 +395,7 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 
 ## Blocked / needed from people (shop)
 - **Shopify app permissions.** The r_orders app has `read_orders`, `read_all_orders`, `write_orders` and `read_customers` (Settings › Data sources, 8 Nov). The shop also needs `read_products` (the Store collection), `read_discounts` (SITEWIDE OFF / VIP code) and `write_products` (Settings › Shop and the template editor save `mmp_shop` fields). Until then the shop can't read its products and stays empty for super users.
-- **Storefront token** for carts: `SHOPIFY_STOREFRONT_PRIVATE_TOKEN` (or the public `SHOPIFY_STOREFRONT_TOKEN`) in Vercel, Preview and Production, with the 10 Store products published to that token's sales channel.
+- **Storefront token** for carts: done 11 Nov. Headless storefront "My Magic Portrait Store" (Shopify admin › Headless › 424297; its sales channel shows as "Storyboards Headless 03", publication 192604864708), its private token in Vercel as `SHOPIFY_STOREFRONT_PRIVATE_TOKEN` (Gavin), and the 11 Store products made available on it. A new Store product must be added to that channel too, or Shopify won't accept it in a cart.
 - **Preview templates** for all 10 products (Settings › Shop › template editor). Every product is hidden until it has one. This session can't open Shopify's product photos (cdn.shopify.com isn't reachable), so they weren't drawn here.
 - **Smallest picture.** 95% of portraits made in the last 60 days are 512 × 512 px (the rest 1024 × 1024). With `shop.default_min_short_side_px` at 1000 every size is hidden for them. Today's tiles already print from the same 512 px pictures; Gavin to choose the minimum.
 - **Magic Puzzle** has no print rules yet (its print area for 30 / 252 / 500 pieces isn't known), so it stays hidden.
@@ -426,7 +426,7 @@ Every size: maker's code = the variant's SKU, Adjust off, placement cover (the m
 |---|---|---|
 | 1 | Apply the shop migration and seed to `magic-vault` | Done 10 Nov |
 | 2 | `mmp_shop` field definitions and values on the Store products | Done 10 Nov, except the puzzle's print areas |
-| 3 | Shopify: add `read_products`, `read_discounts`, `write_products` to the r_orders app; Storefront token in Vercel; Store products published to its channel; redeploy | Needed |
+| 3 | Shopify: add `read_products`, `read_discounts`, `write_products` to the r_orders app; Storefront token in Vercel; Store products published to its channel; redeploy | Done 11 Nov |
 | 4 | Choose the smallest picture (`shop.default_min_short_side_px`) | Done 11 Nov: 512 px |
 | 5 | Templates for each product | Done 11 Nov: studio templates for all 11 |
 | 6 | Turn on `shop.super_user_preview`, test on the branch preview, buy one item end to end (VIP code, `SITEWIDE OFF`, the order prints, the cart shows paid) | |
