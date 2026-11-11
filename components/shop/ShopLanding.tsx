@@ -1,6 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import type { landingData, ShopPage } from "@/lib/shop/pages";
+import type { landingData, RecentPicture, ShopPage } from "@/lib/shop/pages";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { TrackPageView } from "@/components/TrackPageView";
@@ -8,8 +9,22 @@ import { Price } from "./Price";
 
 type Data = Awaited<ReturnType<typeof landingData>>;
 
+/** The person's newest pictures; they stream in after the products so the page shows at once. */
+async function RecentTiles({ recent, base }: { recent: Promise<RecentPicture[]>; base: string }) {
+  const list = await recent;
+  return list.map((p, i) =>
+    p.url ? (
+      <Link key={p.id} href={`${base}/i/${p.id}`} aria-label={t("shop.usePicture", { n: i + 1 })} className="aspect-square overflow-hidden rounded-[12px] bg-black/5">
+        <img src={p.url} alt="" className="ph-no-capture h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+      </Link>
+    ) : null,
+  );
+}
+
+const tileSkeleton = [0, 1, 2].map((i) => <div key={i} aria-hidden="true" className="aspect-square animate-pulse rounded-[12px] bg-black/5" />);
+
 /** The Gifts page (browse by occasion) or the Products page (browse by product type). */
-export function ShopLanding({ page, data }: { page: ShopPage; data: Data }) {
+export function ShopLanding({ page, data, recent }: { page: ShopPage; data: Data; recent: Promise<RecentPicture[]> }) {
   const gifts = page === "gifts";
   const base = `/${page}`;
   const choose = (product?: string) => `${base}/choose${product ? `?product=${encodeURIComponent(product)}` : ""}`;
@@ -48,13 +63,9 @@ export function ShopLanding({ page, data }: { page: ShopPage; data: Data }) {
             <p className="text-[14px] text-ink-2">{t(gifts ? "shop.startSubGifts" : "shop.startSubProducts", { count: data.topPicks })}</p>
           </div>
           <div className="grid grid-cols-4 gap-2">
-            {data.recent.map((p, i) =>
-              p.url ? (
-                <Link key={p.id} href={`${base}/i/${p.id}`} aria-label={t("shop.usePicture", { n: i + 1 })} className="aspect-square overflow-hidden rounded-[12px] bg-black/5">
-                  <img src={p.url} alt="" className="ph-no-capture h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
-                </Link>
-              ) : null,
-            )}
+            <Suspense fallback={tileSkeleton}>
+              <RecentTiles recent={recent} base={base} />
+            </Suspense>
             <Link href={choose()} className="flex aspect-square items-center justify-center rounded-[12px] bg-black/5 text-[14px] font-bold text-ink">
               {t("shop.more")}
             </Link>

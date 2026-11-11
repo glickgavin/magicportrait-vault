@@ -30,7 +30,7 @@ export interface ShopCartSource {
   create(input: { lines: CartLineInput[]; email: string; discountCodes: string[]; attributes: Attr[] }): Promise<RemoteCart>;
   get(cartId: string): Promise<RemoteCart | null>;
   addLines(cartId: string, lines: CartLineInput[]): Promise<RemoteCart>;
-  updateLines(cartId: string, lines: { id: string; quantity: number }[]): Promise<RemoteCart>;
+  updateLines(cartId: string, lines: { id: string; quantity: number; attributes?: Attr[] }[]): Promise<RemoteCart>;
   removeLines(cartId: string, lineIds: string[]): Promise<RemoteCart>;
   setDiscountCodes(cartId: string, codes: string[]): Promise<RemoteCart>;
   setAttributes(cartId: string, attributes: Attr[]): Promise<RemoteCart>;
@@ -109,12 +109,15 @@ export class ShopCartFixtures implements ShopCartSource {
     for (const l of lines) c.lines.push({ id: `${cartId}/line${c.lines.length + 1}-${Math.random().toString(36).slice(2, 6)}`, merchandiseId: l.merchandiseId, quantity: l.quantity, attributes: [...l.attributes], subtotal: { amount: "0", currency: this.currency }, total: { amount: "0", currency: this.currency }, compareAtPerUnit: null });
     return this.price(c);
   }
-  async updateLines(cartId: string, lines: { id: string; quantity: number }[]) {
+  async updateLines(cartId: string, lines: { id: string; quantity: number; attributes?: Attr[] }[]) {
     const c = this.need(cartId);
     this.calls.push({ op: "cartLinesUpdate", cartId, payload: structuredClone(lines) });
     for (const u of lines) {
       const l = c.lines.find((x) => x.id === u.id);
-      if (l) l.quantity = u.quantity;
+      if (l) {
+        l.quantity = u.quantity;
+        if (u.attributes) l.attributes = [...u.attributes];
+      }
     }
     return this.price(c);
   }

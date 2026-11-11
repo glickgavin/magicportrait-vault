@@ -8,9 +8,8 @@ import { PromoBar } from "@/components/shop/PromoBar";
 
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   const shell = await getShellContext();
-  const person = shell.user ? await personProps(shell.user.email) : null;
   // The shop's header bits (docs/shop.md): null, and nothing renders, while the shop is hidden from this person.
-  const shop = await shopShell(shell.user);
+  const [person, shop] = await Promise.all([shell.user ? personProps(shell.user.email) : null, shopShell(shell.user)]);
   return (
     <div className="flex min-h-dvh flex-col">
       {person && <Identify person={person} />}

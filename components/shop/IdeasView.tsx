@@ -12,6 +12,7 @@ import { t, tn } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 import { Price } from "./Price";
+import { announceCartCount } from "./CartIcon";
 import { ShopPreview } from "./ShopPreview";
 
 type Picture = { id: string; kind: string; url: string | null; width: number | null; height: number | null; ordered: boolean };
@@ -134,7 +135,10 @@ function ProductSheet({ page, idea, picture, pricing, maxQty, onClose }: { page:
     const r = await fetch("/api/shop/cart/lines", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ page, imageId: picture.id, variantId: v.id, quantity: qty, crop: JSON.stringify(crop) === JSON.stringify(v.crop) ? undefined : crop }) });
     if (r.ok) {
       setState({ busy: false, added: true, error: null });
-      router.refresh();
+      // The header's cart updates in place; the page itself doesn't need reading again.
+      const b = (await r.json().catch(() => ({}))) as { count?: number };
+      if (typeof b.count === "number") announceCartCount(b.count);
+      else router.refresh();
     } else setState({ busy: false, added: false, error: t("shop.checkoutErrors.other") });
   }
 

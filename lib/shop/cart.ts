@@ -5,13 +5,14 @@ import { getSettings } from "@/lib/settings";
 import { putObject, signedUrl } from "@/lib/storage";
 import { track } from "@/lib/track";
 import { maskEmail } from "@/lib/utils";
+import { afterResponse, mapLimit, timed } from "@/lib/perf";
 import type { CatalogEntry, SellableVariant } from "./catalog";
+import type { ShopImage } from "./images";
 import { cropAllowed, fitVariant, target, type Rect } from "./fit";
 import { discounted } from "./money";
 import { cartCodesFor, customerTypeFor, discountSettingFor, getCatalog, pricingFor, type CustomerType } from "./index";
 import { cartAttributes, cartIdFromOrder, lineAttributes, sameAttrs } from "./order-lines";
 import { ensureSize, pictureBytes, pictureFor } from "./pictures";
-import { renderPreview } from "./render";
 import { getShopCartSource } from "./sources";
 import type { Attr, RemoteCart } from "./sources/cart";
 import { parseTemplate } from "./template";
@@ -43,15 +44,41 @@ async function currentDiscount(email: string): Promise<{ customerType: CustomerT
   return { customerType, code: (await discountSettingFor(customerType)).code };
 }
 
-/** Add to cart: re-checks the picture is theirs, the size suits it and the crop is allowed, then draws the preview. */
+/**
+ * The preview the customer saw, for the order line and customer service. Drawn after the response so
+ * adding never waits for it; checkout draws any that are still missing.
+ */
+async function drawLinePreview(email: string, lineId: string, entry: CatalogEntry, rules: SellableVariant["rules"], source: ShopImage["source"], crop: Rect): Promise<string | null> {
+  const template = parseTemplate(entry.product.template?.value);
+  if (!template) return null;
+  try {
+    const width = (await getSettings(["shop.preview_width_px"] as const))["shop.preview_width_px"];
+    const bytes = await pictureBytes({ source });
+    if (!bytes) return null;
+    const { renderPreview } = await import("./render");
+    const t = target(rules);
+    const jpeg = await timed("shop.renderPreview", () => renderPreview({ template, picture: bytes, crop, placement: rules.placement, backgroundColour: rules.background, targetAspect: t.w / t.h, width }));
+    if (!jpeg) return null;
+    const path = `p/${lineId}.jpg`;
+    await putObject("shop-uploads", path, jpeg, "image/jpeg");
+    await updateLine(lineId, { preview_path: path });
+    return path;
+  } catch (e) {
+    console.error(`[shop] preview failed (${maskEmail(email)}): ${(e as Error).message}`);
+    return null;
+  }
+}
+
+/** Add to cart: re-checks the picture is theirs, the size suits it and the crop is allowed; the preview is drawn after. */
 export async function addToCart(email: string, input: z.infer<typeof addLineSchema>): Promise<{ ok: true; lineId: string; count: number } | CartError> {
-  const s = await getSettings(["shop.cart_max_lines", "shop.cart_line_max_qty", "shop.preview_width_px"] as const);
+  const s = await getSettings(["shop.cart_max_lines", "shop.cart_line_max_qty"] as const);
   if (input.quantity > s["shop.cart_line_max_qty"]) return fail(400, "too_many");
-  const pic = await pictureFor(email, input.imageId);
+  // The picture, the catalog and the discount side by side.
+  const [pic, catalog, discount] = await Promise.all([pictureFor(email, input.imageId), getCatalog(), currentDiscount(email)]);
   if (!pic) return fail(404, "picture_not_found");
   const img = await ensureSize(email, pic);
   if (!img.width || !img.height) return fail(422, "picture_size_unknown");
-  const found = findVariant(await getCatalog(), input.variantId, input.page);
+  const found = findVariant(catalog, input.variantId, input.page);
   if (!found) return fail(404, "product_not_available");
   const { entry, sv } = found;
   const fit = fitVariant(img, sv.rules);
@@ -59,17 +86,17 @@ export async function addToCart(email: string, input: z.infer<typeof addLineSche
   const crop: Rect = input.crop ?? fit.crop;
   if (input.crop && !cropAllowed(input.crop, { width: img.width, height: img.height }, sv.rules)) return fail(400, "crop_not_allowed");
 
-  const { customerType, code } = await currentDiscount(email);
+  const { customerType, code } = discount;
   const cart = await ensureOpenCart(email, { customerType, discountCode: code });
-  const lines = await cartLines(cart.id);
-
   // The picture's own row (sizes, owner), which the line points at.
-  const imageRowId = pic.kind === "new_upload" ? pic.id.slice(2) : await rememberExternalImage(email, { kind: pic.kind, url: (pic.source as { url: string }).url, ref: pic.ref, session: pic.sessionId, width: img.width, height: img.height });
+  const [lines, imageRowId] = await Promise.all([
+    cartLines(cart.id),
+    pic.kind === "new_upload" ? Promise.resolve(pic.id.slice(2)) : rememberExternalImage(email, { kind: pic.kind, url: (pic.source as { url: string }).url, ref: pic.ref, session: pic.sessionId, width: img.width, height: img.height }),
+  ]);
   const same = lines.find((l) => l.variant_id === sv.variant.id && l.image_id === imageRowId && l.page === input.page && JSON.stringify(l.crop) === JSON.stringify(crop));
   if (same) {
     const qty = Math.min(s["shop.cart_line_max_qty"], same.quantity + input.quantity);
-    await updateLine(same.id, { quantity: qty });
-    await updateCart(cart.id, {});
+    await Promise.all([updateLine(same.id, { quantity: qty }), updateCart(cart.id, {})]);
     await track("shop_cart_changed", { change: "quantity", lines: lines.length }, { email });
     return { ok: true, lineId: same.id, count: lines.reduce((n, l) => n + (l.id === same.id ? qty : l.quantity), 0) };
   }
@@ -89,19 +116,7 @@ export async function addToCart(email: string, input: z.infer<typeof addLineSche
     template_version: template?.updated_at ?? entry.product.template?.updatedAt ?? null,
     preview_path: null,
   });
-  // The preview the customer saw, for the order line and customer service. Never blocks adding.
-  try {
-    const bytes = template ? await pictureBytes(img) : null;
-    const t = target(sv.rules);
-    const jpeg = bytes && template ? await renderPreview({ template, picture: bytes, crop, placement: sv.rules.placement, backgroundColour: sv.rules.background, targetAspect: t.w / t.h, width: s["shop.preview_width_px"] }) : null;
-    if (jpeg) {
-      const path = `p/${line.id}.jpg`;
-      await putObject("shop-uploads", path, jpeg, "image/jpeg");
-      await updateLine(line.id, { preview_path: path });
-    }
-  } catch (e) {
-    console.error(`[shop] preview failed (${maskEmail(email)}): ${(e as Error).message}`);
-  }
+  await afterResponse(() => drawLinePreview(email, line.id, entry, sv.rules, img.source, crop));
   await updateCart(cart.id, {});
   await track(
     "shop_added_to_cart",
@@ -170,19 +185,17 @@ export type CartView = {
 type Checked = { line: ShopLineRow; entry: CatalogEntry | null; sv: SellableVariant | null; image: ShopImageRow | null; problem: LineProblem | null };
 
 async function checkLines(email: string, lines: ShopLineRow[]): Promise<Checked[]> {
-  const entries = await getCatalog();
-  const out: Checked[] = [];
-  for (const line of lines) {
-    const image = await imageRowById(email, line.image_id);
+  const [entries, images] = await Promise.all([getCatalog(), Promise.all(lines.map((l) => imageRowById(email, l.image_id)))]);
+  return lines.map((line, i) => {
+    const image = images[i];
     const found = findVariant(entries, line.variant_id, line.page);
     const entry = found?.entry ?? entries.find((e) => e.product.id === line.product_id) ?? null;
     let problem: LineProblem | null = null;
     if (!image) problem = "picture_gone";
     else if (!found || !found.sv.variant.availableForSale) problem = "unavailable";
     else if (!fitVariant({ kind: image.kind, width: image.width, height: image.height }, found.sv.rules).ok) problem = "doesnt_suit";
-    out.push({ line, entry, sv: found?.sv ?? null, image, problem });
-  }
-  return out;
+    return { line, entry, sv: found?.sv ?? null, image, problem };
+  });
 }
 
 async function imageUrlFor(image: ShopImageRow, days: number): Promise<string | null> {
@@ -226,8 +239,14 @@ async function syncShopify(email: string, cart: ShopCartRow, checked: Checked[],
   const stale = remote.lines.filter((l) => !wantIds.has(vaultId(l.attributes) ?? ""));
   if (stale.length) remote = await src.removeLines(remote.id, stale.map((l) => l.id));
   const byVault = new Map(remote.lines.map((l) => [vaultId(l.attributes), l]));
-  const changed = usable.filter((c) => byVault.has(c.line.id) && byVault.get(c.line.id)!.quantity !== c.line.quantity);
-  if (changed.length) remote = await src.updateLines(remote.id, changed.map((c) => ({ id: byVault.get(c.line.id)!.id, quantity: c.line.quantity })));
+  // A changed quantity, or a preview that was drawn after the line reached Shopify (its attributes are then sent again).
+  const lacksPreview = (c: Checked) => Boolean(c.line.preview_path) && !byVault.get(c.line.id)!.attributes.some((a) => a.key === "_shop_preview_url");
+  const changed = usable.filter((c) => byVault.has(c.line.id) && (byVault.get(c.line.id)!.quantity !== c.line.quantity || lacksPreview(c)));
+  if (changed.length)
+    remote = await src.updateLines(
+      remote.id,
+      await Promise.all(changed.map(async (c) => ({ id: byVault.get(c.line.id)!.id, quantity: c.line.quantity, ...(lacksPreview(c) ? { attributes: (await wanted(c)).attributes } : {}) }))),
+    );
   const missing = usable.filter((c) => !byVault.has(c.line.id));
   if (missing.length) remote = await src.addLines(remote.id, await Promise.all(missing.map(wanted)));
   if (JSON.stringify(remote.discountCodes.map((d) => d.code).sort()) !== JSON.stringify([...codes].sort())) remote = await src.setDiscountCodes(remote.id, codes);
@@ -237,10 +256,13 @@ async function syncShopify(email: string, cart: ShopCartRow, checked: Checked[],
 
 /** The cart page: our lines with their previews, checked again, and Shopify's figures. */
 export async function cartView(email: string): Promise<CartView> {
-  const s = await getSettings(["shop.currency", "shop.image_link_seconds"] as const);
-  const cart = await openCartFor(email);
-  const customerType = await customerTypeFor(email);
-  const pct = (await pricingFor(email).catch(() => null))?.pct ?? null;
+  const [s, cart, customerType, pricing] = await Promise.all([
+    getSettings(["shop.currency", "shop.image_link_seconds"] as const),
+    openCartFor(email),
+    customerTypeFor(email),
+    pricingFor(email).catch(() => null),
+  ]);
+  const pct = pricing?.pct ?? null;
   const empty: CartView = { cartId: null, lines: [], count: 0, hasGift: false, giftFor: "", giftMessage: "", currency: s["shop.currency"], figures: null, customerType, pct };
   if (!cart) return empty;
   const lines = await cartLines(cart.id);
@@ -260,8 +282,9 @@ export async function cartView(email: string): Promise<CartView> {
     console.error(`[shop] Shopify cart unavailable (${maskEmail(email)}): ${(e as Error).message}`);
   }
   const byVault = new Map((remote?.lines ?? []).map((l) => [l.attributes.find((a) => a.key === "_vault_line_id")?.value, l]));
+  const previews = await Promise.all(checked.map((c) => (c.line.preview_path ? signedUrl("shop-uploads", c.line.preview_path, s["shop.image_link_seconds"]) : Promise.resolve(null))));
   const views: CartLineView[] = [];
-  for (const c of checked) {
+  for (const [i, c] of checked.entries()) {
     const r = byVault.get(c.line.id);
     const listTotal = ((Math.round(Number(c.sv?.variant.price ?? "0") * 100) * c.line.quantity) / 100).toFixed(2);
     views.push({
@@ -270,7 +293,7 @@ export async function cartView(email: string): Promise<CartView> {
       productTitle: c.entry?.product.title ?? "This product",
       variantTitle: c.sv && c.sv.variant.title !== "Default Title" ? c.sv.variant.title : null,
       quantity: c.line.quantity,
-      previewUrl: c.line.preview_path ? await signedUrl("shop-uploads", c.line.preview_path, s["shop.image_link_seconds"]) : null,
+      previewUrl: previews[i],
       unitPrice: c.sv?.variant.price ?? "0",
       listTotal,
       ourTotal: c.sv ? discounted(listTotal, pct) : null,
@@ -295,16 +318,7 @@ export async function cartView(email: string): Promise<CartView> {
   };
 }
 
-/** The header's cart count (0 when there's no cart). Cheap: our own rows only. */
-export async function cartCount(email: string): Promise<number> {
-  try {
-    const cart = await openCartFor(email);
-    if (!cart) return 0;
-    return (await cartLines(cart.id)).reduce((n, l) => n + l.quantity, 0);
-  } catch {
-    return 0;
-  }
-}
+export { cartCount } from "./cart-count";
 
 export const checkoutSchema = z.object({ giftFor: z.string().trim().max(120).optional(), giftMessage: z.string().max(2000).optional() });
 
@@ -333,6 +347,16 @@ export async function startCheckout(email: string, input: z.infer<typeof checkou
   await updateCart(cart.id, { customer_type: customerType, discount_code: code, gift_for: gift?.for ?? null, gift_message: gift?.message || null });
   cart.customer_type = customerType;
   cart.discount_code = code;
+  // Any preview not drawn yet (the customer was quick, or drawing failed) is drawn now, for the order line.
+  await mapLimit(
+    checked.filter((c) => !c.line.preview_path && c.entry && c.sv && c.image),
+    3,
+    async (c) => {
+      const source = c.image!.storage_path ? { storagePath: c.image!.storage_path } : c.image!.source_url ? { url: c.image!.source_url } : null;
+      const crop = c.line.crop ?? { x: 0, y: 0, w: c.image!.width ?? 0, h: c.image!.height ?? 0 };
+      if (source) c.line.preview_path = await drawLinePreview(email, c.line.id, c.entry!, c.sv!.rules, source, crop);
+    },
+  );
   let remote: RemoteCart;
   try {
     remote = await syncShopify(email, cart, checked, gift);

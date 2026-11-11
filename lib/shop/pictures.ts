@@ -1,4 +1,6 @@
 import "server-only";
+import { cache } from "react";
+import { mapLimit, timed } from "@/lib/perf";
 import { randomUUID } from "node:crypto";
 import { env } from "@/lib/env";
 import { insertNewUpload, knownSizes, newUploadById, newUploadsFor, rememberExternalImage } from "@/lib/db/shop";
@@ -9,17 +11,20 @@ import { maskEmail } from "@/lib/utils";
 import { getVaultProfile } from "@/lib/vault/profile";
 import { buildImageList, isAllowedUrl, looksLikeImageId, orderedPhotoTiles, type RawPhotoTile, type ShopImage } from "./images";
 import { getShopImagesSource } from "./sources";
-import { measureImage, processUpload, type UploadRefusal } from "./upload";
+import type { MirrorImageProps, ShopImagesSource } from "./sources/images";
+import type { UploadRefusal } from "./upload";
 
 /** The signed-in person's pictures for the shop: portraits, past photos, photo tiles and new uploads. */
 export type PictureList = { portraits: ShopImage[]; photos: ShopImage[]; partial: boolean };
 
 const tileUrlCache = new Map<string, string | null>();
+const TILE_CACHE_MAX = 5000;
 
 /** A mirror tile id → its file in the main site's photo-tile folder (the extension is checked once). */
 async function photoTileUrl(tileId: string, base: string, exts: string[], timeoutMs: number): Promise<string | null> {
   if (tileUrlCache.has(tileId)) return tileUrlCache.get(tileId) ?? null;
   if (env.dataSource === "fixtures") return `${base}${tileId}.${exts[0] ?? "jpg"}`;
+  if (tileUrlCache.size >= TILE_CACHE_MAX) tileUrlCache.clear();
   for (const ext of exts) {
     const url = `${base}${tileId}.${ext}`;
     try {
@@ -36,7 +41,25 @@ async function photoTileUrl(tileId: string, base: string, exts: string[], timeou
   return null;
 }
 
-export async function listPictures(email: string): Promise<PictureList> {
+type MirrorPictures = readonly [Awaited<ReturnType<ShopImagesSource["pastUploads"]>>, Awaited<ReturnType<ShopImagesSource["photoTileUploads"]>>];
+/** The mirror's past photos and photo tiles per person, kept briefly like the profile (memory only). */
+const mirrorMemory = new Map<string, { at: number; value: MirrorPictures }>();
+
+async function mirrorPictures(email: string, props: MirrorImageProps, keepMs: number): Promise<MirrorPictures> {
+  const kept = mirrorMemory.get(email);
+  if (keepMs > 0 && kept && Date.now() - kept.at < keepMs) return kept.value;
+  const src = await getShopImagesSource();
+  const emails = [email];
+  const value = await timed("mirror.shopPictures", () => Promise.all([src.pastUploads(emails, props), src.photoTileUploads(emails, props)]));
+  if (keepMs > 0) {
+    if (mirrorMemory.size >= 500) mirrorMemory.delete(mirrorMemory.keys().next().value!);
+    mirrorMemory.set(email, { at: Date.now(), value });
+  }
+  return value;
+}
+
+/** Everything one person can pick from. Memoised per request; the outside reads run side by side. */
+export const listPictures = cache(async (email: string): Promise<PictureList> => {
   const s = await getSettings([
     "redeem.allowed_image_hosts",
     "shop.photo_tile_base_url",
@@ -46,34 +69,36 @@ export async function listPictures(email: string): Promise<PictureList> {
     "shop.mirror_tile_event",
     "shop.mirror_images_limit",
     "shop.image_fetch_timeout_ms",
+    "vault.profile_memory_seconds",
   ] as const);
   const hosts = s["redeem.allowed_image_hosts"];
+  const e = email.trim().toLowerCase();
   let partial = false;
-  const profile = await getVaultProfile(email);
+  const props = { uploadEvent: s["shop.mirror_upload_event"], uploadProperty: s["shop.mirror_upload_property"], tileEvent: s["shop.mirror_tile_event"], limit: s["shop.mirror_images_limit"] };
+  const [profile, [past, tiles], rows] = await Promise.all([
+    getVaultProfile(email),
+    mirrorPictures(e, props, s["vault.profile_memory_seconds"] * 1000).catch((err: unknown) => {
+      partial = true;
+      console.error(`[shop] mirror pictures unavailable (${maskEmail(email)}): ${(err as Error).message}`);
+      return [[], []] as const;
+    }),
+    newUploadsFor(email),
+  ]);
   if (profile.unavailable.length) partial = true;
   const portraits = profile.sessions.flatMap((g) => g.portraits.map((p) => ({ imageId: p.imageId, sessionId: p.sessionId, imageUrl: p.imageUrl, width: p.width, height: p.height, createdAt: p.createdAt, ordered: p.ordered })));
   const orderedTiles = orderedPhotoTiles(profile.rawOrders, hosts);
 
-  const props = { uploadEvent: s["shop.mirror_upload_event"], uploadProperty: s["shop.mirror_upload_property"], tileEvent: s["shop.mirror_tile_event"], limit: s["shop.mirror_images_limit"] };
-  const emails = [email.trim().toLowerCase()];
-  const [past, tiles] = await (async () => {
-    try {
-      const src = await getShopImagesSource();
-      return await Promise.all([src.pastUploads(emails, props), src.photoTileUploads(emails, props)]);
-    } catch (e) {
-      partial = true;
-      console.error(`[shop] mirror pictures unavailable (${maskEmail(email)}): ${(e as Error).message}`);
-      return [[], []] as const;
-    }
-  })();
+  // Each dropped tile's file is looked up once per server, several at a time.
   const orderedIds = new Set(orderedTiles.map((t) => t.tileId).filter(Boolean));
-  const droppedTiles: RawPhotoTile[] = [];
-  for (const t of tiles) {
-    if (orderedIds.has(t.tileId)) continue;
-    const url = await photoTileUrl(t.tileId, s["shop.photo_tile_base_url"], s["shop.photo_tile_extensions"], s["shop.image_fetch_timeout_ms"]);
-    if (url) droppedTiles.push({ url, tileId: t.tileId, createdAt: t.createdAt, ordered: false });
-  }
-  const rows = await newUploadsFor(email);
+  const dropped = await mapLimit(
+    tiles.filter((t) => !orderedIds.has(t.tileId)),
+    8,
+    async (t): Promise<RawPhotoTile | null> => {
+      const url = await photoTileUrl(t.tileId, s["shop.photo_tile_base_url"], s["shop.photo_tile_extensions"], s["shop.image_fetch_timeout_ms"]);
+      return url ? { url, tileId: t.tileId, createdAt: t.createdAt, ordered: false } : null;
+    },
+  );
+  const droppedTiles = dropped.filter((t): t is RawPhotoTile => t !== null);
   const list = buildImageList({
     portraits,
     pastUploads: past.filter((u) => isAllowedUrl(u.url, hosts)),
@@ -90,7 +115,7 @@ export async function listPictures(email: string): Promise<PictureList> {
     }
   }
   return { ...list, partial };
-}
+});
 
 /** One of the signed-in person's own pictures, or null. Never looks anywhere but their own list. */
 export async function pictureFor(email: string, id: string): Promise<ShopImage | null> {
@@ -117,7 +142,7 @@ export async function ensureSize(email: string, img: ShopImage): Promise<ShopIma
       const len = Number(r.headers.get("content-length") ?? 0);
       if (r.ok && (!len || len <= s["shop.image_fetch_max_mb"] * 1024 * 1024)) {
         const buf = Buffer.from(await r.arrayBuffer());
-        if (buf.length <= s["shop.image_fetch_max_mb"] * 1024 * 1024) size = await measureImage(buf);
+        if (buf.length <= s["shop.image_fetch_max_mb"] * 1024 * 1024) size = await (await import("./upload")).measureImage(buf);
       }
     } catch {
       size = null;
@@ -140,6 +165,7 @@ export type SaveUploadResult = { ok: true; image: ShopImage } | { ok: false; rea
 /** Checks, cleans and keeps a new upload in the private shop-uploads bucket. */
 export async function saveUpload(email: string, body: Buffer): Promise<SaveUploadResult> {
   const s = await getSettings(["shop.upload_max_mb", "shop.upload_min_short_side_px", "shop.upload_jpeg_quality"] as const);
+  const { processUpload } = await import("./upload");
   const r = await processUpload(body, { maxBytes: s["shop.upload_max_mb"] * 1024 * 1024, minShortSidePx: s["shop.upload_min_short_side_px"], jpegQuality: s["shop.upload_jpeg_quality"] });
   if (!r.ok) {
     await track("shop_image_uploaded", { ok: false, reason: r.reason }, { email });
@@ -154,7 +180,7 @@ export async function saveUpload(email: string, body: Buffer): Promise<SaveUploa
 }
 
 /** The full picture, for drawing the order line's preview on the server (allowed hosts, capped). */
-export async function pictureBytes(img: ShopImage): Promise<Buffer | null> {
+export async function pictureBytes(img: Pick<ShopImage, "source">): Promise<Buffer | null> {
   if ("storagePath" in img.source) {
     const { getObject } = await import("@/lib/storage");
     return getObject("shop-uploads", img.source.storagePath);

@@ -28,7 +28,7 @@ export async function shopShell(user: SessionUser | null): Promise<{ cartCount: 
   try {
     const s = await getSettings(["shop.enabled", "shop.super_user_preview"] as const);
     if (!canSeeShop({ enabled: s["shop.enabled"], superUserPreview: s["shop.super_user_preview"] }, user)) return null;
-    const { cartCount } = await import("./cart");
+    const { cartCount } = await import("./cart-count");
     const { customerTypeFor } = await import("./index");
     const [count, type] = await Promise.all([cartCount(user.email), customerTypeFor(user.email)]);
     return { cartCount: count, promo: await promoFor(type).catch(() => null), customerType: type };

@@ -1,4 +1,5 @@
 import "server-only";
+import { opName, timed } from "@/lib/perf";
 import { CartSourceError, type Attr, type CartLineInput, type Money, type RemoteCart, type ShopCartSource } from "./cart";
 
 /**
@@ -27,7 +28,7 @@ const M_CREATE = `mutation ShopCartCreate($input: CartInput!) { cartCreate(input
 const M_ADD = `mutation ShopCartAdd($id: ID!, $lines: [CartLineInput!]!) { cartLinesAdd(cartId: $id, lines: $lines) { cart { ...ShopCart } userErrors { field message code } } } ${CART}`;
 const M_UPDATE = `mutation ShopCartUpdate($id: ID!, $lines: [CartLineUpdateInput!]!) { cartLinesUpdate(cartId: $id, lines: $lines) { cart { ...ShopCart } userErrors { field message code } } } ${CART}`;
 const M_REMOVE = `mutation ShopCartRemove($id: ID!, $ids: [ID!]!) { cartLinesRemove(cartId: $id, lineIds: $ids) { cart { ...ShopCart } userErrors { field message code } } } ${CART}`;
-const M_CODES = `mutation ShopCartCodes($id: ID!, $codes: [String!]) { cartDiscountCodesUpdate(cartId: $id, discountCodes: $codes) { cart { ...ShopCart } userErrors { field message code } } } ${CART}`;
+const M_CODES = `mutation ShopCartCodes($id: ID!, $codes: [String!]!) { cartDiscountCodesUpdate(cartId: $id, discountCodes: $codes) { cart { ...ShopCart } userErrors { field message code } } } ${CART}`;
 const M_ATTRS = `mutation ShopCartAttrs($id: ID!, $attrs: [AttributeInput!]!) { cartAttributesUpdate(cartId: $id, attributes: $attrs) { cart { ...ShopCart } userErrors { field message code } } } ${CART}`;
 
 type RawMoney = { amount: string; currencyCode: string };
@@ -90,7 +91,9 @@ export class ShopCartLive implements ShopCartSource {
       const ip = await buyerIp();
       if (ip) headers["shopify-storefront-buyer-ip"] = ip;
     } else if (this.cfg.publicToken) headers["x-shopify-storefront-access-token"] = this.cfg.publicToken;
-    const res = await fetch(`https://${this.cfg.domain}/api/${this.cfg.apiVersion}/graphql.json`, { method: "POST", headers, body: JSON.stringify({ query, variables }), cache: "no-store" });
+    const res = await timed(`shopify.storefront ${opName(query)}`, () =>
+      fetch(`https://${this.cfg.domain}/api/${this.cfg.apiVersion}/graphql.json`, { method: "POST", headers, body: JSON.stringify({ query, variables }), cache: "no-store" }),
+    );
     if ((res.status === 429 || res.status >= 500) && attempt < 3) {
       await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
       return this.gql(query, variables, attempt + 1);
@@ -118,7 +121,7 @@ export class ShopCartLive implements ShopCartSource {
   addLines(cartId: string, lines: CartLineInput[]) {
     return this.mutate(M_ADD, "cartLinesAdd", { id: cartId, lines });
   }
-  updateLines(cartId: string, lines: { id: string; quantity: number }[]) {
+  updateLines(cartId: string, lines: { id: string; quantity: number; attributes?: Attr[] }[]) {
     return this.mutate(M_UPDATE, "cartLinesUpdate", { id: cartId, lines });
   }
   removeLines(cartId: string, lineIds: string[]) {

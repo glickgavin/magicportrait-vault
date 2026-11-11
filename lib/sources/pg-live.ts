@@ -4,11 +4,20 @@ import type { ImagenPortraitRow, ImagenSource, MirrorSession, MirrorSource, MugJ
 
 const pools = new Map<string, ReturnType<typeof postgres>>();
 
-/** One small pool per database URL. Transaction pooler: no prepared statements. Read-only role. */
+/**
+ * One small pool per database URL, shared by everything that reads that database (the shop's picture
+ * lists too). Transaction pooler: no prepared statements. Read-only role. Connections stay open for a
+ * minute between uses, so a person moving between pages doesn't wait for a new one (the mirror is in
+ * us-west-1, a new connection there costs several round trips).
+ */
+export function pgPool(url: string) {
+  return pool(url);
+}
+
 function pool(url: string) {
   let p = pools.get(url);
   if (!p) {
-    p = postgres(url, { max: 3, idle_timeout: 20, connect_timeout: 10, prepare: false, ssl: "require", connection: { application_name: "magic-vault" } });
+    p = postgres(url, { max: 4, idle_timeout: 60, connect_timeout: 10, prepare: false, ssl: "require", connection: { application_name: "magic-vault" } });
     pools.set(url, p);
   }
   return p;

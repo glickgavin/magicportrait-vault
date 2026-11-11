@@ -19,6 +19,16 @@ export async function shopUserOrNull(): Promise<SessionUser | null> {
   return u && (await shopVisibleTo(u)) ? u : null;
 }
 
+/** One outside read per key at a time: callers arriving while it runs share its answer. */
+const inflight = new Map<string, Promise<unknown>>();
+function shared<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const running = inflight.get(key) as Promise<T> | undefined;
+  if (running) return running;
+  const p = work().finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+}
+
 type Cached = { at: number; entries: CatalogEntry[] };
 const g = globalThis as unknown as { __shopCatalog?: Cached | null };
 
@@ -31,11 +41,13 @@ export async function getCatalog(opts: { fresh?: boolean } = {}): Promise<Catalo
   const s = await getSettings(["shop.collection_id", "shop.metafield_namespace", "shop.product_cache_minutes", "shop.default_min_short_side_px", "shop.default_max_crop_pct"] as const);
   const hit = g.__shopCatalog;
   if (!opts.fresh && hit && Date.now() - hit.at < s["shop.product_cache_minutes"] * 60_000) return hit.entries;
-  const src = await getShopCatalogSource();
-  const products = await src.storeProducts(s["shop.collection_id"], s["shop.metafield_namespace"]);
-  const entries = evaluateCatalog(products, { minShortSidePx: s["shop.default_min_short_side_px"], maxCropPct: s["shop.default_max_crop_pct"] });
-  g.__shopCatalog = { at: Date.now(), entries };
-  return entries;
+  return shared(`catalog:${opts.fresh ? "fresh" : "cached"}`, async () => {
+    const src = await getShopCatalogSource();
+    const products = await src.storeProducts(s["shop.collection_id"], s["shop.metafield_namespace"]);
+    const entries = evaluateCatalog(products, { minShortSidePx: s["shop.default_min_short_side_px"], maxCropPct: s["shop.default_max_crop_pct"] });
+    g.__shopCatalog = { at: Date.now(), entries };
+    return entries;
+  });
 }
 
 export type CustomerType = "normal" | "vip";
@@ -61,7 +73,7 @@ export async function customerTypeFor(email: string, opts: { fresh?: boolean } =
   if (!opts.fresh && hit && Date.now() - hit.at < s["shop.customer_type_cache_minutes"] * 60_000) return hit.type;
   let type: CustomerType = "normal";
   try {
-    const tags = await (await getShopCatalogSource()).customerTags(e);
+    const tags = await shared(`tags:${e}`, async () => (await getShopCatalogSource()).customerTags(e));
     type = isVip(tags, s["shop.vip_customer_tag"]) ? "vip" : "normal";
   } catch {
     return "normal"; // not cached, so the next request asks Shopify again
@@ -88,9 +100,11 @@ async function discountInfoCached(code: string | null): Promise<DiscountInfo | n
   const minutes = (await getSettings(["shop.product_cache_minutes"] as const))["shop.product_cache_minutes"];
   const hit = discountCache.get(code);
   if (hit && Date.now() - hit.at < minutes * 60_000) return hit.info;
-  const info = await discountInfo(code);
-  discountCache.set(code, { at: Date.now(), info });
-  return info;
+  return shared(`discount:${code}`, async () => {
+    const info = await discountInfo(code);
+    discountCache.set(code, { at: Date.now(), info });
+    return info;
+  });
 }
 
 /** The codes to put on a Shopify cart: none for an automatic discount (Shopify applies that itself). */

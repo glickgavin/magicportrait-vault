@@ -261,6 +261,8 @@ All coordinates are in pixels on the 1500 × 2100 canvas.
 | `auth.code_valid_minutes` | 10 (must match the Supabase Auth OTP expiry; Settings shows it read-only with that note) |
 | `vault.first_order_offer` | "" |
 | `vault.lookup_cache_minutes` | 10 |
+| `vault.profile_memory_seconds` | 60 (each server keeps a person's Shopify orders and Imagen portraits in memory this long between pages; never stored; 0 = read live every page) |
+| `vault.slow_call_log_ms` | 500 (`[perf]` log line for slower outside calls; 0 = off) |
 | `themes.in_season_days_before` | 45 |
 | `brand.support_email` | "" |
 | `email.from_cards` | "{from} via Magic Portraits <cards@magicportraitspartners.com>" (the address must be the AgentMail inbox) |

@@ -437,3 +437,19 @@ Every size: maker's code = the variant's SKU, Adjust off, placement cover (the m
 | 7 | Run `pnpm test` and `pnpm e2e` in a session that can reach the container registries | |
 | 8 | Merge `claude/shop`; add the shop funnel to the PostHog dashboard | Merged 11 Nov; funnel still to add once shop events arrive |
 | 9 | Turn on `shop.enabled`; add a promotion bar if wanted | Live for everyone on merge, 11 Nov (Gavin's choice, with `shop.enabled` already on) |
+
+## Speed (11 Nov)
+Gavin: "slow to react when a button is pressed". Measured before changing anything:
+- PostHog web vitals for my.magicportraits.ai (7 days): first paint p75 3.9 s, LCP p75 4.0 s; INP p75 0.14 s, so taps themselves were fine and the wait was the server.
+- Timed from Gavin's browser (Israel → fra1 → iad1): `/` 1.8 s, `/gifts` 2.4–3.1 s, `/products` 2.1 s, `/portraits` 2.0 s, `/cart` 1.0 s, `/cards` 0.6–0.9 s, `/api/health` 0.2 s.
+- Supabase edge logs line up each page: our own queries take 10–30 ms; the gap is the person's Shopify orders and Imagen portraits read one after the other (1.2–1.4 s on every page), then on shop pages the pricing/catalog (0.2–0.6 s) and the mirror's pictures (0.2–0.6 s), also one after the other.
+- Bug found on the way: Storefront `cartDiscountCodesUpdate` was declared `$codes: [String!]` (Shopify wants `[String!]!`), so every cart whose code had changed logged "Shopify cart unavailable" and its checkout returned `shopify_unavailable`. Fixed; all seven cart operations now checked against Shopify's published Storefront schema (`@shopify/hydrogen-react` 2026.4).
+
+What changed:
+- **Profile** (`lib/vault/profile.ts`): Imagen starts on the known sessions while Shopify is still answering (extra sessions from order lines after); kept in the server's memory for `vault.profile_memory_seconds` (new, default 60, memory only, never in the database; 0 = live every page); requests arriving together share one read; the member-cache write runs after the response (`after`). `forgetProfile` after a mug choice. Health's warm timing skips the memory.
+- **Shop**: picture list reads profile, mirror and new uploads side by side, photo-tile lookups 8 at a time, memoised per request; landing, ideas, cart and add to cart read side by side; Gifts/Products stream the "Start with a picture" tiles (Suspense) so products show first; shared in-flight catalog, VIP and discount reads; one mirror pool kept open 60 s.
+- **Add to cart** answers before drawing the preview (drawn after the response; checkout draws any still missing and Shopify's line gets the preview attribute when it appears); the header cart badge updates in place instead of reloading the page.
+- **Cart**: + / − / Remove change the line, prices and badge at once; quick taps are saved together; Checkout waits until the cart is saved.
+- **Every customer page** shows a loading placeholder the moment a link is tapped (`app/(customer)/loading.tsx`).
+- **Cold starts**: the layout no longer loads the canvas and image libraries (light `lib/shop/cart-count.ts`, renderer and sharp imported only when used).
+- **Logs**: `[perf] <step> <ms>ms` for any outside call slower than `vault.slow_call_log_ms` (new, default 500): Shopify Admin/Storefront by operation name, the Shopify token, Imagen, the mirror, preview drawing. Step and time only.
