@@ -456,33 +456,34 @@ def wall_piece(w, h, kind, yaw=0.0, cam_side=0.0, lens=50, fill=0.5):
 
 
 def pillow(w=305 * MM, h=305 * MM, thick=125 * MM):
-    box("wall", (6, 0.05, 3), (0, 0.9 + 0.025, 1.3), textured("wall", WALL, rough=0.92, bump_strength=0.05))
-    box("floor", (6, 3, 0.04), (0, -0.6, -0.02), wood("floor", scale=2.0))
-    fab = textured("sofa", OATMEAL, rough=0.95, bump_strength=0.25, scale=900, sheen=0.7, vary=0.05)
-    box("seat", (1.6, 0.62, 0.18), (0, -0.05, 0.36), fab, bevel=0.035, segments=5)
-    box("base", (1.62, 0.64, 0.27), (0, -0.05, 0.135), fab, bevel=0.02)
-    box("back", (1.6, 0.22, 0.44), (0, 0.33, 0.68), fab, rot=(-0.14, 0, 0), bevel=0.05, segments=5)
-    box("arm", (0.2, 0.78, 0.34), (0.86, 0.0, 0.6), fab, bevel=0.06, segments=5)
-    lean = -0.30
-    R = Matrix.Translation(Vector((0, 0.14, 0.45 + h / 2 * math.cos(lean)))) @ Matrix.Rotation(lean, 4, "X")
-    R2 = Matrix.Translation(Vector((0.22, 0.25, 0.455 + 0.185 * math.cos(lean - 0.06)))) @ Matrix.Rotation(-0.12, 4, "Z") @ Matrix.Rotation(lean - 0.06, 4, "X") @ Matrix.Rotation(-0.06, 4, "Y")
+    """The cushion on an oak bench, leaning on the wall, with a folded throw and a plant."""
+    wall_y = 0.27
+    box("wall", (6, 0.05, 3), (0, wall_y + 0.025, 1.3), textured("wall", WALL, rough=0.92, bump_strength=0.05))
+    box("floor", (6, 3, 0.04), (0, wall_y - 1.5, -0.02), wood("floor", scale=2.0))
+    oak = wood("bench", scale=5.0, rough=0.4, coat=0.2)
+    seat_z = 0.45
+    box("bench", (1.1, 0.38, 0.045), (0, wall_y - 0.21, seat_z - 0.0225), oak, bevel=0.004)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            box(f"leg{sx}{sy}", (0.04, 0.04, seat_z - 0.045), (sx * 0.5, wall_y - 0.21 + sy * 0.14, (seat_z - 0.045) / 2), oak, bevel=0.003)
+    lean = -0.20
+    cy = wall_y - 0.012 - (thick / 2) * math.cos(lean) - (h / 2) * math.sin(-lean)
+    R = Matrix.Translation(Vector((0.0, cy, seat_z + (h / 2) * math.cos(lean) + 0.004))) @ Matrix.Rotation(lean, 4, "X")
     front, back_, corners = pillow_meshes(w, h, thick)
     f = mesh_obj("print", front, face_mat(), ROLE_FACE, smooth=True)
     b = mesh_obj("pillowback", back_, textured("pillowback", (0.82, 0.81, 0.79), rough=0.95, bump_strength=0.2, scale=900, sheen=0.5), smooth=True)
     for o in (f, b):
         o.matrix_world = R
     f["corners"] = [list(R @ Vector(p)) for p in corners]
-    fr2, bk2, _ = pillow_meshes(0.37, 0.37, 0.15, square=True)
-    sm = textured("terracotta", TERRACOTTA, rough=0.95, bump_strength=0.25, scale=900, sheen=0.6)
-    for nm, bm_ in (("other_f", fr2), ("other_b", bk2)):
-        o = mesh_obj(nm, bm_, sm, smooth=True)
-        o.matrix_world = R2
-    box("throw", (0.5, 0.3, 0.02), (-0.55, -0.1, 0.46), textured("throw", SAGE, rough=0.95, bump_strength=0.3, scale=600, sheen=0.6), rot=(0, 0, 0.12), bevel=0.008)
-    tgt = Vector((0.02, 0.1, 0.45 + h / 2))
-    area_light("window", (-1.9, -0.7, 1.3), tgt, 1.4, 230, color=(1.0, 0.975, 0.94))
-    area_light("fill", (1.4, -1.6, 1.1), tgt, 2.4, 45, color=(0.93, 0.95, 1.0))
-    area_light("rim", (0.3, 1.2, 1.5), tgt, 1.2, 40)
-    framed_camera(tgt + Vector((0.035, 0, -0.03)), 0.66, Vector((0, 1, -0.20)), lens=70, fstop=4.0)
+    throw = textured("throw", SAGE, rough=0.95, bump_strength=0.35, scale=700, sheen=0.6)
+    for k in range(3):
+        box(f"throw{k}", (0.30 - 0.01 * k, 0.24, 0.022), (-0.30, wall_y - 0.2, seat_z + 0.011 + 0.022 * k), throw, rot=(0, 0, 0.06 - 0.03 * k), bevel=0.009, segments=4)
+    vase((0.255, wall_y - 0.13, seat_z), h=0.20, r=0.05, color=STONE)
+    tgt = Vector((0.0, cy, seat_z + h / 2 - 0.01))
+    area_light("window", (-1.6, -1.2, 1.4), tgt, 1.6, 200, color=(1.0, 0.975, 0.94))
+    area_light("fill", (1.4, -1.6, 0.9), tgt, 2.4, 45, color=(0.93, 0.95, 1.0))
+    area_light("top", (0.2, -0.3, 1.8), tgt, 1.0, 40)
+    framed_camera(tgt, 0.62, Vector((0, 1, -0.16)), lens=70, fstop=4.0)
     return {"kind": "corners", "bulged": True}
 
 
