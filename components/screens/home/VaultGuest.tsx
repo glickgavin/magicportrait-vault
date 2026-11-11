@@ -55,7 +55,7 @@ export function VaultGuest({ data }: { data: HomeData }) {
       <Link href="/portraits" className="mt-4 flex items-center justify-between rounded-[18px] bg-white px-4 py-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
         <span>
           <span className="block text-[16px] font-bold">{t("home.allMyPortraits")}</span>
-          <span className="block text-[14px] text-ink-2">{t("home.sessionsSummary", { sessions: profile.sessions.length, portraits: profile.portraitCount })}</span>
+          <span className="block text-[14px] text-ink-2">{t("home.sessionsSummary", { sessions: profile.sessionCount, portraits: profile.portraitCount })}</span>
         </span>
         <span className="ml-auto mr-1 shrink-0 text-[15px] font-semibold text-pink-link">{t("home.seeAll")}</span>
         <ChevronRight className="h-5 w-5 text-ink-3" aria-hidden="true" />

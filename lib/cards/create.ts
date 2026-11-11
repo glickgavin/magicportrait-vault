@@ -97,7 +97,9 @@ export async function createCard(email: string, raw: unknown): Promise<{ card: C
   const input = createCardSchema.parse(raw);
   const now = new Date();
   const s = await getSettings(["cards.message_max_chars", "themes.in_season_days_before", "redeem.allowed_image_hosts", "cards.schedule_max_days"] as const);
-  const profile = await getVaultProfile(email);
+  let profile = await getVaultProfile(email);
+  // A portrait from an older session (Show more) isn't in the newest ones: look through them all.
+  if (input.imageId && !profile.sessions.some((g) => g.portraits.some((p) => p.imageId === input.imageId)) && profile.more.sessions > 0) profile = await getVaultProfile(email, { all: true });
 
   const access = await accessFor(email, profile.hasFreeGift, profile.portraitCount, now);
   if (!access.allowed) throw new CardError(access.reason, access.reason === "paused" ? 403 : access.reason === "limit" ? 429 : 403, access.reason === "limit" ? { nextAvailableAt: access.nextAvailableAt } : {});

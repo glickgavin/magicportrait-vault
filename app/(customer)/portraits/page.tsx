@@ -9,7 +9,8 @@ import { TrackPageView } from "@/components/TrackPageView";
 import { TrackedLink } from "@/components/TrackedLink";
 import { EmptyHome } from "@/components/screens/home/EmptyHome";
 import { PartialNotice } from "@/components/screens/home/PartialNotice";
-import { t } from "@/lib/i18n";
+import { ShowMoreLink } from "@/components/ShowMoreLink";
+import { t, tn } from "@/lib/i18n";
 import { fmtDate } from "@/lib/format";
 import { PortraitsShopBanner } from "@/components/shop/ShopWaysIn";
 import { shopVisible } from "@/lib/shop/visible";
@@ -17,11 +18,13 @@ import { shopVisible } from "@/lib/shop/visible";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: t("portraits.title") };
 
-export default async function PortraitsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
+export default async function PortraitsPage({ searchParams }: { searchParams: Promise<{ filter?: string; all?: string }> }) {
   const user = await requireUser("/portraits");
   const sp = await searchParams;
   const filter: Filter = sp.filter === "ordered" || sp.filter === "not_ordered" ? sp.filter : "all";
-  const data = await loadHome(user.email);
+  // The newest sessions first; "Show more" reads them all (?all=1).
+  const all = sp.all === "1";
+  const data = await loadHome(user.email, { all });
   const { profile } = data;
   const partial = profile.unavailable.length > 0;
   if (profile.state === "nobody" && partial) return <PartialNotice />;
@@ -33,13 +36,13 @@ export default async function PortraitsPage({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-[640px]" data-testid="portraits-page">
       {partial && <PartialNotice />}
-      <TrackPageView event="page_view_vault_portraits" props={{ session_count: profile.sessions.length, portrait_count: profile.portraitCount, ordered_count: profile.orderedCount }} />
+      <TrackPageView event="page_view_vault_portraits" props={{ session_count: profile.sessionCount, portrait_count: profile.portraitCount, ordered_count: profile.orderedCount }} />
       {profile.hasFreeGift && <HomeTabs active="portraits" />}
       <h1 className="mt-5 text-[28px] font-extrabold tracking-tight">{t("portraits.title")}</h1>
-      <p className="text-[15px] text-ink-2">{t("portraits.summary", { sessions: profile.sessions.length, portraits: profile.portraitCount, ordered: profile.orderedCount })}</p>
+      <p className="text-[15px] text-ink-2">{t("portraits.summary", { sessions: profile.sessionCount, portraits: profile.portraitCount, ordered: profile.orderedCount })}</p>
       {shop && <PortraitsShopBanner />}
       <div className="mt-4">
-        <PortraitFilter value={filter} />
+        <PortraitFilter value={filter} showAll={all} />
       </div>
       <div className="mt-4 flex flex-col gap-4">
         {groups.length === 0 && <p className="rounded-[16px] bg-white p-5 text-center text-ink-2">{t("portraits.none")}</p>}
@@ -47,6 +50,14 @@ export default async function PortraitsPage({ searchParams }: { searchParams: Pr
           <SessionCard key={g.sessionId} group={g} filter={filter} canMakeCard={data.access.allowed} />
         ))}
       </div>
+      {profile.more.sessions > 0 && (
+        <div className="mt-4 flex flex-col items-center gap-2" data-testid="portraits-more">
+          <p className="text-[13px] text-ink-2">{t("ui.showingNewest", { shown: profile.sessions.length, total: profile.sessionCount })}</p>
+          <ShowMoreLink href={`/portraits?${new URLSearchParams({ ...(filter !== "all" ? { filter } : {}), all: "1" }).toString()}`} className="flex h-12 items-center justify-center rounded-[14px] border border-black/15 bg-white px-5 text-[15px] font-bold">
+            {tn("ui.showMoreSessions", profile.more.sessions)}
+          </ShowMoreLink>
+        </div>
+      )}
       <TrackedLink
         href={data.startPortraitUrl}
         event="vault_new_portrait_tapped"

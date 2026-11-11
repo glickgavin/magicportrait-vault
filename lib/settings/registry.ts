@@ -181,6 +181,18 @@ export const REGISTRY = {
     min: 0,
     max: 600,
   }),
+  "vault.recent_sessions": num("vault", 3, {
+    label: "Sessions shown at first",
+    description: "Portraits, the card builder and the shop's picture lists show the newest this many Imagen sessions, with Show more for the rest. 0 shows them all.",
+    min: 0,
+    max: 1000,
+  }),
+  "vault.recent_orders": num("vault", 3, {
+    label: "Orders read at first",
+    description: "Pages read the newest this many Shopify orders; older ones are read only when these don't show the free gift. 0 reads them all.",
+    min: 0,
+    max: 250,
+  }),
   "vault.slow_call_log_ms": num("vault", 500, { label: "Log calls slower than (ms)", description: "Server logs a [perf] line (step and time only) for any outside call that takes longer. 0 turns it off.", min: 0, max: 60000 }),
   "vault.shopify_api_version": text("vault", "2025-07", { label: "Shopify Admin API version", pattern: /^\d{4}-\d{2}$/ }),
   "vault.order_search_page_size": num("vault", 25, { label: "Orders per page", min: 1, max: 250 }),

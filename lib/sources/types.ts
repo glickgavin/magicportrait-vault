@@ -42,6 +42,8 @@ export type MetafieldWriteResult = { ok: true } | { ok: false; reason: string };
 export interface ShopifySource {
   readonly kind: "live" | "fixtures";
   ordersByEmail(email: string): Promise<ShopifyOrder[]>;
+  /** The newest `limit` orders (test orders left out) and whether older ones exist. */
+  recentOrdersByEmail(email: string, limit: number): Promise<{ orders: ShopifyOrder[]; more: boolean }>;
   orderById(gidOrLegacyId: string): Promise<ShopifyOrder | null>;
   resolveOrderByName(name: string): Promise<{ id: string; name: string } | null>;
   setMugChoice(input: { orderGid: string; namespace: string; key: string; type: string; value: string; compareDigest: string | null }): Promise<MetafieldWriteResult>;
@@ -99,9 +101,14 @@ export type ImagenPortraitRow = {
   firstOrderedAt: string | null;
 };
 
+export type PortraitTotals = { sessions: number; portraits: number; ordered: number };
+
 export interface ImagenSource {
   readonly kind: "live" | "fixtures";
-  portraits(sessionIds: string[], opts: { includeChildren: boolean; imageBaseUrl: string }): Promise<ImagenPortraitRow[]>;
+  /** `newestSessions`: only the newest that many sessions (with a picture) among them and their children. */
+  portraits(sessionIds: string[], opts: { includeChildren: boolean; imageBaseUrl: string; newestSessions?: number }): Promise<ImagenPortraitRow[]>;
+  /** How many sessions, portraits and ordered portraits there are in all of them (for "3 of 73"). */
+  portraitTotals(sessionIds: string[], opts: { includeChildren: boolean }): Promise<PortraitTotals>;
   sessions(sessionIds: string[]): Promise<{ id: string; createdAt: string; status: string; petName: string | null; themeName: string | null }[]>;
   ping(): Promise<{ rows: number }>;
 }

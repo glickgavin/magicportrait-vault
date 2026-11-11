@@ -10,8 +10,9 @@ import { StickyFooterBar } from "./StepHeader";
 import { useDraft } from "./useDraft";
 import { submitCard } from "./submit";
 import type { BuilderData } from "./types";
+import { useMoreSessions } from "./useMoreSessions";
 import { isShown, usableIdeas } from "@/lib/render/layout";
-import { t } from "@/lib/i18n";
+import { t, tn } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 
@@ -37,8 +38,9 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
   const longPressed = useRef(false);
 
   const version = data.versions.find((v) => v.id === draft.versionId) ?? data.versions[0] ?? null;
-  const portrait = data.sessions.flatMap((s) => s.portraits).find((p) => p.imageId === draft.imageId) ?? null;
-  const session = data.sessions.find((s) => s.sessionId === portrait?.sessionId);
+  const { sessions, more, loading: loadingMore, loadMore } = useMoreSessions(data);
+  const portrait = sessions.flatMap((s) => s.portraits).find((p) => p.imageId === draft.imageId) ?? null;
+  const session = sessions.find((s) => s.sessionId === portrait?.sessionId);
   const ideas = useMemo(() => (version ? usableIdeas(version.messageIdeas, session?.petName) : []), [version, session?.petName]);
   const cycle = useMemo(() => {
     const inSeason = data.versions.filter((v) => v.inSeason);
@@ -259,7 +261,7 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
         </div>
       </Sheet>
       <Sheet open={sheet === "photo"} onClose={() => setSheet(null)} title={t("builder.pickPhoto")}>
-        {data.sessions.map((s) => (
+        {sessions.map((s) => (
           <div key={s.sessionId} className="mb-4">
             <p className="mb-2 text-[15px] font-bold">{[s.themeName, s.petName].filter(Boolean).join(" · ")}</p>
             <div role="radiogroup" aria-label={[s.themeName, s.petName].filter(Boolean).join(" · ")} className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -284,6 +286,11 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
             </div>
           </div>
         ))}
+        {more > 0 && (
+          <button type="button" onClick={() => void loadMore()} disabled={loadingMore} aria-busy={loadingMore || undefined} className="mb-2 flex h-12 w-full items-center justify-center rounded-[14px] border border-black/15 bg-white text-[15px] font-bold disabled:opacity-60" data-testid="portraits-more">
+            {loadingMore ? t("ui.loading") : tn("ui.showMoreSessions", more)}
+          </button>
+        )}
       </Sheet>
     </div>
   );

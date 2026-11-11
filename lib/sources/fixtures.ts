@@ -28,6 +28,10 @@ export class ShopifyFixtures implements ShopifySource {
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     );
   }
+  async recentOrdersByEmail(email: string, limit: number) {
+    const all = await this.ordersByEmail(email);
+    return { orders: all.slice(0, limit), more: all.length > limit };
+  }
   async orderById(id: string) {
     const gid = /^\d+$/.test(id) ? `gid://shopify/Order/${id}` : id;
     const o = this.orders.find((x) => x.id === gid);
@@ -79,8 +83,16 @@ export class MirrorFixtures implements MirrorSource {
 
 export class ImagenFixtures implements ImagenSource {
   readonly kind = "fixtures" as const;
-  async portraits(sessionIds: string[], opts: { includeChildren: boolean }) {
-    return fxPortraitRows(sessionIds, opts.includeChildren);
+  async portraits(sessionIds: string[], opts: { includeChildren: boolean; newestSessions?: number }) {
+    const rows = fxPortraitRows(sessionIds, opts.includeChildren);
+    if (!opts.newestSessions) return rows;
+    const created = new Map(rows.map((r) => [r.sessionId, r.sessionCreatedAt]));
+    const keep = new Set([...created.entries()].sort((a, b) => b[1].localeCompare(a[1])).slice(0, opts.newestSessions).map(([id]) => id));
+    return rows.filter((r) => keep.has(r.sessionId));
+  }
+  async portraitTotals(sessionIds: string[], opts: { includeChildren: boolean }) {
+    const rows = fxPortraitRows(sessionIds, opts.includeChildren);
+    return { sessions: new Set(rows.map((r) => r.sessionId)).size, portraits: rows.length, ordered: rows.filter((r) => r.ordered).length };
   }
   async sessions(sessionIds: string[]) {
     return FX_SESSIONS.filter((s) => sessionIds.includes(s.id)).map((s) => ({ id: s.id, createdAt: s.createdAt, status: "done", petName: s.petName, themeName: s.theme.name }));

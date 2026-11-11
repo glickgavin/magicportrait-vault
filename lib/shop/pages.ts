@@ -74,9 +74,8 @@ export async function recentPictures(email: string): Promise<RecentPicture[]> {
 export type PictureView = { id: string; kind: string; url: string | null; ordered: boolean; small: boolean };
 
 /** Choose a picture: their portraits and photos, with the ones too small for most prints marked. */
-export async function choosePictureData(user: SessionUser) {
-  const s = await getSettings(["shop.default_min_short_side_px"] as const);
-  const list = await listPictures(user.email);
+export async function choosePictureData(user: SessionUser, all = false) {
+  const [s, list] = await Promise.all([getSettings(["shop.default_min_short_side_px"] as const), listPictures(user.email, all)]);
   const view = async (p: Awaited<ReturnType<typeof listPictures>>["portraits"][number]): Promise<PictureView> => ({
     id: p.id,
     kind: p.kind,
@@ -84,7 +83,7 @@ export async function choosePictureData(user: SessionUser) {
     ordered: p.ordered,
     small: Boolean(p.width && p.height && Math.min(p.width, p.height) < s["shop.default_min_short_side_px"]),
   });
-  return { portraits: await Promise.all(list.portraits.map(view)), photos: await Promise.all(list.photos.map(view)), partial: list.partial };
+  return { portraits: await Promise.all(list.portraits.map(view)), photos: await Promise.all(list.photos.map(view)), partial: list.partial, moreSessions: list.moreSessions };
 }
 
 export type VariantView = {

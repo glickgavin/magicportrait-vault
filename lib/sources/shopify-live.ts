@@ -171,6 +171,15 @@ export class ShopifyLive implements ShopifySource {
     return out;
   }
 
+  async recentOrdersByEmail(email: string, limit: number): Promise<{ orders: ShopifyOrder[]; more: boolean }> {
+    const search = `email:"${email.replace(/"/g, "")}"`;
+    // One small page, newest first. Test orders are dropped after, so ask for a few more than needed.
+    const d: { orders: Conn<RawOrder> } = await this.gql(Q_ORDERS, { search, first: limit + 2, after: null, lines: this.cfg.linesPageSize });
+    const real = d.orders.edges.filter((e) => !e.node.test);
+    const orders = await Promise.all(real.slice(0, limit).map((e) => this.mapOrder(e.node)));
+    return { orders, more: real.length > limit || d.orders.pageInfo.hasNextPage };
+  }
+
   async orderById(id: string): Promise<ShopifyOrder | null> {
     const gid = /^\d+$/.test(id) ? `gid://shopify/Order/${id}` : id;
     const d = await this.gql<{ order: RawOrder | null }>(Q_ORDER, { id: gid, lines: this.cfg.linesPageSize });
