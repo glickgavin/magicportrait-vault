@@ -1,4 +1,5 @@
 import "server-only";
+import { opName, timed } from "@/lib/perf";
 import type { ShopifyTokenProvider } from "./shopify-auth";
 import type { FinancialStatus, MetafieldWriteResult, ShopifyLineItem, ShopifyOrder, ShopifySource } from "./types";
 
@@ -83,12 +84,14 @@ export class ShopifyLive implements ShopifySource {
 
   private async gql<T>(query: string, variables: Record<string, unknown>, attempt = 0, refreshed = false): Promise<T> {
     const token = await this.cfg.auth.get({ fresh: refreshed });
-    const res = await fetch(`https://${this.cfg.domain}/admin/api/${this.cfg.apiVersion}/graphql.json`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-shopify-access-token": token },
-      body: JSON.stringify({ query, variables }),
-      cache: "no-store",
-    });
+    const res = await timed(`shopify.admin ${opName(query)}`, () =>
+      fetch(`https://${this.cfg.domain}/admin/api/${this.cfg.apiVersion}/graphql.json`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-shopify-access-token": token },
+        body: JSON.stringify({ query, variables }),
+        cache: "no-store",
+      }),
+    );
     // A client-credentials token can be revoked or rotated early: get a fresh one and retry once.
     if (res.status === 401 && !refreshed && this.cfg.auth.mode === "client_credentials") return this.gql(query, variables, attempt, true);
     if (res.status === 429 || res.status >= 500) {

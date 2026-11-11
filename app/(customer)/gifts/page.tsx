@@ -1,4 +1,4 @@
-import { landingData, requireShopUser } from "@/lib/shop/pages";
+import { landingData, recentPictures, requireShopUser } from "@/lib/shop/pages";
 import { ShopLanding } from "@/components/shop/ShopLanding";
 
 export const dynamic = "force-dynamic";
@@ -8,5 +8,7 @@ export const metadata = { title: "Gifts" };
 export default async function Page({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const user = await requireShopUser("/gifts");
   const { filter } = await searchParams;
-  return <ShopLanding page="gifts" data={await landingData(user, "gifts", typeof filter === "string" ? filter.slice(0, 60) : null)} />;
+  // Started now so the pictures are read while the products are; they stream in when ready.
+  const recent = recentPictures(user.email);
+  return <ShopLanding page="gifts" data={await landingData(user, "gifts", typeof filter === "string" ? filter.slice(0, 60) : null)} recent={recent} />;
 }

@@ -15,7 +15,7 @@ export function Header({ user, mainSiteUrl, thumbnails, cardsEnabled, shop }: { 
         <Link href="/" aria-label={t("app.name")} className="absolute left-1/2 top-[13px] -translate-x-1/2">
           <img src="/mp-logo.svg" alt={t("app.logoAlt")} width={156} height={30} className="h-[30px] w-auto" />
         </Link>
-        {shop && shop.cartCount > 0 && <CartIcon count={shop.cartCount} />}
+        {shop && <CartIcon count={shop.cartCount} />}
         {user ? (
           <AccountMenu user={user} />
         ) : (

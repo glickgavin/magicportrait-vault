@@ -1,4 +1,5 @@
 import "server-only";
+import { opName, timed } from "@/lib/perf";
 import type { ShopifyTokenProvider } from "@/lib/sources/shopify-auth";
 import { parseList } from "../fields";
 import type { DiscountInfo, FieldDefinitionSpec, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopProduct, WriteResult } from "./types";
@@ -148,12 +149,14 @@ export class ShopCatalogLive implements ShopCatalogSource {
 
   private async gql<T>(query: string, variables: Record<string, unknown>, attempt = 0, refreshed = false): Promise<T> {
     const token = await this.cfg.auth.get(refreshed ? { fresh: true } : undefined);
-    const res = await fetch(`https://${this.cfg.domain}/admin/api/${this.cfg.apiVersion}/graphql.json`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-shopify-access-token": token },
-      body: JSON.stringify({ query, variables }),
-      cache: "no-store",
-    });
+    const res = await timed(`shopify.admin ${opName(query)}`, () =>
+      fetch(`https://${this.cfg.domain}/admin/api/${this.cfg.apiVersion}/graphql.json`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-shopify-access-token": token },
+        body: JSON.stringify({ query, variables }),
+        cache: "no-store",
+      }),
+    );
     if (res.status === 401 && !refreshed && this.cfg.auth.mode === "client_credentials") return this.gql(query, variables, attempt, true);
     if ((res.status === 429 || res.status >= 500) && attempt < 3) {
       await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));

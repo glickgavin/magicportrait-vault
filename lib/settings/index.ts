@@ -4,18 +4,32 @@ import { REGISTRY, getDef, isSettingKey, validateSetting, type SettingKey, type 
 
 const CACHE_MS = Number(process.env.SETTINGS_CACHE_MS ?? 15_000);
 let cache: { at: number; values: Map<string, unknown> } | null = null;
+let loading: Promise<Map<string, unknown>> | null = null;
+
+let generation = 0;
 
 export function clearSettingsCache() {
   cache = null;
+  loading = null;
+  generation++;
 }
 
 async function loadAll(): Promise<Map<string, unknown>> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.values;
-  const rows = must(await db().from("settings").select("key, value"), "load settings") as { key: string; value: unknown }[];
-  const values = new Map<string, unknown>();
-  for (const r of rows) values.set(r.key, r.value);
-  cache = { at: Date.now(), values };
-  return values;
+  // Many reads at once on a cold server share one query.
+  const gen = generation;
+  loading ??= (async () => {
+    try {
+      const rows = must(await db().from("settings").select("key, value"), "load settings") as { key: string; value: unknown }[];
+      const values = new Map<string, unknown>();
+      for (const r of rows) values.set(r.key, r.value);
+      if (gen === generation) cache = { at: Date.now(), values }; // a save since then: don't keep the older read
+      return values;
+    } finally {
+      if (gen === generation) loading = null;
+    }
+  })();
+  return loading;
 }
 
 /** A setting's value, validated against the registry; invalid or missing values fall back to the default. */

@@ -1,18 +1,9 @@
 import "server-only";
-import postgres from "postgres";
+import { pgPool } from "@/lib/sources/pg-live";
 import type { MirrorImageProps, MirrorTileUpload, ShopImagesSource } from "./images";
 
-let pool: ReturnType<typeof postgres> | null = null;
-let poolUrl: string | null = null;
-
-/** Its own small pool on the read-only vault_reader role (MIRROR_DATABASE_URL), like lib/sources/pg-live.ts. */
-function sqlFor(url: string) {
-  if (!pool || poolUrl !== url) {
-    pool = postgres(url, { max: 2, idle_timeout: 20, connect_timeout: 10, prepare: false, ssl: "require", connection: { application_name: "magic-vault-shop" } });
-    poolUrl = url;
-  }
-  return pool;
-}
+/** The mirror's shared pool on the read-only vault_reader role (MIRROR_DATABASE_URL), see lib/sources/pg-live.ts. */
+const sqlFor = (url: string) => pgPool(url);
 
 const UUID_RE = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$";
 

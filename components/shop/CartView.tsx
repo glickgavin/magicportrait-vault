@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { CartView as Cart } from "@/lib/shop/cart";
 import { formatMoney } from "@/lib/shop/money";
 import { t, tn } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { TrackPageView } from "@/components/TrackPageView";
+import { announceCartCount } from "./CartIcon";
 
 type Line = Cart["lines"][number];
 
@@ -26,21 +27,92 @@ export function linePrice(l: Line): { was: string | null; now: string; pct: numb
   return { was: null, now: l.shopify?.total ?? l.listTotal, pct: null };
 }
 
+/** Quantity changes and removals not yet confirmed by the server: line id → new quantity, or null when removed. */
+export type PendingLines = Record<string, number | null>;
+
+/**
+ * The cart as it will be once the pending changes are saved, so a tap shows at once. Prices scale with
+ * the quantity; Shopify's cart-level figures are left out until the server's answer replaces this guess.
+ */
+export function withPending(cart: Cart, pending: PendingLines): Cart {
+  if (!Object.keys(pending).length) return cart;
+  const scale = (a: string, from: number, to: number) => ((Math.round(Number(a) * 100) * to) / from / 100).toFixed(2);
+  const lines = cart.lines.flatMap((l): Line[] => {
+    if (!(l.id in pending)) return [l];
+    const q = pending[l.id];
+    if (q === null) return [];
+    if (q === l.quantity) return [l];
+    return [
+      {
+        ...l,
+        quantity: q,
+        listTotal: scale(l.listTotal, l.quantity, q),
+        ourTotal: l.ourTotal === null ? null : scale(l.ourTotal, l.quantity, q),
+        shopify: l.shopify ? { subtotal: scale(l.shopify.subtotal, l.quantity, q), total: scale(l.shopify.total, l.quantity, q) } : null,
+      },
+    ];
+  });
+  return { ...cart, lines, count: lines.reduce((n, l) => n + l.quantity, 0), hasGift: lines.some((l) => l.page === "gifts"), figures: null };
+}
+
 /** The cart: lines with their previews, "Who's it for?" only when it holds a gift, Shopify's figures, Checkout. */
-export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQty: number; maxMessage: number; label: string }) {
+export function CartView({ cart: saved, maxQty, maxMessage, label }: { cart: Cart; maxQty: number; maxMessage: number; label: string }) {
   const router = useRouter();
-  const [busyLine, setBusyLine] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingLines>({});
+  const [refreshing, startRefresh] = useTransition();
+  const timers = useRef<Record<string, { timer: ReturnType<typeof setTimeout>; quantity: number | null }>>({});
+  const sending = useRef(new Set<Promise<void>>());
+  const cart = withPending(saved, pending);
   const [giftFor, setGiftFor] = useState(cart.giftFor);
   const [message, setMessage] = useState(cart.giftMessage);
   const [state, setState] = useState<{ busy: boolean; error: string | null; nameError: boolean }>({ busy: false, error: null, nameError: false });
   const money = (a: string | number) => formatMoney(a, cart.currency);
   const blocked = cart.lines.some((l) => l.problem);
+  const unsaved = Object.keys(pending).length > 0 || refreshing;
 
-  async function change(id: string, quantity: number | null) {
-    setBusyLine(id);
-    await fetch(`/api/shop/cart/lines/${id}`, quantity === null ? { method: "DELETE" } : { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ quantity }) });
-    setBusyLine(null);
-    router.refresh();
+  // The server's answer replaces the guesses once nothing else is waiting to be saved.
+  useEffect(() => {
+    if (!sending.current.size && !Object.keys(timers.current).length) setPending({});
+  }, [saved]);
+  useEffect(() => () => Object.values(timers.current).forEach((w) => clearTimeout(w.timer)), []);
+
+  function send(id: string, quantity: number | null): Promise<void> {
+    delete timers.current[id];
+    const p = (async () => {
+      const r = await fetch(`/api/shop/cart/lines/${id}`, quantity === null ? { method: "DELETE" } : { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ quantity }) }).catch(() => null);
+      if (!r?.ok) {
+        setPending((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setState((st) => ({ ...st, error: t("shop.checkoutErrors.other") }));
+      }
+    })();
+    sending.current.add(p);
+    void p.finally(() => {
+      sending.current.delete(p);
+      startRefresh(() => router.refresh());
+    });
+    return p;
+  }
+
+  /** Shows the change at once; quick taps on + or − are saved together a moment later. */
+  function change(id: string, quantity: number | null) {
+    const next = { ...pending, [id]: quantity };
+    setPending(next);
+    announceCartCount(withPending(saved, next).count);
+    clearTimeout(timers.current[id]?.timer);
+    timers.current[id] = { quantity, timer: setTimeout(() => void send(id, quantity), quantity === null ? 0 : 350) };
+  }
+
+  /** Saves every change still waiting, so checkout reads the cart as the customer sees it. */
+  async function saveAll() {
+    for (const [id, w] of Object.entries(timers.current)) {
+      clearTimeout(w.timer);
+      void send(id, w.quantity);
+    }
+    await Promise.all([...sending.current]);
   }
 
   async function checkout() {
@@ -49,6 +121,7 @@ export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQ
       return;
     }
     setState({ busy: true, error: null, nameError: false });
+    await saveAll();
     const r = await fetch("/api/shop/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cart.hasGift ? { giftFor, giftMessage: message } : {}) });
     const b = (await r.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string };
     if (r.ok && b.checkoutUrl) {
@@ -129,16 +202,18 @@ export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQ
                 <div className="mt-auto flex items-center gap-4 pt-1">
                   {!l.problem && (
                     <div role="group" aria-label={`${t("shop.quantity")}: ${l.productTitle}`} className="flex items-center overflow-hidden rounded-[10px] border border-black/15">
-                      <button type="button" aria-label={t("shop.fewer")} disabled={busyLine === l.id || l.quantity <= 1} onClick={() => void change(l.id, l.quantity - 1)} className="h-9 w-9 text-[18px] disabled:opacity-40">
+                      <button type="button" aria-label={t("shop.fewer")} disabled={l.quantity <= 1} onClick={() => change(l.id, l.quantity - 1)} className="h-9 w-9 text-[18px] disabled:opacity-40">
                         −
                       </button>
-                      <span className="w-7 text-center text-[15px] font-bold">{l.quantity}</span>
-                      <button type="button" aria-label={t("shop.moreOne")} disabled={busyLine === l.id || l.quantity >= maxQty} onClick={() => void change(l.id, l.quantity + 1)} className="h-9 w-9 text-[18px] disabled:opacity-40">
+                      <span className="w-7 text-center text-[15px] font-bold" aria-live="polite">
+                        {l.quantity}
+                      </span>
+                      <button type="button" aria-label={t("shop.moreOne")} disabled={l.quantity >= maxQty} onClick={() => change(l.id, l.quantity + 1)} className="h-9 w-9 text-[18px] disabled:opacity-40">
                         +
                       </button>
                     </div>
                   )}
-                  <button type="button" disabled={busyLine === l.id} onClick={() => void change(l.id, null)} className="h-9 text-[13px] font-bold text-pink-link">
+                  <button type="button" onClick={() => change(l.id, null)} className="h-9 text-[13px] font-bold text-pink-link">
                     {t("shop.remove")}
                   </button>
                 </div>
@@ -177,7 +252,7 @@ export function CartView({ cart, maxQty, maxMessage, label }: { cart: Cart; maxQ
               </div>
             </section>
           )}
-          <section aria-label={t("shop.subtotal")} className="flex flex-col gap-1.5 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+          <section aria-label={t("shop.subtotal")} aria-busy={unsaved || undefined} className={cn("flex flex-col gap-1.5 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] transition-opacity", unsaved && "opacity-70")}>
             <div className="flex justify-between text-[14px] text-ink-2">
               <span>{t("shop.items")}</span>
               <span>{money(summary.items)}</span>

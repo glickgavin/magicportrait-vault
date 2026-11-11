@@ -3,7 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { Crop, X } from "lucide-react";
 import type { IdeaView, Pricing, ShopPage, VariantView } from "@/lib/shop/pages";
 import { centredCrop, type Rect } from "@/lib/shop/fit";
@@ -12,11 +12,34 @@ import { t, tn } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 import { Price } from "./Price";
+import { announceCartCount } from "./CartIcon";
 import { ShopPreview } from "./ShopPreview";
 
 type Picture = { id: string; kind: string; url: string | null; width: number | null; height: number | null; ordered: boolean };
 
-export function IdeasView({ page, picture, top, rest, others, pricing, sizeKnown, tooSmall = null, open, maxQty }: { page: ShopPage; picture: Picture; top: IdeaView[]; rest: IdeaView[]; others: { id: string; url: string | null }[]; pricing: Pricing; sizeKnown: boolean; tooSmall?: { px: number; need: number } | null; open: string | null; maxQty: number }) {
+/** The person's other pictures, to switch to. Streams in after the ideas. */
+function OtherPictures({ others, showChange, base, page }: { others: Promise<{ id: string; url: string | null }[]>; showChange: boolean; base: string; page: ShopPage }) {
+  const list = use(others);
+  if (!(showChange || list.length <= 6)) return null;
+  return (
+    <ul aria-label={t("shop.changePicture")} className={cn("grid grid-cols-5 gap-1.5", !showChange && "hidden lg:grid")}>
+      {list.map((o, n) => (
+        <li key={o.id}>
+          <Link href={`${base}/i/${o.id}`} aria-label={t("shop.usePicture", { n: n + 1 })} onClick={() => trackClient("shop_image_selected", { changed: true, page })} className="block aspect-square overflow-hidden rounded-[10px] bg-black/5">
+            {o.url && <img src={o.url} alt="" className="ph-no-capture h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />}
+          </Link>
+        </li>
+      ))}
+      <li>
+        <Link href={`${base}/choose`} className="flex aspect-square items-center justify-center rounded-[10px] bg-black/5 text-[12px] font-bold text-ink">
+          {t("shop.all")}
+        </Link>
+      </li>
+    </ul>
+  );
+}
+
+export function IdeasView({ page, picture, top, rest, others, pricing, sizeKnown, tooSmall = null, open, maxQty }: { page: ShopPage; picture: Picture; top: IdeaView[]; rest: IdeaView[]; others: Promise<{ id: string; url: string | null }[]>; pricing: Pricing; sizeKnown: boolean; tooSmall?: { px: number; need: number } | null; open: string | null; maxQty: number }) {
   const [showAll, setShowAll] = useState(false);
   const [openIdea, setOpenIdea] = useState<IdeaView | null>(() => [...top, ...rest].find((i) => i.handle === open) ?? null);
   const [showChange, setShowChange] = useState(false);
@@ -61,22 +84,9 @@ export function IdeasView({ page, picture, top, rest, others, pricing, sizeKnown
               </button>
             </div>
           </div>
-          {(showChange || others.length <= 6) && (
-            <ul aria-label={t("shop.changePicture")} className={cn("grid grid-cols-5 gap-1.5", !showChange && "hidden lg:grid")}>
-              {others.map((o, n) => (
-                <li key={o.id}>
-                  <Link href={`${base}/i/${o.id}`} aria-label={t("shop.usePicture", { n: n + 1 })} onClick={() => trackClient("shop_image_selected", { changed: true, page })} className="block aspect-square overflow-hidden rounded-[10px] bg-black/5">
-                    {o.url && <img src={o.url} alt="" className="ph-no-capture h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />}
-                  </Link>
-                </li>
-              ))}
-              <li>
-                <Link href={`${base}/choose`} className="flex aspect-square items-center justify-center rounded-[10px] bg-black/5 text-[12px] font-bold text-ink">
-                  {t("shop.all")}
-                </Link>
-              </li>
-            </ul>
-          )}
+          <Suspense fallback={null}>
+            <OtherPictures others={others} showChange={showChange} base={base} page={page} />
+          </Suspense>
         </aside>
 
         <section aria-labelledby="ideas-title" className="flex min-w-0 flex-[999_1_420px] flex-col gap-4">
@@ -134,7 +144,10 @@ function ProductSheet({ page, idea, picture, pricing, maxQty, onClose }: { page:
     const r = await fetch("/api/shop/cart/lines", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ page, imageId: picture.id, variantId: v.id, quantity: qty, crop: JSON.stringify(crop) === JSON.stringify(v.crop) ? undefined : crop }) });
     if (r.ok) {
       setState({ busy: false, added: true, error: null });
-      router.refresh();
+      // The header's cart updates in place; the page itself doesn't need reading again.
+      const b = (await r.json().catch(() => ({}))) as { count?: number };
+      if (typeof b.count === "number") announceCartCount(b.count);
+      else router.refresh();
     } else setState({ busy: false, added: false, error: t("shop.checkoutErrors.other") });
   }
 

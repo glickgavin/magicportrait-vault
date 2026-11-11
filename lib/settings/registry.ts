@@ -175,6 +175,13 @@ export const REGISTRY = {
   "vault.first_order_offer_code": text("vault", "", { label: "First-order offer code", max: 40 }),
   "vault.lookup_cache_minutes": num("vault", 10, { label: "Portrait lookup cache (minutes)", min: 0, max: 1440 }),
   "vault.lookup_rate_limit_per_hour": num("vault", 120, { label: "Lookups per person per hour", min: 1, max: 1000000 }),
+  "vault.profile_memory_seconds": num("vault", 60, {
+    label: "Keep a person's orders and portraits between pages (seconds)",
+    description: "Each server keeps what it read from Shopify and Imagen for this long, so moving between pages doesn't read it all again. Never stored in the database. 0 reads them live on every page.",
+    min: 0,
+    max: 600,
+  }),
+  "vault.slow_call_log_ms": num("vault", 500, { label: "Log calls slower than (ms)", description: "Server logs a [perf] line (step and time only) for any outside call that takes longer. 0 turns it off.", min: 0, max: 60000 }),
   "vault.shopify_api_version": text("vault", "2025-07", { label: "Shopify Admin API version", pattern: /^\d{4}-\d{2}$/ }),
   "vault.order_search_page_size": num("vault", 25, { label: "Orders per page", min: 1, max: 250 }),
   "vault.imagen_public_image_base_url": url("vault", "https://ngyunrirwrjudbgaijek.supabase.co/storage/v1/object/public/images/", { label: "Imagen public image base" }),

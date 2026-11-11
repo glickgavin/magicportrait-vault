@@ -7,6 +7,7 @@ import { dedupeByTile, parseRedeemOrder, type ParsedOrder, type RedeemConfig, ty
 import { mugChoiceValue, mugLockState, type LockState } from "./lock";
 import { track } from "@/lib/track";
 import { maskEmail } from "@/lib/utils";
+import { forgetProfile } from "@/lib/vault/profile";
 
 export async function redeemConfig(): Promise<RedeemConfig & { s: Awaited<ReturnType<typeof loadRedeemSettings>> }> {
   const s = await loadRedeemSettings();
@@ -150,6 +151,7 @@ export async function saveMugChoice(email: string, orderParam: string, tileId: s
   }
   const tag = await shopify.addTags(order.id, [cfg.s["redeem.mug_ready_tag"]]).catch((e: Error) => ({ ok: false as const, reason: e.message }));
   if (!tag.ok) await track("redeem_mug_save_failed", { order_id: orderId, tile_id: tileId, reason: "tag_failed" }, { email, ref: { type: "order", id: orderId } });
+  forgetProfile(email); // the home page's "choose your mug photo" count changes
   await track("redeem_mug_saved", { order_id: orderId, order_name: order.name, tile_id: tileId, is_first_save: !view.parsed.mug.currentTileId }, { email, ref: { type: "order", id: orderId } });
   return { ok: true, tileId };
 }

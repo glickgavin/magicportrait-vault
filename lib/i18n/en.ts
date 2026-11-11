@@ -7,6 +7,7 @@ export const en = {
   ui: {
     back: "Back",
     skip: "Skip to content",
+    loading: "Loading…",
     footer: {
       products: "Products:",
       petPortraits: "Pet Portraits",

@@ -47,18 +47,28 @@ async function occasionOrder(entries: CatalogEntry[]): Promise<string[]> {
 
 /** The Gifts page (by occasion) or the Products page (by product type). */
 export async function landingData(user: SessionUser, page: ShopPage, filter: string | null) {
-  const pricing = await pricingFor(user.email);
-  const entries = forPage(await getCatalog(), page);
+  // Pricing, the catalog and the setting side by side; the person's pictures stream in separately (recentPictures).
+  const [pricing, catalog, s] = await Promise.all([pricingFor(user.email), getCatalog(), getSettings(["shop.top_picks_count"] as const)]);
+  const entries = forPage(catalog, page);
   const groups = page === "gifts" ? (await occasionOrder(entries)).filter((o) => entries.some((e) => e.product.occasions.includes(o))) : [...new Set(entries.map((e) => e.product.productType.trim()).filter(Boolean))];
   const inGroup = (e: CatalogEntry, g: string) => (page === "gifts" ? e.product.occasions.includes(g) : e.product.productType.trim() === g);
   const chosen = filter && groups.includes(filter) ? filter : null;
   const sections = (chosen ? [chosen] : groups).map((g) => ({ title: g, products: entries.filter((e) => inGroup(e, g)).map((e) => card(e, pricing.pct)) })).filter((s) => s.products.length);
   const ungrouped = entries.filter((e) => !groups.some((g) => inGroup(e, g)));
   if (!chosen && ungrouped.length) sections.push({ title: "", products: ungrouped.map((e) => card(e, pricing.pct)) });
-  const pictures = await listPictures(user.email).catch(() => ({ portraits: [], photos: [], partial: true }));
-  const recent = await Promise.all([...pictures.portraits, ...pictures.photos].slice(0, 3).map(async (p) => ({ id: p.id, url: await pictureLink(p) })));
-  const topPicks = (await getSettings(["shop.top_picks_count"] as const))["shop.top_picks_count"];
-  return { pricing: pricing as Pricing, groups, chosen, sections, recent, total: entries.length, topPicks };
+  return { pricing: pricing as Pricing, groups, chosen, sections, total: entries.length, topPicks: s["shop.top_picks_count"] };
+}
+
+export type RecentPicture = { id: string; url: string | null };
+
+/** The person's three newest pictures for the "Start with a picture" box. Never throws: none on failure. */
+export async function recentPictures(email: string): Promise<RecentPicture[]> {
+  try {
+    const pictures = await listPictures(email);
+    return await Promise.all([...pictures.portraits, ...pictures.photos].slice(0, 3).map(async (p) => ({ id: p.id, url: await pictureLink(p) })));
+  } catch {
+    return [];
+  }
 }
 
 export type PictureView = { id: string; kind: string; url: string | null; ordered: boolean; small: boolean };
@@ -128,12 +138,17 @@ function ideaView(i: Idea, pct: number | null): IdeaView | null {
 
 /** Product ideas for one of their pictures; null when the picture isn't theirs. */
 export async function ideasData(user: SessionUser, page: ShopPage, imageId: string) {
-  const pic = await pictureFor(user.email, imageId);
+  // The picture, the pricing, the catalog and the "Change picture" strip all side by side.
+  const listP = listPictures(user.email).catch(() => ({ portraits: [], photos: [], partial: true }));
+  const [pic, s, pricing, catalog] = await Promise.all([
+    pictureFor(user.email, imageId),
+    getSettings(["shop.top_picks_count", "shop.change_strip_count", "shop.cart_line_max_qty"] as const),
+    pricingFor(user.email),
+    getCatalog(),
+  ]);
   if (!pic) return null;
   const img = await ensureSize(user.email, pic);
-  const s = await getSettings(["shop.top_picks_count", "shop.change_strip_count", "shop.cart_line_max_qty"] as const);
-  const pricing = await pricingFor(user.email);
-  const entries = forPage(await getCatalog(), page);
+  const entries = forPage(catalog, page);
   const ideas = img.width && img.height ? ideasFor(entries, { kind: img.kind, width: img.width, height: img.height }).map((i) => ideaView(i, pricing.pct)).filter((v): v is IdeaView => v !== null) : [];
   // When nothing fits, say whether the picture is too small for every size (rather than the wrong shape).
   const needs = entries.flatMap((e) => e.sellable.map((v) => v.rules.minShortSidePx));
@@ -143,13 +158,17 @@ export async function ideasData(user: SessionUser, page: ShopPage, imageId: stri
   const n = s["shop.top_picks_count"];
   const top = ideas.slice(0, n);
   const rest = ideas.slice(n);
-  const list = await listPictures(user.email).catch(() => ({ portraits: [], photos: [], partial: true }));
-  const others = await Promise.all(
-    [...list.portraits, ...list.photos]
-      .filter((p) => p.id !== pic.id)
-      .slice(0, s["shop.change_strip_count"])
-      .map(async (p) => ({ id: p.id, url: await pictureLink(p) })),
-  );
+  // Streamed: the ideas show first, the "Change picture" strip follows when the full list is read.
+  const others: Promise<{ id: string; url: string | null }[]> = listP
+    .then((list) =>
+      Promise.all(
+        [...list.portraits, ...list.photos]
+          .filter((p) => p.id !== pic.id)
+          .slice(0, s["shop.change_strip_count"])
+          .map(async (p) => ({ id: p.id, url: await pictureLink(p) })),
+      ),
+    )
+    .catch(() => []);
   return {
     picture: { id: img.id, kind: img.kind, url: await pictureLink(img), width: img.width, height: img.height, ordered: img.ordered },
     sizeKnown: Boolean(img.width && img.height),

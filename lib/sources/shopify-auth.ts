@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
+import { timed } from "@/lib/perf";
 
 /**
  * Shopify Admin API auth. The r_orders app is a Dev Dashboard app: it has a client id and secret
@@ -78,12 +79,14 @@ export function shopifyTokenProvider(domain: string, auth: ShopifyAuth, fetchImp
 }
 
 async function requestToken(domain: string, auth: Extract<ShopifyAuth, { mode: "client_credentials" }>, fetchImpl: typeof fetch) {
-  const res = await fetchImpl(`https://${domain}/admin/oauth/access_token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-    body: new URLSearchParams({ grant_type: "client_credentials", client_id: auth.clientId, client_secret: auth.clientSecret }).toString(),
-    cache: "no-store",
-  });
+  const res = await timed("shopify.token", () =>
+    fetchImpl(`https://${domain}/admin/oauth/access_token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+      body: new URLSearchParams({ grant_type: "client_credentials", client_id: auth.clientId, client_secret: auth.clientSecret }).toString(),
+      cache: "no-store",
+    }),
+  );
   const body = (await res.json().catch(() => null)) as { access_token?: string; expires_in?: number; error?: string } | null;
   // Only Shopify's short error code goes into the message (e.g. invalid_client), never the response body.
   if (!res.ok || !body?.access_token) throw new Error(`shopify_token_http_${res.status}${body?.error ? `: ${String(body.error).slice(0, 60)}` : ""}`);
