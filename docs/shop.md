@@ -174,6 +174,16 @@ Each Store product has a studio template made in Blender (`scripts/mockups/`), s
 | Magic Xmas Ornaments | Round ceramic ornament on a red ribbon, tree lights behind | 1:1, circle |
 | Magic Puzzle | On a table with its box lid and a cup of tea, 12 × 9 cuts drawn | 4:3 |
 
+### Room photos (Settings › Shop › Room photos)
+
+Lifestyle photos of Store products in furnished rooms, for product pages, emails and, later, templates. A super user picks a scene and a sample picture; the server asks an image model through **Vercel AI Gateway** (the deployment's OIDC token authenticates, so the app holds no key) and keeps the result.
+
+- **What the model gets:** the instructions in `shop.scene_prompt_rules` with `{product}` (from `shop.scene_products`) and `{scene}` (from `shop.scene_presets`) put in, the product's studio photo (its template background) for shape and material only, and the sample picture cropped to the product's print shape (`print_aspect`).
+- **Scenes:** `shop.scene_presets` starts with 12, three each for the pillow, the Masterpiece, the puzzle and the acrylic block, each with its own sample picture from `public/shop-samples/scenes/` (listed in `shop.scene_sample_pictures`). A scene can use any sample picture and an extra one-line instruction.
+- **Model and cost:** `shop.scene_model` (default `google/gemini-3-pro-image`), `shop.scene_image_size` (2K) and `shop.scene_daily_limit` (60 kept per UTC day). Each photo is charged to the team's AI Gateway credit.
+- **Where they live:** the public `theme-assets` bucket under `shop-scenes/<product handle>/<yyyymmdd>.<scene>.<picture>.<id>.<w>x<h>.jpg` (product photos, not customer data), never in Shopify. The name carries everything the gallery shows.
+- **Route:** `POST /api/admin/shop/scene` (multipart: presetId, picture, pictureName, note) and `DELETE` (JSON: key), super users only, 404 otherwise. Event `admin_shop_scene_made`.
+
 ## Cart and checkout
 
 Our cart and a Shopify cart move together. Ours holds the pictures and crops; Shopify's holds the prices and discounts, so the cart always shows what checkout will charge.

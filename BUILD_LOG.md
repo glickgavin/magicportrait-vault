@@ -480,3 +480,8 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 - Everything else reads all: Settings › Customers, sign-in (refresh, which also feeds Klaviyo), the health check, `/api/shop/pictures`.
 - Known limits of the newest-only view: the home page's "choose your mug photo" count covers the newest orders only (the Orders page lists them all), and a portrait whose only order is an older, cancelled one on the same email can show "Ordered" until Show more.
 
+### Room photos (11 Nov)
+- Settings › Shop › Room photos: AI lifestyle photos of Store products (pillow on a sofa, Masterpiece on a wall, puzzle on a table, acrylic block on a sideboard or desk), made through Vercel AI Gateway with the deployment's OIDC token. 12 starter scenes with 12 sample pictures; scenes, product wording, model, size and daily limit are settings. Photos are kept in theme-assets/shop-scenes/.
+- Decision: the model gets the product's studio render for shape only and the picture pre-cropped to the print shape, so the printed area matches what the customer orders.
+- Next: pick favourites, then use them as product photos and/or as templates (a blank version of the same room, with the zone fitted).
+

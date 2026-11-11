@@ -99,7 +99,12 @@ export default async function ShopSettings() {
                     {overview.entries.filter((e) => !e.hidden.length).length} shown · {overview.entries.filter((e) => e.hidden.length).length} hidden{overview.sourceKind === "fixtures" ? " · fixtures" : ""}
                   </span>
                 </div>
-                <p className="mt-1 text-[14px] text-ink-2">In the collection&apos;s order, which is the order on both pages. Sizes, prices and print rules are edited in Shopify.</p>
+                <p className="mt-1 text-[14px] text-ink-2">
+                  In the collection&apos;s order, which is the order on both pages. Sizes, prices and print rules are edited in Shopify.{" "}
+                  <Link href="/settings/shop/scenes" className="link font-bold">
+                    Room photos →
+                  </Link>
+                </p>
                 <ul className="mt-4 flex flex-col gap-3">
                   {overview.entries.map((e) => {
                     const p = e.product;
