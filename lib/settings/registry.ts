@@ -15,7 +15,7 @@ const isTimeZone = (tz: string) => {
  * `supabase/seed.sql` is generated from this file (scripts/gen-seed.ts); a test keeps them in sync.
  * Secrets never go here (CLAUDE.md).
  */
-export const SECTIONS = ["cards", "gift", "redeem", "auth", "vault", "themes", "brand", "email", "links", "tracking", "klaviyo"] as const;
+export const SECTIONS = ["cards", "gift", "redeem", "auth", "vault", "themes", "brand", "email", "links", "tracking", "klaviyo", "shop", "site"] as const;
 export type Section = (typeof SECTIONS)[number];
 export const SETTING_TYPES = ["text", "number", "boolean", "choice", "list", "json", "shopify_id", "date"] as const;
 export type SettingType = (typeof SETTING_TYPES)[number];
@@ -68,6 +68,8 @@ const list = (section: Section, d: string[], m: Meta & { item?: z.ZodString; max
 const shopifyId = (section: Section, d: string, m: Meta): SettingDef<string> => ({ type: "shopify_id", section, default: d, schema: z.string().regex(/^\d{6,20}$/), ...m });
 const date = (section: Section, d: string, m: Meta): SettingDef<string> => ({ type: "date", section, default: d, schema: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ...m });
 const json = <T>(section: Section, d: T, schema: z.ZodType<T>, m: Meta): SettingDef<T> => ({ type: "json", section, default: d, schema, ...m });
+
+export type PromoBarSetting = { id: string; on: boolean; text: string; link_label: string; link_url: string; audience: "everyone" | "normal" | "vip"; starts: string; ends: string; style: "tint" | "gradient"; closable: boolean };
 
 const httpUrl = () => z.string().max(2000).regex(/^https:\/\/[^\s]+$/, "Must be an https:// link");
 const numericId = z.string().regex(/^\d{6,20}$/);
@@ -237,6 +239,68 @@ export const REGISTRY = {
   "klaviyo.profile_properties": bool("klaviyo", true, { label: "Update profile properties" }),
   "klaviyo.delete_on_request": bool("klaviyo", true, { label: "Klaviyo deletion on data requests" }),
   "klaviyo.max_attempts": num("klaviyo", 8, { label: "Outbox attempts before giving up", min: 1, max: 30 }),
+  // ---------- shop: Gifts and Products pages (docs/shop.md) ----------
+  "shop.enabled": bool("shop", false, { label: "Shop on for customers", description: "Off: /gifts, /products and /cart are 404 for customers and no shop menu item, tile, cart icon or promotion bar shows. Turning it on is the shop's launch." }),
+  "shop.super_user_preview": bool("shop", false, { label: "Shop preview for super users", description: "On: super users see the shop on the live site while it is still off for customers." }),
+  "shop.collection_id": shopifyId("shop", "328021508292", { label: "Store collection id", description: "Every shop product sits in this Shopify collection; its manual order is the order on both pages." }),
+  "shop.metafield_namespace": text("shop", "mmp_shop", { label: "Shop metafield namespace", description: "The only product fields the app may write (CLAUDE.md).", readOnly: true }),
+  "shop.top_picks_count": num("shop", 5, { label: "Product ideas per picture", min: 1, max: 12 }),
+  "shop.product_cache_minutes": num("shop", 5, { label: "Product cache (minutes)", min: 0, max: 60 }),
+  "shop.discount_code_normal": text("shop", "SITEWIDE OFF", { label: "Discount code: normal customers", description: "A Shopify discount code limited to the Store collection. Empty: no discount.", max: 60 }),
+  "shop.discount_code_vip": text("shop", "", { label: "Discount code: VIP customers", description: "Empty: VIPs get the normal code.", max: 60 }),
+  "shop.vip_customer_tag": text("shop", "VIP", { label: "VIP customer tags", description: "The Shopify customer tags that mark a VIP, separated by commas, e.g. VIP, member-active. A customer with any one of them is a VIP (any case).", allowEmpty: false, max: 300 }),
+  "shop.discount_label_normal": text("shop", "Member price", { label: "Discount label: normal", allowEmpty: false, max: 40 }),
+  "shop.discount_label_vip": text("shop", "VIP price", { label: "Discount label: VIP", allowEmpty: false, max: 40 }),
+  "shop.default_min_short_side_px": num("shop", 1000, { label: "Default smallest picture for a size (short side, px)", description: "Used when a variant has no mmp_shop.min_short_side_px.", min: 100, max: 20000 }),
+  "shop.default_max_crop_pct": num("shop", 30, { label: "Default most a size may crop (%)", description: "Used when a variant has no mmp_shop.max_crop_pct.", min: 0, max: 90 }),
+  "shop.cart_max_lines": num("shop", 20, { label: "Most lines in a cart", min: 1, max: 100 }),
+  "shop.cart_line_max_qty": num("shop", 10, { label: "Most of one item", min: 1, max: 100 }),
+  "shop.cart_expiry_days": num("shop", 30, { label: "Clear an untouched cart after (days)", min: 1, max: 365 }),
+  "shop.gift_message_max_chars": num("shop", 200, { label: "Gift message max characters", min: 20, max: 1000 }),
+  "shop.fulfilment_link_days": num("shop", 90, { label: "New-upload link for fulfilment (days)", min: 1, max: 365 }),
+  "shop.upload_max_mb": num("shop", 20, { label: "Largest upload (MB)", min: 1, max: 20 }),
+  "shop.upload_min_short_side_px": num("shop", 1000, { label: "Smallest upload (short side, px)", min: 200, max: 6000 }),
+  "shop.upload_jpeg_quality": num("shop", 92, { label: "Upload JPEG quality", min: 60, max: 100 }),
+  "shop.upload_rate_limit_per_hour": num("shop", 20, { label: "Uploads per person per hour", min: 1, max: 1000000 }),
+  "shop.image_link_seconds": num("shop", 600, { label: "New-upload preview link lifetime (s)", min: 60, max: 86400 }),
+  "shop.image_fetch_timeout_ms": num("shop", 8000, { label: "Reading a picture's size: timeout (ms)", min: 1000, max: 30000 }),
+  "shop.image_fetch_max_mb": num("shop", 30, { label: "Reading a picture's size: largest file (MB)", min: 1, max: 100 }),
+  "shop.photo_tile_base_url": url("shop", "https://afqxjwizbmpzmvzzkzdb.supabase.co/storage/v1/object/public/tiles-uploads/order-uploads/", { label: "Photo-tile uploads folder", description: "Where the main site keeps photo-tile photos; a mirror tile_id is the file name here." }),
+  "shop.photo_tile_extensions": list("shop", ["jpg", "jpeg", "png"], { label: "Photo-tile file extensions to try", max: 6, item: z.string().regex(/^[a-z0-9]{2,5}$/) }),
+  "shop.mirror_upload_event": text("shop", "funnel_portrait_generated", { label: "Mirror event for portrait uploads", allowEmpty: false, max: 80 }),
+  "shop.mirror_upload_property": text("shop", "original_image_url", { label: "Mirror property: uploaded photo URL", allowEmpty: false, max: 80 }),
+  "shop.mirror_tile_event": text("shop", "tile_dropped", { label: "Mirror event for photo tiles", allowEmpty: false, max: 80 }),
+  "shop.mirror_images_limit": num("shop", 200, { label: "Most past photos read per person", min: 10, max: 2000 }),
+  "shop.template_image_hosts": list("shop", ["cdn.shopify.com"], { label: "Template photo hosts", description: "Where blank product photos and overlays may be loaded from (the product's own Shopify media).", item: host, max: 10 }),
+  "shop.preview_width_px": num("shop", 800, { label: "Preview image width (px)", min: 200, max: 2400 }),
+  "shop.currency": text("shop", "USD", { label: "Shop currency (ISO code)", description: "How prices are written on the shop's pages; the cart and checkout use Shopify's own figures.", pattern: /^[A-Z]{3}$/ }),
+  "shop.customer_type_cache_minutes": num("shop", 10, { label: "VIP check cache (minutes)", min: 0, max: 1440 }),
+  "shop.cart_rate_limit_per_hour": num("shop", 120, { label: "Cart changes per person per hour", min: 1, max: 1000000 }),
+  "shop.checkout_rate_limit_per_hour": num("shop", 20, { label: "Checkouts started per person per hour", min: 1, max: 1000000 }),
+  "shop.change_strip_count": num("shop", 12, { label: "Pictures in the Change picture strip", min: 3, max: 48 }),
+  "shop.storefront_api_version": text("shop", "2025-07", { label: "Shopify Storefront API version", pattern: /^\d{4}-\d{2}$/ }),
+
+  // ---------- site: the whole of My Magic Portraits ----------
+  "site.promo_bars": json(
+    "site",
+    [] as PromoBarSetting[],
+    z.array(
+      z.object({
+        id: z.string().regex(/^[a-z0-9-]{1,40}$/),
+        on: z.boolean(),
+        text: z.string().min(1).max(200),
+        link_label: z.string().max(40).default(""),
+        link_url: z.string().max(300).regex(/^(\/[^\s]*|https:\/\/[^\s]+)$/, "A path like /gifts or an https:// link").or(z.literal("")).default(""),
+        audience: z.enum(["everyone", "normal", "vip"]).default("everyone"),
+        starts: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).default(""),
+        ends: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).default(""),
+        style: z.enum(["tint", "gradient"]).default("tint"),
+        closable: z.boolean().default(true),
+      }),
+    ).max(10) as unknown as z.ZodType<PromoBarSetting[]>,
+    { label: "Promotion bars", description: "Shown above the header while the shop is visible. One for everyone, or one for normal customers and one for VIPs. Dates are business-time days (inclusive). The text is cut at site.promo_bar_max_chars." },
+  ),
+  "site.promo_bar_max_chars": num("site", 90, { label: "Promotion bar max characters", min: 20, max: 200 }),
 } as const;
 
 export type Registry = typeof REGISTRY;
@@ -266,4 +330,4 @@ export function validateSetting(key: string, value: unknown): ValidationResult<u
 }
 
 /** Keys that must stay off on the live project until launch (BUILD.md). */
-export const LAUNCH_SWITCHES: SettingKey[] = ["cards.enabled", "gift.offer_email_enabled", "gift.popup_enabled", "gift.popup_email_later_enabled", "gift.reminder_email_enabled", "klaviyo.enabled", "redeem.mug_reminder_enabled"];
+export const LAUNCH_SWITCHES: SettingKey[] = ["cards.enabled", "gift.offer_email_enabled", "gift.popup_enabled", "gift.popup_email_later_enabled", "gift.reminder_email_enabled", "klaviyo.enabled", "redeem.mug_reminder_enabled", "shop.enabled", "shop.super_user_preview"];

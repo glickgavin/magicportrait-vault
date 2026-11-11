@@ -4,15 +4,18 @@ import type { SessionUser } from "@/lib/auth/types";
 import { MenuSheet } from "@/components/MenuSheet";
 import { AccountMenu } from "@/components/AccountMenu";
 import { t } from "@/lib/i18n";
+import { CartIcon } from "@/components/shop/CartIcon";
 
-export function Header({ user, mainSiteUrl, thumbnails, cardsEnabled }: { user: SessionUser | null; mainSiteUrl: string; thumbnails?: string[]; cardsEnabled?: boolean }) {
+/** `shop` is set only while the shop is visible to this person (docs/shop.md); without it the header is unchanged. */
+export function Header({ user, mainSiteUrl, thumbnails, cardsEnabled, shop }: { user: SessionUser | null; mainSiteUrl: string; thumbnails?: string[]; cardsEnabled?: boolean; shop?: { cartCount: number } | null }) {
   return (
     <header className="sticky top-0 z-40 h-14 border-b border-line bg-page/95 backdrop-blur supports-[backdrop-filter]:bg-page/80">
       <div className="relative mx-auto flex h-14 max-w-2xl items-center px-4">
-        <MenuSheet user={user} mainSiteUrl={mainSiteUrl} thumbnails={thumbnails} cardsEnabled={cardsEnabled} />
+        <MenuSheet user={user} mainSiteUrl={mainSiteUrl} thumbnails={thumbnails} cardsEnabled={cardsEnabled} shopVisible={Boolean(shop)} />
         <Link href="/" aria-label={t("app.name")} className="absolute left-1/2 top-[13px] -translate-x-1/2">
           <img src="/mp-logo.svg" alt={t("app.logoAlt")} width={156} height={30} className="h-[30px] w-auto" />
         </Link>
+        {shop && shop.cartCount > 0 && <CartIcon count={shop.cartCount} />}
         {user ? (
           <AccountMenu user={user} />
         ) : (

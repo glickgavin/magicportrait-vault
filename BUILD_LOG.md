@@ -314,3 +314,126 @@ From Gavin and Gideon's walk-through (`review-fixes-2026-11-04.md`), reviewed ag
 | 6 | Klaviyo: turn on `klaviyo.enabled`, send one test event of each kind; later build the flows and turn on `gift.popup_email_later_enabled` | ⬜ Outbox, events and Data sources card ready |
 | 7 | Privacy policy line about stored cards and staff access | ⬜ Outside this repo |
 | 8 | Turn on `cards.enabled`, then `gift.popup_enabled` and `gift.offer_email_enabled`; watch Insights and PostHog | ⬜ All off in `magic-vault` (verified) |
+
+---
+
+# Shop (Gifts and Products), from 10 Nov 2026
+
+Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mockups" design canvas.
+
+| Part | Name | Status |
+|---|---|---|
+| Shop 1 | Switches, settings, tables, Store collection reader, Settings › Shop | done (see Not run) |
+| Shop 2 | Images and fit | done (see Not run) |
+| Shop 3 | Templates and previews | done (see Not run) |
+| Shop 4 | Customer screens | done (see Not run) |
+| Shop 5 | Cart and checkout | done (see Not run) |
+| Shop 6 | Tracking and docs | done, except the PostHog funnel (see below) |
+
+## Shop 1
+- **Hidden by default.** `shop.enabled` (customers) and `shop.super_user_preview` (super users) are launch switches, both off. `lib/shop/access.ts` decides; `lib/shop/index.ts` › `shopUserOrNull()` is what shop routes will call before anything else.
+- **Settings:** 24 `shop.*` keys and `site.promo_bar_max_chars`; sections `shop` and `site`. Discount codes default to `SITEWIDE OFF` for normal customers and empty for VIPs (falls back to normal). Rule defaults (`shop.default_min_short_side_px` 1000, `shop.default_max_crop_pct` 30) are settings, not code.
+- **Tables:** `shop_images`, `shop_carts`, `shop_cart_lines`, RLS on with no policies; private bucket `shop-uploads`. Migration `20261110000002_shop.sql` (not applied to `magic-vault`).
+- **Shopify:** `lib/shop/sources/` (its own interface, fixtures and live), so `lib/sources` is unchanged. Reads the Store collection (products, media, variants, `mmp_shop` metafields), the `mmp_shop` definitions, a discount by code and a customer's tags. Writes only `mmp_shop.page`, `mmp_shop.occasions`, the occasions definition's choices and missing `mmp_shop` definitions (CLAUDE.md allowed write 5). The product and definition queries and the discount query were run read-only against the live store on 10 Nov and match the code's types.
+- **Settings › Shop** (`/settings/shop`, new SHOP group in the sidebar): the two switches; each product in the collection's order with Shown/Hidden and why, sizes ready, page and occasions saved to Shopify; the occasion list (add, rename, reorder, remove; refuses to remove one a product still uses); "Create N shop fields in Shopify" when definitions are missing; both discount codes with what Shopify says about them.
+- **Events:** `admin_shop_product_updated`, `admin_shop_occasions_updated`, `admin_shop_fields_created` (business, Settings).
+- **Live store on 10 Nov (read-only check):** 10 products in the Store collection, none with any `mmp_shop` metafield yet and no `mmp_shop` definitions, so all 10 show as hidden until set up. `SITEWIDE OFF` is active: 50% off, limited to the Store collection, combines with product, order and shipping discounts, no end date. The shop's mug is its own product (`magic-mug-with-photo-copy-1`), not the free-gift mug that /redeem uses.
+
+## Shop 2
+- **Pictures** (`lib/shop/pictures.ts`, pure merge in `lib/shop/images.ts`): portraits from the existing profile lookup; photo tiles on the person's paid orders (`_tile_type` = photo, allowed hosts only, never signed links); past portrait uploads and dropped photo tiles from the events mirror through their own read-only source (`lib/shop/sources/images*.ts`, same index rules as docs/data.md §2.4); and new uploads. My photos lists them together, newest first, each URL once (an ordered tile keeps its label). Photo-tile file extensions are checked once with HEAD and remembered.
+- **Opaque ids:** a hash of kind and URL (`p_`, `u_`, `t_`) or `n_<row id>` for new uploads. An id is only resolved against the signed-in person's own list, so it can't reach anyone else's picture.
+- **Sizes:** read once per picture (allowed hosts, timeout and size cap from settings) and kept in `shop_images`.
+- **Uploads** (`lib/shop/upload.ts`): checked by content with `sharp` (JPEG, PNG, WEBP, HEIC where the server can decode it), turned upright, converted to JPEG with camera and location data removed, transparent areas on white, refused under `shop.upload_min_short_side_px`. Stored in the private `shop-uploads` bucket as `u/<uuid>.jpg` (no email in the path) and shown through short-lived signed links. Rate-limited per email and IP.
+- **Fit rules** (`lib/shop/fit.ts`, pure): picture kind, smallest short side, most it may crop, contain never crops, and for mugs the picture zone (`zone_px`, new variant field) rather than the whole wrap. `ideasFor` keeps the collection's order and only the sizes that pass; `cropAllowed` checks an Adjust crop. Tests cover square, 3:4, landscape and small pictures.
+- **Routes:** `GET /api/shop/pictures`, `POST /api/shop/uploads`, both 404 unless the person can see the shop. Event `shop_image_uploaded`.
+- **Deletion:** Settings › Customers › delete now also removes the person's shop carts, remembered pictures and uploads; it skips quietly if the shop migration isn't applied yet.
+
+## Shop 3
+- **Templates** (`lib/shop/template.ts`): one schema for `mmp_shop.template`; four-corner zones use a projective map, mug wraps a cylinder map with curve and spread. `zoneAspect` measures the zone so the editor can warn when it doesn't match a size's print shape.
+- **One drawing routine** (`lib/shop/preview.ts`) for the browser and the server: the picture is cropped (or fitted, for contain) to the print shape on a flat canvas with the mask, then warped onto the blank product photo as a mesh of small triangles (8 × 8 flat, 32 × 12 for a wrap) with plain affine transforms. Each triangle is grown along its edges so no seams show; multiply is applied to the finished warp in one go, for the same reason. Server rendering in `lib/shop/render.ts` (`@napi-rs/canvas`), template photos only from `shop.template_image_hosts` (Shopify's CDN) or, in fixtures, `public/fixtures/shop/`.
+- **Golden images** (`tests/fixtures/golden/shop/`): poster, tile and mug, each with a square and a 3:4 picture, plus a landscape picture on a poster with contain. Checked by eye before they were saved.
+- **Template editor** (`/settings/shop/template/<product id>`, linked from each product in Settings › Shop): pick the blank photo and an optional overlay from the product's Shopify photos; flat or mug zone; drag the handles (or move them with the arrow keys, Shift for bigger steps); mask, corner size and shading; test renders with square, 3:4 and landscape sample pictures for any size that has rules; the shape warning; the draft kept in the browser; Publish writes `mmp_shop.template` (allowed write 5) and refuses photos that aren't the product's own. Event `admin_shop_template_published`. Tried in Chromium through a stand-alone harness (keyboard, drag, test renders, warning, draft restore; no console errors); not yet inside the app, which needs the local database.
+- **Fixtures:** made-up blank product photos (`scripts/gen-shop-fixtures.ts` → `public/fixtures/shop/`) and their templates (`lib/shop/fixture-scenes.ts`).
+
+## Shop 4
+- **Screens** (`components/shop/`, routes in `docs/shop.md` › Routes): the Gifts and Products pages (chips by occasion or product type, "Start with a picture", sections with the customer's price); Choose a picture (Portraits, My photos with ORDERED / PHOTO TILE / SMALL labels, Upload with progress and every refusal in plain words); Product ideas (the picture with Change picture, the first `shop.top_picks_count` previews drawn live in the browser, See all); the product sheet (big preview, sizes as a radio group with prices, quantity, Add to cart); Adjust (drag or arrow keys, zoom capped so the crop never drops under the size's smallest-picture rule); the cart.
+- **Header and menu:** Gifts and Products (NEW) in the menu, the cart icon with its count only while the cart has items, and the promotion bar above the header (`site.promo_bars`, edited in Settings › Shop; closed bars stay closed for the visit and come back when the text changes). All of it only while the shop is visible to the person (`lib/shop/shell.ts`, kept light because the customer layout calls it on every page).
+- **Existing screens touched** (each only renders shop things while the shop is visible): `Header` (optional `shop` prop), `MenuSheet` (optional `shopVisible`), the customer layout, Home (two tiles after the page, never on the first-time home) and My portraits (a banner).
+- **Checked** in Chromium through a stand-alone harness with the app's own CSS, on fixtures, at 390, 360 and 1280 px: every screen renders with no console errors, axe (WCAG 2.2 AA) is clean on all of them, Adjust (zoom, drag, arrow keys), changing size, the gift-name check and the cart's notices work. Not yet inside the running app (needs the local database).
+
+## Shop 5
+- **Cart** (`lib/shop/cart.ts`, rows in `lib/db/shop.ts`): one open cart per email. Add to cart re-checks on the server that the picture is the person's, the size suits it and an Adjust crop is allowed, then draws the order line's preview on the server and keeps it in `shop-uploads` (`p/<line id>.jpg`). Quantity and removal only touch the person's own open cart. Limits and rate limits come from settings.
+- **Shopify's cart** (`lib/shop/sources/cart*.ts`, Storefront API, allowed write 4): created when the cart is first shown, then kept in step by `_vault_line_id` (add, change, remove), with the customer's discount code and our cart attributes. The cart page shows Shopify's own figures; if Shopify can't be reached it shows our prices and says so, and Checkout says it isn't available.
+- **Checkout:** every line checked again (picture still theirs, product still for sale, rules still pass); the VIP tag read fresh so the code matches who's paying; "Who's it for?" required only when the cart holds a Gifts-page line (name required, message optional, `shop.gift_message_max_chars`), saved as `Gift for` / `Gift message` on Shopify's cart; then Shopify's `checkoutUrl`. The cart stays open, so coming back without paying keeps it.
+- **What goes on the order** is one pure function (`lib/shop/order-lines.ts`) with a test that pins the exact keys, checks none is a portrait key, and runs a shop line through the /redeem parser to prove it isn't read as a portrait, mug or download.
+- **orders/paid:** the existing webhook now also marks a shop cart paid when the order carries `_source` = shop and our `_vault_cart_id` (`shop_order_paid`); any failure there is logged and never changes the webhook's reply. The gift-offer handling is unchanged.
+- **Fulfilment:** `POST /api/shop/fulfilment/image` (shared secret `SHOP_FULFILMENT_SECRET`) hands out fresh signed links for new uploads and previews. Daily cron `/api/cron/shop-carts` (new entry in `vercel.json`) clears carts untouched for `shop.cart_expiry_days`.
+
+## Shop 6
+- **Events** (`docs/analytics.md` › Shop): page views for every screen, picture chosen and uploaded, product opened, added to cart, cart changed, checkout started, order paid, promotion bar tapped and closed. Never a picture URL, gift name or message. `shop_added_to_cart` and `shop_checkout_started` can go to Klaviyo but only once someone adds them to `klaviyo.events`.
+- **Docs:** `docs/shop.md` (switches, routes, order keys), `docs/data.md` §11 (Admin and Storefront calls, webhook, fulfilment endpoint, mirror reads), `docs/schema.md` (tables, bucket), `docs/analytics.md`, `SPEC.md` §22, `.env.example` (`SHOPIFY_STOREFRONT_TOKEN`, `SHOPIFY_STOREFRONT_PRIVATE_TOKEN`, `SHOP_FULFILMENT_SECRET`), CLAUDE.md (allowed writes 4–5, the switch rule).
+- **PostHog funnel not created yet:** none of the shop events exist in PostHog until the shop is used, and a funnel on events PostHog hasn't seen would be empty. Its definition is in `docs/analytics.md`; add it to the dashboard after the first super-user preview.
+- **Settings › Shop › Shopify access** lists the four Admin permissions the shop needs, whether a Storefront token is set and whether the fulfilment secret is set.
+
+## Studio templates (11 Nov)
+- **Why:** the product previews are what sell the shop, and corners dragged onto stock photos never line up exactly. Each Store product now has a studio scene rendered in Blender (`scripts/mockups/`, docs/shop.md › Studio templates). Because the print area is known in 3D, the zone matches it to the pixel, the picture takes the product's real shading (`blend: multiply`), and the overlay adds the shine and clips the edges.
+- **Checked** through the shop's own `drawPreview` with a made-up picture for all 11 products, at draft and at final size.
+- **Live since 11 Nov (Gavin's OK):** the 22 files are in Shopify Files (`mmp-shop-<product>-base.jpg` / `-overlay.webp`, uploaded from `assets/shop-templates/` at commit cf9a479), and all 11 products' `mmp_shop.template` now use them, replacing the 9 drawn by hand on 10 Nov (each write checked the template hadn't changed since it was read). Acrylic Print (no page), Magic Puzzle and Acrylic Glass Art (no print rules) stay hidden until those are filled in; the puzzle's zone is 4:3 landscape, so its print areas should be too.
+- **Smallest picture:** `shop.default_min_short_side_px` set to 512 (Gavin, 11 Nov): 95% of portraits are 512 × 512 and the live tiles print from them. When nothing fits, the Ideas page now says whether the picture is too small ("This picture is 512 px across, and our products need at least … px") or the wrong shape.
+- **Editor change:** a template's background and overlay may now be Shopify Files (not the product's gallery), so the studio photos never show on product pages. Settings › Shop › the template editor lists them beside the product's photos, and Publish accepts only the product's own photos or the ones its saved template already uses.
+
+## Product sheet copy (11 Nov)
+- The sheet shows Shopify's description as paragraphs and bullet lists (`lib/shop/description.ts`, text only, never raw HTML).
+- New `mmp_shop.short_description` (multi-line text) wins over it: Gavin asked for 4 to 5 lines on a phone. Written for all 11 Store products from their existing descriptions, sizes and SKUs and measured at 390 px with the site font (4 lines each, 5 for Acrylic Print). The products' own descriptions were left as they are, because six of them are also on the Lovable, Shop and TikTok channels.
+
+## Decisions (shop)
+- **Shop lines don't reuse portrait keys** (`_tile_id`, `_imagegen_session_id`, `_gelato_product_uid`…); they use `_shop_*` keys, so /redeem and the existing print pipelines can't pick them up. Changed from the first spec draft.
+- **A size with no print rules is dropped, not the whole product;** the product is hidden only when no available size has rules. Settings lists the sizes that need rules.
+- **Shop orders unlock the free card offer** like any paid order (unchanged behaviour), until Gavin says otherwise.
+- **Mugs fill a zone, not the wrap.** Measuring a square portrait against a whole 2475 × 1155 mug wrap hid every mug; the new `zone_px` rule is the shape the picture fills.
+- **Landscape photos** see fewer ideas on portrait-shaped prints (open question in docs/shop.md).
+- **Activity rows** for shop admin events carry the product id in props, not `ref`, so `activity_log`'s ref types stay as they are.
+
+## Not run (this session)
+- The local Supabase stack can't start here: the network blocks the container registries (ghcr.io, Docker Hub). So the DB-backed unit tests (74 on `main` too) and every e2e, including the new `tests/e2e/shop-settings.spec.ts`, `shop-pictures.spec.ts` and `shop-flow.spec.ts`, haven't run. Typecheck, lint and the 147 other unit tests plus the new shop tests pass. Run `pnpm test` and `pnpm e2e` in a session that can reach the registries before merging.
+
+## Blocked / needed from people (shop)
+- **Shopify app permissions.** The r_orders app has `read_orders`, `read_all_orders`, `write_orders` and `read_customers` (Settings › Data sources, 8 Nov). The shop also needs `read_products` (the Store collection), `read_discounts` (SITEWIDE OFF / VIP code) and `write_products` (Settings › Shop and the template editor save `mmp_shop` fields). Until then the shop can't read its products and stays empty for super users.
+- **Storefront token** for carts: done 11 Nov. Headless storefront "My Magic Portrait Store" (Shopify admin › Headless › 424297; its sales channel shows as "Storyboards Headless 03", publication 192604864708), its private token in Vercel as `SHOPIFY_STOREFRONT_PRIVATE_TOKEN` (Gavin), and the 11 Store products made available on it. A new Store product must be added to that channel too, or Shopify won't accept it in a cart.
+- **Preview templates** for all 10 products (Settings › Shop › template editor). Every product is hidden until it has one. This session can't open Shopify's product photos (cdn.shopify.com isn't reachable), so they weren't drawn here.
+- **Smallest picture.** 95% of portraits made in the last 60 days are 512 × 512 px (the rest 1024 × 1024). With `shop.default_min_short_side_px` at 1000 every size is hidden for them. Today's tiles already print from the same 512 px pictures; Gavin to choose the minimum.
+- **Magic Puzzle** has no print rules yet (its print area for 30 / 252 / 500 pieces isn't known), so it stays hidden.
+- **Print system.** It takes orders from Shopify on its own (Gavin, 10 Nov), so there's no fulfilment secret or endpoint to set up. It must take the picture from `_image_url` on shop lines, the same key today's portrait lines use. Adjust is off on every size (`mmp_shop.adjustable = false`), so what prints is the centred crop the preview shows, whether or not it reads `_shop_crop`.
+- **Tests** still can't run here: the image downloads come from `pkg-containers.githubusercontent.com` (GitHub) and `production.cloudfront.docker.com` (Docker Hub), which are blocked, and Docker Hub rate-limits. `api.supabase.com` is now blocked too, so `pnpm db:apply-remote` can't run from this session.
+
+## Done on the live systems (10 Nov, with Gavin's OK)
+- **magic-vault:** migration `20261110000002_shop.sql` applied through the Supabase connection (recorded in `supabase_migrations.schema_migrations` under the same version, so `db:apply-remote` skips it) and the 41 `shop.*` / `site.*` seed rows added (insert-only). Checked: 3 shop tables with RLS on, private `shop-uploads` bucket, `shop.enabled` and `shop.super_user_preview` off. The rows show in main's Settings › Variables as extra rows; nothing else on main reads them.
+- **Shopify:** the 14 `mmp_shop` metafield definitions (occasions: Christmas, Birthday, New Year, For Mom, For Dad, Pet lovers) and 111 values on the Store collection, through the Shopify connection. No other product field was changed (product types were left as they are; they only group the Products page).
+
+| Product | Page | Occasions | Maker · print area per size |
+|---|---|---|---|
+| Magic Xmas Ornaments (set of 2) | Gifts | Christmas, New Year | Gelato · 900×900 |
+| Magic Mug with Photo | All | Christmas, Birthday, For Mom, For Dad, Pet lovers | Gelato (from the SKU's form) · 2475×1155 wrap, 1155×1155 picture |
+| Magic Pillow with Photo | All | Christmas, Birthday, For Mom, Pet lovers | Prodigi `GLOBAL-CUSH-12X12-LIN` · 3600×3600 |
+| Magic Puzzle | All | Christmas, Birthday, For Dad | **not set** |
+| Acrylic Block | All | Christmas, Birthday, For Mom, For Dad | Prodigi · 4×6 1200×1800, 5×7 1500×2100, 6×8 1800×2400 |
+| Acrylic Square Block | All | Birthday, For Mom, For Dad, Pet lovers | Prodigi · 4×4, 6×6, 8×8 at 300 dpi |
+| Masterpiece | All | Christmas, Birthday, For Mom, For Dad | In-house · 8×12, 12×16, 16×24, 20×30 at 300 dpi |
+| Magic Poster | Products | | Prodigi · 8×10, 12×16, 18×24, 24×36 at 300 dpi |
+| Acrylic Print | Products | | Gelato (from the SKU's form) · 8×12, 12×16, 16×20 at 300 dpi |
+| Magic Portrait Tile | Products | | In-house · 8×8, 12×12, 16×16 at 300 dpi |
+
+Every size: maker's code = the variant's SKU, Adjust off, placement cover (the mug: wrap_zone). Smallest picture and most crop are left to the settings (`shop.default_min_short_side_px`, `shop.default_max_crop_pct` 30%), so a square portrait won't be offered on 2:3 sizes (4×6, 8×12, 16×24, 20×30, 24×36), which would lose a third of it.
+
+## Shop launch checklist
+| # | Step | Status |
+|---|---|---|
+| 1 | Apply the shop migration and seed to `magic-vault` | Done 10 Nov |
+| 2 | `mmp_shop` field definitions and values on the Store products | Done 10 Nov, except the puzzle's print areas |
+| 3 | Shopify: add `read_products`, `read_discounts`, `write_products` to the r_orders app; Storefront token in Vercel; Store products published to its channel; redeploy | Done 11 Nov |
+| 4 | Choose the smallest picture (`shop.default_min_short_side_px`) | Done 11 Nov: 512 px |
+| 5 | Templates for each product | Done 11 Nov: studio templates for all 11 |
+| 6 | Turn on `shop.super_user_preview`, test on the branch preview, buy one item end to end (VIP code, `SITEWIDE OFF`, the order prints, the cart shows paid) | |
+| 7 | Run `pnpm test` and `pnpm e2e` in a session that can reach the container registries | |
+| 8 | Merge `claude/shop`; add the shop funnel to the PostHog dashboard | Merged 11 Nov; funnel still to add once shop events arrive |
+| 9 | Turn on `shop.enabled`; add a promotion bar if wanted | Live for everyone on merge, 11 Nov (Gavin's choice, with `shop.enabled` already on) |

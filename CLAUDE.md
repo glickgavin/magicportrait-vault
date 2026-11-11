@@ -11,6 +11,7 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 | `docs/schema.md` | The app's own tables, buckets, layout JSON, seed data |
 | `docs/analytics.md` | PostHog events and the `activity_log` |
 | `docs/design.md` | Brand tokens, header, menu, footer, components |
+| `docs/shop.md` | The shop (Gifts and Products pages, cart, Shopify checkout): its spec, switches and build parts |
 | `designs/README.md` | Screen mockups → routes |
 | `reference/live-site/` | The live site's header, menu, footer and tokens, copied from its code |
 
@@ -50,13 +51,16 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 ## Rules
 
 **Data**
-- Shopify and Imagen are the sources of truth. Read them live; never copy orders or portraits into our database, except the cached session-id list and the copy of a portrait used on a card.
-- Writes outside our database are allowed in exactly three places:
+- Shopify and Imagen are the sources of truth. Read them live; never copy orders, products or portraits into our database, except the cached session-id list, the copy of a portrait used on a card, and the shop's carts and new uploads (`docs/shop.md`).
+- Writes outside our database are allowed in exactly five places:
   1. The mug choice on a Shopify order: `metafieldsSet` + `tagsAdd`, as in `docs/data.md`.
   2. Klaviyo events, profile properties and deletion jobs, through the outbox only.
   3. The webhook-registration script, which a human runs.
+  4. Shop carts: Storefront `cartCreate` and the cart update mutations, for a signed-in customer's own cart (`docs/shop.md`).
+  5. Shop product fields: `metafieldsSet` on the `mmp_shop` namespace of products in the Store collection, and the `mmp_shop` metafield definitions, from Settings › Shop by a super user. Never any other product field.
   
   Never write to Imagen, the events mirror or the live site's databases.
+- The shop is hidden unless `shop.enabled` (customers) or `shop.super_user_preview` (super users) is on; hidden shop routes return 404 and shop UI doesn't render. Shop changes must leave every existing screen and test unchanged with both off.
 - Every external source sits behind an interface in `lib/sources/` with a `fixtures` implementation. Tests and local dev use fixtures (`DATA_SOURCE=fixtures`); fixtures contain made-up people only.
 - Our own database: there is one Supabase project, `magic-vault`, and it is live. Tests and e2e use the **local Supabase stack** (`supabase start`, Docker) in the build session. `magic-vault` gets migrations and `supabase/seed.sql` only, through `scripts/db-apply-remote.ts` and the Management API; never test data. Vercel previews also use `magic-vault`, with every switch off.
 

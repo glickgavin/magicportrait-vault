@@ -8,6 +8,7 @@ import { removeObjects, signedUrl } from "@/lib/storage";
 import { queueDeletion } from "@/lib/klaviyo";
 import { track } from "@/lib/track";
 import { emailSchema } from "@/lib/auth/schemas";
+import { deleteShopRows } from "@/lib/db/shop";
 
 export const emailHash = (e: string) => createHash("sha256").update(e.toLowerCase()).digest("hex").slice(0, 16);
 
@@ -91,6 +92,9 @@ export async function deleteCustomer(email: string, by: string): Promise<{ reque
   const listed = (await db().storage.from("portraits").list(prefix, { limit: 1000 })).data ?? [];
   await removeObjects("portraits", [...new Set([...portraitKeys, ...listed.map((f) => `${prefix}/${f.name}`)])]);
   if (cards.length) await db().from("cards").delete().in("id", cards.map((c) => c.id));
+  // The shop (docs/shop.md): carts, cart lines, remembered pictures and new uploads.
+  const shop = await deleteShopRows(e);
+  await removeObjects("shop-uploads", shop.uploadPaths);
   const anon = (await db().rpc("anonymise_activity", { p_email: e })).data as number;
   await db().from("outbound_events").delete().eq("email", e);
   await queueDeletion(e);
@@ -98,7 +102,7 @@ export async function deleteCustomer(email: string, by: string): Promise<{ reque
   await db().from("signin_links").delete().eq("email", e);
   await db().from("gift_offers").update({ email: `deleted-${emailHash(e)}@invalid.local` }).eq("email", e);
   await db().from("vault_members").delete().eq("email", e);
-  await db().from("data_requests").update({ status: "done", completed_at: new Date().toISOString(), notes: `cards=${cards.length} activity=${anon}` }).eq("id", req.id);
+  await db().from("data_requests").update({ status: "done", completed_at: new Date().toISOString(), notes: `cards=${cards.length} activity=${anon} shop_images=${shop.images} shop_carts=${shop.carts}` }).eq("id", req.id);
   await track("admin_data_deleted", { request_id: req.id, cards: cards.length }, { email: by, actor: `super_user:${by}`, ref: { type: "request", id: req.id } });
   return { requestId: req.id, cards: cards.length, anonymised: anon ?? 0 };
 }

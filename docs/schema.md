@@ -173,6 +173,17 @@ A data-deletion request deletes the person's rows here too, and calls Klaviyo's 
 ### data_source_checks
 `source text pk`, `ok`, `checked_at`, `last_ok_at`, `ms`, `detail jsonb` (counts and timings only), `checked_by`. Powers the status cards in Settings › Data sources.
 
+### shop_images
+The shop (`docs/shop.md`). One row per picture a customer has used in the shop: `id uuid pk`, `owner_email`, `kind` (`portrait` · `upload` · `photo_tile` · `new_upload`), `source_url` (external pictures, referenced, never copied), `storage_path` (new uploads in `shop-uploads`), `source_ref` (Imagen image id or tile id), `source_session` (Imagen session id, portraits), `width`, `height`, `created_at`, `updated_at`. Unique `(owner_email, source_url)`.
+
+### shop_carts
+`id uuid pk`, `owner_email`, `status` (`open` · `checked_out` · `paid` · `expired`; one `open` per email), `customer_type` (`normal` · `vip`), `discount_code`, `shopify_cart_id`, `shopify_checkout_url`, `gift_for`, `gift_message` (private: never in analytics or logs), `paid_order_id`, `checked_out_at`, `paid_at`, `created_at`, `updated_at`.
+
+### shop_cart_lines
+`id uuid pk`, `cart_id` → `shop_carts` (cascade), `page` (`gifts` · `products`), `product_id`, `variant_id` (Shopify gids), `quantity` (1–100; the setting is lower), `image_id` → `shop_images`, `crop jsonb` (`x,y,w,h` in source pixels), `rules_version`, `template_version`, `shopify_line_id`, `preview_path`, `created_at`, `updated_at`.
+
+Migration `20261110000002_shop.sql` also lets `settings.section` be `shop` or `site`; nothing else existing changes.
+
 ## Storage buckets
 
 | bucket | public | contents |
@@ -180,6 +191,7 @@ A data-deletion request deletes the person's rows here too, and calls Klaviyo's 
 | `theme-assets` | yes (read) | backgrounds, overlays, thumbnails, sample portrait |
 | `portraits` | no | cached copies of chosen Imagen portraits |
 | `cards` | no | rendered JPEGs; served via short-lived signed URLs or the `/c/[slug]/image` route |
+| `shop-uploads` | no | new shop uploads (JPEG, location and camera data removed); fulfilment gets a signed link |
 
 ## Layout JSON (`theme_versions.layout`)
 

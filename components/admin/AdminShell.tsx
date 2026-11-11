@@ -10,10 +10,11 @@ const GROUPS = [
   ["admin.groups.setup", [["/settings", "admin.nav.general"]]],
   ["admin.groups.cards", [["/settings/themes", "admin.nav.themes"], ["/settings/template", "admin.nav.template"]]],
   ["admin.groups.redeem", [["/settings/redeem", "admin.nav.redeem"]]],
+  ["admin.groups.shop", [["/settings/shop", "admin.nav.shop"]]],
   ["admin.groups.system", [["/settings/emails", "admin.nav.emails"], ["/settings/tracking", "admin.nav.tracking"], ["/settings/data-sources", "admin.nav.dataSources"], ["/settings/super-users", "admin.nav.superUsers"], ["/settings/activity", "admin.nav.activity"]]],
 ] as const;
 
-/** Settings: desktop first, with the dark sidebar (INSIGHTS · SETUP · GREETING CARDS · REDEEM · SYSTEM). */
+/** Settings: desktop first, with the dark sidebar (INSIGHTS · SETUP · GREETING CARDS · REDEEM · SHOP · SYSTEM). */
 export function AdminShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
   return (
     <div className="min-h-dvh bg-page lg:grid lg:grid-cols-[230px_1fr]">

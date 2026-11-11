@@ -1,0 +1,29 @@
+{
+ "v": 1,
+ "background": {
+  "media_id": "",
+  "url": "",
+  "w": 1200,
+  "h": 1200
+ },
+ "zone": {
+  "kind": "wrap",
+  "left": 0.2793,
+  "right": 0.657,
+  "top": 0.2948,
+  "bottom": 0.7545,
+  "curve": 0.0274,
+  "spread": 0.6638
+ },
+ "overlay": {
+  "media_id": "",
+  "url": "",
+  "w": 1200,
+  "h": 1200
+ },
+ "mask": {
+  "kind": "none",
+  "radius": 0
+ },
+ "blend": "multiply"
+}

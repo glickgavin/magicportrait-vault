@@ -6,6 +6,8 @@ import { VaultHome } from "@/components/screens/home/VaultHome";
 import { VaultGuest } from "@/components/screens/home/VaultGuest";
 import { EmptyHome } from "@/components/screens/home/EmptyHome";
 import { PartialNotice } from "@/components/screens/home/PartialNotice";
+import { ShopWaysIn } from "@/components/shop/ShopWaysIn";
+import { shopVisible } from "@/lib/shop/visible";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +18,15 @@ export default async function HomePage() {
   const { profile } = data;
   const partial = profile.unavailable.length > 0;
   const page = await pick(data, partial);
-  if (!partial) return page;
+  // The shop's two tiles (docs/shop.md): only while it's visible, and never on the simple first-time home.
+  const first = data.cardsCount === 0 && data.cardsEnabled;
+  const ways = page && !first && profile.state !== "nobody" && (await shopVisible(user)) ? <ShopWaysIn /> : null;
+  if (!partial && !ways) return page;
   return (
     <>
-      <PartialNotice />
+      {partial && <PartialNotice />}
       {page}
+      {ways}
     </>
   );
 }

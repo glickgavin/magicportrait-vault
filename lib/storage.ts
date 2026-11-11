@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { db } from "@/lib/db/client";
 
-export type Bucket = "theme-assets" | "portraits" | "cards";
+export type Bucket = "theme-assets" | "portraits" | "cards" | "shop-uploads";
 
 export async function putObject(bucket: Bucket, key: string, body: Buffer, contentType: string) {
   const { error } = await db().storage.from(bucket).upload(key, body, { contentType, upsert: true, cacheControl: bucket === "theme-assets" ? "31536000" : "0" });

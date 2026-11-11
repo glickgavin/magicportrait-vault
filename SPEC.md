@@ -569,3 +569,8 @@ These came up while reading the live code and databases. They affect customers t
 7. **Klaviyo post-purchase flows are dead.** "Purchase Thank You - checkout." and "Purchase Thank You" are live but trigger on API order events that stopped in August, so customers get no thank-you email from Klaviyo. Repoint them to Shopify `Placed Order`, or retire them.
 8. **Imagen API key** in the live site's browser code (`src/lib/imagegen.ts`), and `user_sessions` readable and writable without sign-in.
 9. **`pg_net` is open to every database login** on imagegen-prod and shopify-dailyreport: `PUBLIC` has usage on schema `net` and full rights on its request queue, so any login role can make the database send HTTP requests. Revoke those `PUBLIC` grants after checking nothing relies on them (`docs/data.md` › Environment variables).
+
+## 22. The shop (Gifts and Products)
+
+Added 10 Nov 2026 and specified in `docs/shop.md`: Gifts and Products pages, Choose a picture, Product ideas with live previews, the product sheet with Adjust, a cart kept in step with a Shopify cart, "Who's it for?" for gifts, Shopify checkout, the promotion bar and Settings › Shop. Hidden behind `shop.enabled` and `shop.super_user_preview` (both off); with both off every existing screen is unchanged.
+

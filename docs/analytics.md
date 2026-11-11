@@ -151,7 +151,26 @@ New ones:
 On sign-out call `posthog.reset()` so the next person on the device starts fresh.
 
 ### Settings (super users, internal)
-`settings_viewed`, `setting_changed` (`key`, `section`; never the value), `super_user_added` / `super_user_removed`, `admin_theme_created`, `admin_version_published`, `admin_version_archived`, `data_source_tested` (`source`, `ok`). Super users sit in the existing test-account cohort so they never count as customers.
+**Shop** (`docs/shop.md`). Never a picture URL, a gift name or a gift message; only kinds, our ids and Shopify ids.
+
+| Event | Where | When | Props |
+|---|---|---|---|
+| `page_view_gifts`, `page_view_products` | browser | Gifts or Products page shown | `filter`, `customer_type`, `products` |
+| `page_view_shop_choose` | browser | Choose a picture shown | `page`, `portraits`, `photos` |
+| `shop_image_selected` | browser | A picture chosen, or changed on Product ideas | `image_kind`, `changed`, `page` |
+| `shop_image_uploaded` | server, business | Upload accepted or refused | `ok`, `reason`, `width`, `height` |
+| `page_view_shop_ideas` | browser | Product ideas shown | `page`, `products_shown`, `products_total`, `image_kind` |
+| `shop_product_opened` | browser | Product sheet opened | `product_handle`, `position`, `page` |
+| `shop_added_to_cart` | server, business, Klaviyo-able | Added to cart | `product_handle`, `variant_id`, `price`, `page`, `image_kind`, `customer_type`, `position` |
+| `shop_cart_changed` | server, business | Quantity changed or line removed | `change`, `lines` |
+| `page_view_cart` | browser | Cart shown | `lines`, `has_gift`, `subtotal`, `customer_type` |
+| `shop_checkout_started` | server, business, Klaviyo-able | Shopify checkout link handed out | `lines`, `subtotal`, `has_gift`, `customer_type` |
+| `shop_order_paid` | server (orders/paid), business | A paid order carries our `_vault_cart_id` | `order_id`, `lines`, `revenue`, `test` |
+| `promo_bar_tapped`, `promo_bar_closed` | browser | Promotion bar tapped or closed | `bar_id`, `audience` |
+
+`shop_added_to_cart` and `shop_checkout_started` reach Klaviyo only once they're added to the `klaviyo.events` setting (they aren't by default), for an abandoned-cart flow later. The shop funnel in PostHog: `page_view_shop_ideas` → `shop_product_opened` → `shop_added_to_cart` → `shop_checkout_started` → `shop_order_paid`, broken down by `page`.
+
+`settings_viewed`, `setting_changed` (`key`, `section`; never the value), `super_user_added` / `super_user_removed`, `admin_theme_created`, `admin_version_published`, `admin_version_archived`, `data_source_tested` (`source`, `ok`), `admin_shop_product_updated` (`product_id`, `fields`: which of page and occasions changed; never their values), `admin_shop_occasions_updated` (`count`, `added`, `removed`), `admin_shop_fields_created` (`created`, `failed`), `admin_shop_template_published` (`product_id`, `zone`: corners or wrap). Super users sit in the existing test-account cohort so they never count as customers.
 
 Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 

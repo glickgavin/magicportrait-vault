@@ -11,6 +11,8 @@ import { EmptyHome } from "@/components/screens/home/EmptyHome";
 import { PartialNotice } from "@/components/screens/home/PartialNotice";
 import { t } from "@/lib/i18n";
 import { fmtDate } from "@/lib/format";
+import { PortraitsShopBanner } from "@/components/shop/ShopWaysIn";
+import { shopVisible } from "@/lib/shop/visible";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: t("portraits.title") };
@@ -27,6 +29,7 @@ export default async function PortraitsPage({ searchParams }: { searchParams: Pr
   const groups = profile.sessions.filter((g) => (filter === "ordered" ? g.portraits.some((p) => p.ordered) : filter === "not_ordered" ? g.portraits.some((p) => !p.ordered) : true));
   const oldest = profile.sessions.map((s) => s.createdAt).sort()[0];
   const nothingOlder = !oldest || oldest.slice(0, 10) >= data.mirrorSince;
+  const shop = await shopVisible(user);
   return (
     <div className="mx-auto max-w-[640px]" data-testid="portraits-page">
       {partial && <PartialNotice />}
@@ -34,6 +37,7 @@ export default async function PortraitsPage({ searchParams }: { searchParams: Pr
       {profile.hasFreeGift && <HomeTabs active="portraits" />}
       <h1 className="mt-5 text-[28px] font-extrabold tracking-tight">{t("portraits.title")}</h1>
       <p className="text-[15px] text-ink-2">{t("portraits.summary", { sessions: profile.sessions.length, portraits: profile.portraitCount, ordered: profile.orderedCount })}</p>
+      {shop && <PortraitsShopBanner />}
       <div className="mt-4">
         <PortraitFilter value={filter} />
       </div>

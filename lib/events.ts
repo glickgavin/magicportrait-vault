@@ -113,6 +113,22 @@ export const EVENTS = {
   account_menu_opened: ui,
   vault_signed_out: bizBrowser,
 
+  // Shop (docs/shop.md)
+  page_view_gifts: ui,
+  page_view_products: ui,
+  page_view_shop_choose: ui,
+  page_view_shop_ideas: ui,
+  page_view_cart: ui,
+  shop_image_selected: ui,
+  shop_image_uploaded: biz,
+  shop_product_opened: ui,
+  shop_added_to_cart: bizKlaviyo,
+  shop_cart_changed: biz,
+  shop_checkout_started: bizKlaviyo,
+  shop_order_paid: biz,
+  promo_bar_tapped: ui,
+  promo_bar_closed: ui,
+
   // Settings
   settings_viewed: ui,
   setting_changed: biz,
@@ -134,6 +150,10 @@ export const EVENTS = {
   admin_theme_updated: biz,
   admin_category_updated: biz,
   admin_version_updated: biz,
+  admin_shop_product_updated: biz,
+  admin_shop_occasions_updated: biz,
+  admin_shop_fields_created: biz,
+  admin_shop_template_published: biz,
 
   // Lifecycle (server)
   vault_signin_link_used: biz,
