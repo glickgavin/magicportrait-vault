@@ -2,7 +2,9 @@ import { adminOr404 } from "@/lib/admin/guard";
 import { json } from "@/lib/auth/http";
 import { getSettings } from "@/lib/settings";
 import { getCatalog } from "@/lib/shop";
-import { saveTemplateUpload, type TemplateUploadKind } from "@/lib/shop/template-media";
+import { saveTemplateUpload, uploadKeyFor, type TemplateUploadKind } from "@/lib/shop/template-media";
+import { parseTemplate } from "@/lib/shop/template";
+import { removeObjects } from "@/lib/storage";
 import { track } from "@/lib/track";
 
 export const dynamic = "force-dynamic";
@@ -38,4 +40,26 @@ export async function POST(req: Request) {
   if (!r.ok) return json({ error: MESSAGES[r.reason] ?? "Couldn't use that file." }, 422);
   await track("admin_shop_template_uploaded", { product_id: entry.product.legacyId, kind }, { email: u.email, actor: `super_user:${u.email}` });
   return json({ ok: true, media: r.media });
+}
+
+/** Removes a photo uploaded for a product, unless its published template uses it. JSON: productId, mediaId. */
+export async function DELETE(req: Request) {
+  const u = await adminOr404();
+  if (u instanceof Response) return u;
+  const b = (await req.json().catch(() => null)) as { productId?: unknown; mediaId?: unknown } | null;
+  let entries;
+  try {
+    entries = await getCatalog({ fresh: true });
+  } catch {
+    return json({ error: "Couldn't read Shopify just now. Try again in a minute." }, 502);
+  }
+  const entry = entries.find((e) => e.product.id === b?.productId);
+  if (!entry) return json({ error: "That product isn't in the Store collection." }, 404);
+  const mediaId = typeof b?.mediaId === "string" ? b.mediaId : "";
+  const key = uploadKeyFor(entry.product.legacyId, mediaId);
+  if (!key) return json({ error: "That isn't a photo uploaded for this product." }, 400);
+  const saved = parseTemplate(entry.product.template?.value);
+  if (saved && (saved.background.media_id === mediaId || saved.overlay?.media_id === mediaId)) return json({ error: "The published template uses this photo. Publish one without it first." }, 409);
+  await removeObjects("theme-assets", [key]);
+  return json({ ok: true });
 }

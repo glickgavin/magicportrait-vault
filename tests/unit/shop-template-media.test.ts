@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import sharp from "sharp";
-import { isUploadedTemplateUrl, processTemplateUpload } from "@/lib/shop/template-media";
+import { isUploadedTemplateUrl, processTemplateUpload, uploadKeyFor } from "@/lib/shop/template-media";
 
 const png = (w: number, h: number, alpha: number) => sharp({ create: { width: w, height: h, channels: 4, background: { r: 200, g: 200, b: 200, alpha } } }).png().toBuffer();
 
@@ -47,3 +47,13 @@ describe("uploaded template links", () => {
     expect(isUploadedTemplateUrl("https://evil.example/storage/v1/object/public/theme-assets/shop-templates/1/x.jpg")).toBe(false);
   });
 });
+
+describe("removing an uploaded photo", () => {
+  it("only names this product's own uploads", () => {
+    expect(uploadKeyFor("123", "upload:123/0123456789abcdef-800x600.jpg")).toBe("shop-templates/123/0123456789abcdef-800x600.jpg");
+    expect(uploadKeyFor("123", "upload:456/0123456789abcdef-800x600.jpg")).toBeNull();
+    expect(uploadKeyFor("123", "upload:123/../cards/x.jpg")).toBeNull();
+    expect(uploadKeyFor("123", "gid://shopify/MediaImage/1")).toBeNull();
+  });
+});
+

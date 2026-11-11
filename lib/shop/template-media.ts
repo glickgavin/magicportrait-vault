@@ -72,6 +72,13 @@ export async function processTemplateUpload(
   return { ok: true, body: out.data, contentType: "image/jpeg", ext: "jpg", width: out.info.width, height: out.info.height };
 }
 
+/** The storage key of one product's uploaded photo from its media id, or null when it isn't one of them. */
+export function uploadKeyFor(productLegacyId: string, mediaId: string): string | null {
+  const m = /^upload:(\d{1,20})\/([^/]+)$/.exec(mediaId);
+  if (!m || m[1] !== productLegacyId || !NAME.test(m[2])) return null;
+  return `${TEMPLATE_FOLDER}/${m[1]}/${m[2]}`;
+}
+
 /** Keeps a cleaned upload for one product and returns it as a template photo choice. */
 export async function saveTemplateUpload(productLegacyId: string, kind: TemplateUploadKind, body: Buffer): Promise<{ ok: true; media: TemplateMedia } | { ok: false; reason: TemplateUploadRefusal }> {
   const maxPx = (await getSettings(["shop.template_upload_max_px"] as const))["shop.template_upload_max_px"];

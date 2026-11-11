@@ -306,6 +306,14 @@ function Editor({
     };
   }, [t, size, samples]);
 
+  async function remove(m: Media) {
+    setMsg(null);
+    const r = await fetch("/api/admin/shop/template/upload", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId, mediaId: m.id }) }).catch(() => null);
+    const b = (await r?.json().catch(() => ({}))) as { error?: string } | undefined;
+    if (r?.ok) setMedia((list) => list.filter((x) => x.id !== m.id));
+    else setMsg({ ok: false, text: b?.error ?? "Couldn't remove that photo." });
+  }
+
   const added = (m: Media, which: "background" | "overlay") => {
     setMedia((list) => [m, ...list.filter((x) => x.id !== m.id)]);
     const v = { media_id: m.id, url: m.url, w: m.width, h: m.height };
@@ -396,8 +404,11 @@ function Editor({
         )}
         {media.map((m) => {
           const on = which === "background" ? t.background.media_id === m.id : t.overlay?.media_id === m.id;
+          // Uploaded photos can be removed while nothing uses them (this draft or the published template).
+          const removable = m.id.startsWith("upload:") && t.background.media_id !== m.id && t.overlay?.media_id !== m.id && published?.background.media_id !== m.id && published?.overlay?.media_id !== m.id;
           return (
-            <label key={m.id} className={cn("cursor-pointer rounded-[10px] border-2 p-0.5 focus-within:ring-2 focus-within:ring-[#DD07C4]", on ? "border-[#DD07C4]" : "border-transparent")}>
+            <span key={m.id} className="relative">
+            <label className={cn("block cursor-pointer rounded-[10px] border-2 p-0.5 focus-within:ring-2 focus-within:ring-[#DD07C4]", on ? "border-[#DD07C4]" : "border-transparent")}>
               <input
                 type="radio"
                 className="sr-only"
@@ -410,6 +421,12 @@ function Editor({
               />
               <img src={m.url} alt={m.alt ?? "Product photo"} className="h-14 w-14 rounded-[8px] object-cover" />
             </label>
+            {removable && (
+              <button type="button" aria-label="Remove this uploaded photo" onClick={() => void remove(m)} className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-ink text-[13px] font-bold leading-none text-white shadow">
+                ×
+              </button>
+            )}
+            </span>
           );
         })}
         <UploadTile productId={productId} kind={which} upload={upload} onUploaded={(m) => added(m, which)} />
@@ -419,7 +436,7 @@ function Editor({
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <section aria-label="Zone" className="grid content-start gap-5 rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)] 2xl:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
+      <section aria-label="Zone" className="grid content-start gap-5 rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)] lg:grid-cols-[minmax(0,1fr)_minmax(220px,320px)]">
         <div className="min-w-0">
         {restored && (
           <p role="status" className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[14px] text-[#7a4a00]">
@@ -495,7 +512,7 @@ function Editor({
               )}
             </div>
             <p className="text-[13px] text-ink-2">How customers will see it with a picture. It changes as you edit.</p>
-            <div className="grid grid-cols-2 gap-3 2xl:grid-cols-1">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
               {samples.map((u, i) => (
                 <canvas key={u} ref={(el) => { live.current[i] = el; }} role="img" aria-label={`Live preview with sample picture ${i + 1}`} className="w-full rounded-[12px] bg-black/[0.04]" />
               ))}
