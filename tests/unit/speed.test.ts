@@ -3,7 +3,7 @@ import { withPending, type PendingLines } from "@/components/shop/CartView";
 import { afterResponse, mapLimit, opName } from "@/lib/perf";
 import { sameCrop } from "@/lib/shop/cart";
 import { ImagenFixtures, ShopifyFixtures } from "@/lib/sources/fixtures";
-import { needsOlderOrders } from "@/lib/vault/profile";
+import { needsOlderOrders, newestOf } from "@/lib/vault/profile";
 import { buildProfile } from "@/lib/vault/profile-core";
 
 type Cart = Parameters<typeof withPending>[0];
@@ -108,5 +108,16 @@ describe("the newest sessions and orders first (Show more for the rest)", () => 
     const p = buildProfile({ email: "x@example.com", orders: [], mirrorSessions: [], rows: [], unlockRule: "any_paid_order", qualifyingProductIds: [], orderUrlTemplate: "", startPortraitUrl: "" });
     expect(p.more).toEqual({ sessions: 0, orders: false });
     expect(p.sessionCount).toBe(0);
+  });
+
+  it("a full profile kept in memory answers a newest-first page with only the newest sessions", () => {
+    const g = (id: string, createdAt: string) => ({ sessionId: id, createdAt, portraits: [] }) as unknown as ReturnType<typeof buildProfile>["sessions"][number];
+    const full = { ...buildProfile({ email: "x@example.com", orders: [], mirrorSessions: [], rows: [], unlockRule: "any_paid_order", qualifyingProductIds: [], orderUrlTemplate: "", startPortraitUrl: "" }), sessions: [g("c", "3"), g("b", "2"), g("a", "1")], sessionCount: 3 };
+    const v = newestOf(full, 2);
+    expect(v.sessions.map((x) => x.sessionId)).toEqual(["c", "b"]);
+    expect(v.more.sessions).toBe(1);
+    expect(v.sessionCount).toBe(3);
+    expect(full.sessions).toHaveLength(3);
+    expect(newestOf(full, 0)).toBe(full);
   });
 });

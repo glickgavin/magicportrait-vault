@@ -72,6 +72,13 @@ export const getVaultProfile = cache(async (email: string, opts: ProfileOpts = {
   return p;
 });
 
+/** A full profile as a "newest first" one: the newest `limit` sessions shown, the totals kept. Never changes `p`. */
+export function newestOf(p: VaultProfile, limit: number): VaultProfile {
+  if (!limit || p.sessions.length <= limit) return p;
+  const sessions = p.sessions.slice(0, limit);
+  return { ...p, sessions, more: { ...p.more, sessions: Math.max(0, p.sessionCount - sessions.length) } };
+}
+
 /** True when the newest orders don't settle the free gift but older ones might (so they must be read). */
 export function needsOlderOrders(recent: Pick<VaultProfile, "hasFreeGift">, more: boolean): boolean {
   return more && !recent.hasFreeGift;
@@ -94,14 +101,16 @@ async function readProfile(e: string, opts: ProfileOpts): Promise<VaultProfile> 
   ] as const);
   const keepMs = s["vault.profile_memory_seconds"] * 1000;
   const live = opts.refresh || opts.memory === false;
-  // Everything kept already answers a "recent" request too.
-  if (!live) {
-    const hit = kept(e, "all", keepMs) ?? (opts.all ? null : kept(e, "recent", keepMs));
-    if (hit) return hit;
-  }
   const sessionLimit = opts.all || opts.refresh ? 0 : s["vault.recent_sessions"];
   const orderLimit = opts.all || opts.refresh ? 0 : s["vault.recent_orders"];
   const scope: Scope = sessionLimit || orderLimit ? "recent" : "all";
+  if (!live) {
+    // Everything kept also answers a "newest first" request, cut down to the newest sessions.
+    const everything = kept(e, "all", keepMs);
+    if (everything) return scope === "all" ? everything : newestOf(everything, sessionLimit);
+    const recent = scope === "recent" ? kept(e, "recent", keepMs) : null;
+    if (recent) return recent;
+  }
 
   const { shopify, mirror, imagen } = await getSources();
   const member = await getMember(e);
