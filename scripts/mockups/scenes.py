@@ -465,14 +465,14 @@ def pillow(w=305 * MM, h=305 * MM, thick=125 * MM):
     box("arm", (0.2, 0.78, 0.34), (0.86, 0.0, 0.6), fab, bevel=0.06, segments=5)
     lean = -0.30
     R = Matrix.Translation(Vector((0, 0.14, 0.45 + h / 2 * math.cos(lean)))) @ Matrix.Rotation(lean, 4, "X")
-    R2 = Matrix.Translation(Vector((0.36, 0.22, 0.46 + 0.20 * math.cos(lean)))) @ Matrix.Rotation(-0.30, 4, "Z") @ Matrix.Rotation(lean - 0.04, 4, "X") @ Matrix.Rotation(-0.10, 4, "Y")
+    R2 = Matrix.Translation(Vector((0.22, 0.25, 0.455 + 0.185 * math.cos(lean - 0.06)))) @ Matrix.Rotation(-0.12, 4, "Z") @ Matrix.Rotation(lean - 0.06, 4, "X") @ Matrix.Rotation(-0.06, 4, "Y")
     front, back_, corners = pillow_meshes(w, h, thick)
     f = mesh_obj("print", front, face_mat(), ROLE_FACE, smooth=True)
     b = mesh_obj("pillowback", back_, textured("pillowback", (0.82, 0.81, 0.79), rough=0.95, bump_strength=0.2, scale=900, sheen=0.5), smooth=True)
     for o in (f, b):
         o.matrix_world = R
     f["corners"] = [list(R @ Vector(p)) for p in corners]
-    fr2, bk2, _ = pillow_meshes(0.42, 0.42, 0.15)
+    fr2, bk2, _ = pillow_meshes(0.37, 0.37, 0.15, square=True)
     sm = textured("terracotta", TERRACOTTA, rough=0.95, bump_strength=0.25, scale=900, sheen=0.6)
     for nm, bm_ in (("other_f", fr2), ("other_b", bk2)):
         o = mesh_obj(nm, bm_, sm, smooth=True)
@@ -482,16 +482,16 @@ def pillow(w=305 * MM, h=305 * MM, thick=125 * MM):
     area_light("window", (-1.9, -0.7, 1.3), tgt, 1.4, 230, color=(1.0, 0.975, 0.94))
     area_light("fill", (1.4, -1.6, 1.1), tgt, 2.4, 45, color=(0.93, 0.95, 1.0))
     area_light("rim", (0.3, 1.2, 1.5), tgt, 1.2, 40)
-    framed_camera(tgt, 0.56, Vector((0, 1, -0.22)), lens=70, fstop=4.0)
+    framed_camera(tgt + Vector((0.035, 0, -0.03)), 0.66, Vector((0, 1, -0.20)), lens=70, fstop=4.0)
     return {"kind": "corners", "bulged": True}
 
 
-def pillow_meshes(w, h, thick, n=40, pinch=0.045):
+def pillow_meshes(w, h, thick, n=40, pinch=0.045, square=False):
     """Front and back of a stuffed square cushion: puffed in the middle, pinched along the edges."""
     def pos(x, y, side):
         X = x * (w / 2) * (1 - pinch * (1 - y * y))
         Y = y * (h / 2) * (1 - pinch * (1 - x * x))
-        z = (thick / 2) * ((1 - x * x) * (1 - y * y)) ** 0.75
+        z = (thick / 2) * (((1 - x ** 4) * (1 - y ** 4)) ** 0.6 if square else ((1 - x * x) * (1 - y * y)) ** 0.75)
         return Vector((X, -side * z, Y))  # the front faces -Y (towards the camera)
     out = []
     for side in (1, -1):
