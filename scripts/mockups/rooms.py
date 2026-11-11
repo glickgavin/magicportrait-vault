@@ -564,7 +564,7 @@ def puzzle_table(w=276 * MM, h=368 * MM):
     Upright (3:4), the shape of a Magic Portraits picture; the top of the picture is away from the camera."""
     room(width=5.0, depth=5.0, window={"y": -1.6, "w": 1.6, "h": 1.8, "sill": 0.7}, wall=PAINT_WARM)
     tw, td, th = 1.9, 0.95, 0.75
-    tmat = photo_wood("tabletop", plank=1.1, value=0.8, sat=0.7, tint=(1.0, 0.86, 0.68), rough=0.42, coat=0.15, offset_v=-0.0511, offset_u=0.23)
+    tmat = photo_wood("tabletop", plank=0.17, value=0.74, sat=0.8, tint=(1.0, 0.88, 0.74), rough=0.42, coat=0.15, offset_u=0.23)  # a farmhouse table of 17 cm oak boards
     box("table", (tw, td, 0.045), (0, -1.2, th - 0.0225), tmat, bevel=0.004)
     legm = oak("tablelegs")
     for sx in (-1, 1):
@@ -578,7 +578,7 @@ def puzzle_table(w=276 * MM, h=368 * MM):
     R = Matrix.Rotation(yaw, 4, "Z")
     tl, tr, br, bl = frame_corners(Vector((c.x, c.y, th + board_t + 0.15 * MM)), (R @ Vector((1, 0, 0))).to_3d(), (R @ Vector((0, 1, 0))).to_3d(), w, h)
     quad_face("print", tl, tr, br, bl, face_mat())
-    lid = box("lid", (0.30, 0.22, 0.055), (0.36, -1.08, th + 0.0275), weave("lid", srgb(236, 228, 214), rough=0.8, strength=0.05, scale=500), rot=(0, 0, -0.42), bevel=1.5 * MM)
+    lid = box("lid", (0.26, 0.19, 0.04), (0.33, -1.06, th + 0.02), weave("lid", srgb(176, 146, 108), rough=0.85, strength=0.12, scale=600, vary=0.08), rot=(0, 0, -0.42), bevel=1.2 * MM)  # the kraft box lid
     asset("DiffuseTransmissionTeacup", loc=(-0.42, -1.12, th), rot_z=0.8, size=0.16, axis=0)
     asset("GlassVaseFlowers", loc=(0.15, -0.86, th), rot_z=0.2, size=0.30)
     for k, (x, rz) in enumerate(((-0.45, math.radians(180)), (0.45, math.radians(176)))):
@@ -587,9 +587,9 @@ def puzzle_table(w=276 * MM, h=368 * MM):
     frame_art((0.0, 0, 1.6), 1.0, 0.7, art_color=srgb(160, 170, 150))
     sky(sun_elev=26, sun_az=300, strength=0.8)
     window_key((-2.42, -1.6, 1.55), (0, -1.3, th), 1.5, 1.6, 240)
-    tgt = Vector((0.0, -1.3, th))
+    tgt = Vector((-0.04, -1.24, th))
     fill_light(tgt, (0.5, -3.6, 2.2), size=3.0, energy=12)
-    camera_at(tgt + Vector((0.10, -0.68, 0.70)), tgt, lens=40, fstop=5.0)
+    camera_at(tgt + Vector((0.08, -0.50, 0.56)), tgt, lens=40, fstop=4.5)
     return {"kind": "corners", "puzzle": True, "puzzle_grid": [9, 12]}
 
 
