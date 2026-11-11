@@ -16,7 +16,7 @@ import { ShopPreview } from "./ShopPreview";
 
 type Picture = { id: string; kind: string; url: string | null; width: number | null; height: number | null; ordered: boolean };
 
-export function IdeasView({ page, picture, top, rest, others, pricing, sizeKnown, open, maxQty }: { page: ShopPage; picture: Picture; top: IdeaView[]; rest: IdeaView[]; others: { id: string; url: string | null }[]; pricing: Pricing; sizeKnown: boolean; open: string | null; maxQty: number }) {
+export function IdeasView({ page, picture, top, rest, others, pricing, sizeKnown, tooSmall = null, open, maxQty }: { page: ShopPage; picture: Picture; top: IdeaView[]; rest: IdeaView[]; others: { id: string; url: string | null }[]; pricing: Pricing; sizeKnown: boolean; tooSmall?: { px: number; need: number } | null; open: string | null; maxQty: number }) {
   const [showAll, setShowAll] = useState(false);
   const [openIdea, setOpenIdea] = useState<IdeaView | null>(() => [...top, ...rest].find((i) => i.handle === open) ?? null);
   const [showChange, setShowChange] = useState(false);
@@ -90,7 +90,11 @@ export function IdeasView({ page, picture, top, rest, others, pricing, sizeKnown
             {pricing.pct != null && <span className="rounded-full bg-pink-tint px-2.5 py-1 text-[12px] font-bold text-pink-dark">{t("shop.priceApplied", { label: pricing.label })}</span>}
           </div>
           {!sizeKnown && <p role="alert" className="rounded-[14px] bg-[#fff1d6] p-3 text-[14px] text-[#7a4a00]">{t("shop.sizeUnknown")}</p>}
-          {sizeKnown && !all.length && <p className="rounded-[14px] bg-white p-4 text-[15px] text-ink-2">{t("shop.noIdeas")}</p>}
+          {sizeKnown && !all.length && (
+            <p className="rounded-[14px] bg-white p-4 text-[15px] text-ink-2" data-testid="no-ideas">
+              {tooSmall ? t("shop.noIdeasSmall", { px: tooSmall.px, need: tooSmall.need }) : t("shop.noIdeas")}
+            </p>
+          )}
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:gap-4">{top.map(card)}</ul>
           {rest.length > 0 &&
             (showAll ? (

@@ -131,7 +131,13 @@ export async function ideasData(user: SessionUser, page: ShopPage, imageId: stri
   const img = await ensureSize(user.email, pic);
   const s = await getSettings(["shop.top_picks_count", "shop.change_strip_count", "shop.cart_line_max_qty"] as const);
   const pricing = await pricingFor(user.email);
-  const ideas = img.width && img.height ? ideasFor(forPage(await getCatalog(), page), { kind: img.kind, width: img.width, height: img.height }).map((i) => ideaView(i, pricing.pct)).filter((v): v is IdeaView => v !== null) : [];
+  const entries = forPage(await getCatalog(), page);
+  const ideas = img.width && img.height ? ideasFor(entries, { kind: img.kind, width: img.width, height: img.height }).map((i) => ideaView(i, pricing.pct)).filter((v): v is IdeaView => v !== null) : [];
+  // When nothing fits, say whether the picture is too small for every size (rather than the wrong shape).
+  const needs = entries.flatMap((e) => e.sellable.map((v) => v.rules.minShortSidePx));
+  const shortSide = img.width && img.height ? Math.min(img.width, img.height) : 0;
+  const need = needs.length ? Math.min(...needs) : 0;
+  const tooSmall = !ideas.length && shortSide > 0 && need > shortSide ? { px: shortSide, need } : null;
   const n = s["shop.top_picks_count"];
   const top = ideas.slice(0, n);
   const rest = ideas.slice(n);
@@ -145,6 +151,7 @@ export async function ideasData(user: SessionUser, page: ShopPage, imageId: stri
   return {
     picture: { id: img.id, kind: img.kind, url: await pictureLink(img), width: img.width, height: img.height, ordered: img.ordered },
     sizeKnown: Boolean(img.width && img.height),
+    tooSmall,
     top,
     rest,
     others,

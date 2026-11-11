@@ -13,5 +13,5 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   if (!data) notFound();
   const sp = await searchParams;
   const open = typeof sp.product === "string" && /^[a-z0-9-]{1,120}$/.test(sp.product) ? sp.product : null;
-  return <IdeasView page="gifts" picture={data.picture} top={data.top} rest={data.rest} others={data.others} pricing={data.pricing} sizeKnown={data.sizeKnown} open={open} maxQty={data.maxQty} />;
+  return <IdeasView page="gifts" picture={data.picture} top={data.top} rest={data.rest} others={data.others} pricing={data.pricing} sizeKnown={data.sizeKnown} tooSmall={data.tooSmall} open={open} maxQty={data.maxQty} />;
 }

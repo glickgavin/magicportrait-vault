@@ -378,6 +378,8 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 ## Studio templates (11 Nov)
 - **Why:** the product previews are what sell the shop, and corners dragged onto stock photos never line up exactly. Each Store product now has a studio scene rendered in Blender (`scripts/mockups/`, docs/shop.md › Studio templates). Because the print area is known in 3D, the zone matches it to the pixel, the picture takes the product's real shading (`blend: multiply`), and the overlay adds the shine and clips the edges.
 - **Checked** through the shop's own `drawPreview` with a made-up picture for all 11 products, at draft and at final size.
+- **Live since 11 Nov (Gavin's OK):** the 22 files are in Shopify Files (`mmp-shop-<product>-base.jpg` / `-overlay.webp`, uploaded from `assets/shop-templates/` at commit cf9a479), and all 11 products' `mmp_shop.template` now use them, replacing the 9 drawn by hand on 10 Nov (each write checked the template hadn't changed since it was read). Acrylic Print (no page), Magic Puzzle and Acrylic Glass Art (no print rules) stay hidden until those are filled in; the puzzle's zone is 4:3 landscape, so its print areas should be too.
+- **Smallest picture:** `shop.default_min_short_side_px` set to 512 (Gavin, 11 Nov): 95% of portraits are 512 × 512 and the live tiles print from them. When nothing fits, the Ideas page now says whether the picture is too small ("This picture is 512 px across, and our products need at least … px") or the wrong shape.
 - **Editor change:** a template's background and overlay may now be Shopify Files (not the product's gallery), so the studio photos never show on product pages. Settings › Shop › the template editor lists them beside the product's photos, and Publish accepts only the product's own photos or the ones its saved template already uses.
 
 ## Decisions (shop)
@@ -425,8 +427,8 @@ Every size: maker's code = the variant's SKU, Adjust off, placement cover (the m
 | 1 | Apply the shop migration and seed to `magic-vault` | Done 10 Nov |
 | 2 | `mmp_shop` field definitions and values on the Store products | Done 10 Nov, except the puzzle's print areas |
 | 3 | Shopify: add `read_products`, `read_discounts`, `write_products` to the r_orders app; Storefront token in Vercel; Store products published to its channel; redeploy | Needed |
-| 4 | Choose the smallest picture (`shop.default_min_short_side_px`) | Needed |
-| 5 | Templates for each product in Settings › Shop on the branch preview | Needed |
+| 4 | Choose the smallest picture (`shop.default_min_short_side_px`) | Done 11 Nov: 512 px |
+| 5 | Templates for each product | Done 11 Nov: studio templates for all 11 |
 | 6 | Turn on `shop.super_user_preview`, test on the branch preview, buy one item end to end (VIP code, `SITEWIDE OFF`, the order prints, the cart shows paid) | |
 | 7 | Run `pnpm test` and `pnpm e2e` in a session that can reach the container registries | |
 | 8 | Merge `claude/shop`; add the shop funnel to the PostHog dashboard | |
