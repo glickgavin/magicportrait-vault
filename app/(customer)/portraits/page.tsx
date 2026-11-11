@@ -9,7 +9,7 @@ import { TrackPageView } from "@/components/TrackPageView";
 import { TrackedLink } from "@/components/TrackedLink";
 import { EmptyHome } from "@/components/screens/home/EmptyHome";
 import { PartialNotice } from "@/components/screens/home/PartialNotice";
-import Link from "next/link";
+import { ShowMoreLink } from "@/components/ShowMoreLink";
 import { t, tn } from "@/lib/i18n";
 import { fmtDate } from "@/lib/format";
 import { PortraitsShopBanner } from "@/components/shop/ShopWaysIn";
@@ -53,9 +53,9 @@ export default async function PortraitsPage({ searchParams }: { searchParams: Pr
       {profile.more.sessions > 0 && (
         <div className="mt-4 flex flex-col items-center gap-2" data-testid="portraits-more">
           <p className="text-[13px] text-ink-2">{t("ui.showingNewest", { shown: profile.sessions.length, total: profile.sessionCount })}</p>
-          <Link href={`/portraits?${new URLSearchParams({ ...(filter !== "all" ? { filter } : {}), all: "1" }).toString()}`} scroll={false} className="flex h-12 items-center justify-center rounded-[14px] border border-black/15 bg-white px-5 text-[15px] font-bold">
+          <ShowMoreLink href={`/portraits?${new URLSearchParams({ ...(filter !== "all" ? { filter } : {}), all: "1" }).toString()}`} className="flex h-12 items-center justify-center rounded-[14px] border border-black/15 bg-white px-5 text-[15px] font-bold">
             {tn("ui.showMoreSessions", profile.more.sessions)}
-          </Link>
+          </ShowMoreLink>
         </div>
       )}
       <TrackedLink

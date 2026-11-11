@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ShowMoreLink } from "@/components/ShowMoreLink";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Check, Upload, X } from "lucide-react";
@@ -109,14 +110,13 @@ export function ChoosePicture({ page, product, tab: initialTab, portraits, photo
             {portraits.length > 0 && <p className="text-[13px] font-semibold text-ink-2">{tn("shop.portraitsCount", portraits.length)}</p>}
             {grid(portraits, t("shop.noPortraits"))}
             {moreSessions > 0 && (
-              <Link
+              <ShowMoreLink
                 href={`${base}/choose?${new URLSearchParams({ ...(product ? { product } : {}), all: "1" }).toString()}`}
-                scroll={false}
                 className="mt-2 flex h-12 items-center justify-center self-center rounded-[14px] border border-black/15 bg-white px-5 text-[15px] font-bold"
-                data-testid="portraits-more"
+                testId="portraits-more"
               >
                 {tn("ui.showMoreSessions", moreSessions)}
-              </Link>
+              </ShowMoreLink>
             )}
           </div>
         )}
