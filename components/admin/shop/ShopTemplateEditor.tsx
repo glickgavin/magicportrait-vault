@@ -81,15 +81,145 @@ function loadImg(url: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Each photo is loaded once per visit, so dragging a corner only redraws. */
+const imageCache = new Map<string, Promise<HTMLImageElement>>();
+function cachedImg(url: string): Promise<HTMLImageElement> {
+  let p = imageCache.get(url);
+  if (!p) {
+    p = loadImg(url);
+    p.catch(() => imageCache.delete(url));
+    imageCache.set(url, p);
+  }
+  return p;
+}
+
+/** Shrinks a big file in the browser before sending (Vercel takes 4.5 MB at most). Overlays stay WebP so their see-through parts survive. */
+async function shrinkForUpload(file: File, kind: "background" | "overlay", maxPx: number, maxBytes: number): Promise<Blob> {
+  let bmp: ImageBitmap;
+  try {
+    bmp = await createImageBitmap(file);
+  } catch {
+    return file; // the server says what's wrong with it
+  }
+  const scale = Math.min(1, maxPx / Math.max(bmp.width, bmp.height));
+  if (scale === 1 && file.size <= maxBytes) return file;
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+  const type = kind === "overlay" ? "image/webp" : "image/jpeg";
+  return new Promise((resolve) => c.toBlob((b) => resolve(b ?? file), type, 0.9));
+}
+
 const clamp = (v: number) => Math.min(1.2, Math.max(-0.2, Math.round(v * 1000) / 1000));
 
 type HandleId = "c0" | "c1" | "c2" | "c3" | "left" | "right" | "top" | "bottom";
 
-export function ShopTemplateEditor({ productId, media, published, sizes }: { productId: string; media: Media[]; published: Template | null; sizes: Size[] }) {
+export function ShopTemplateEditor({
+  productId,
+  media: initialMedia,
+  published,
+  sizes,
+  samples = [],
+  upload,
+}: {
+  productId: string;
+  media: Media[];
+  published: Template | null;
+  sizes: Size[];
+  samples?: string[];
+  upload: { maxMb: number; maxPx: number };
+}) {
+  const [media, setMedia] = useState<Media[]>(initialMedia);
+  if (!media.length && !published) return <FirstPhoto productId={productId} upload={upload} onUploaded={(m) => setMedia([m])} />;
+  return <Editor productId={productId} media={media} setMedia={setMedia} published={published} sizes={sizes} samples={samples} upload={upload} />;
+}
+
+/** No photo yet: upload the blank product photo to start. */
+function FirstPhoto({ productId, upload, onUploaded }: { productId: string; upload: { maxMb: number; maxPx: number }; onUploaded: (m: Media) => void }) {
+  return (
+    <section className="flex flex-col items-start gap-3 rounded-[20px] bg-white p-6 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+      <h2 className="text-[17px] font-extrabold">Start with a photo of the blank product</h2>
+      <p className="text-[14px] text-ink-2">This product has no photos in Shopify. Upload one here (JPEG, PNG or WebP, at least 400 px on its short side): it&apos;s kept with My Magic Portraits, not added to the product in Shopify.</p>
+      <UploadTile productId={productId} kind="background" upload={upload} onUploaded={onUploaded} wide />
+    </section>
+  );
+}
+
+/** "+ Upload": sends a photo (or an overlay) for this product and adds it to the choices. */
+function UploadTile({ productId, kind, upload, onUploaded, wide = false }: { productId: string; kind: "background" | "overlay"; upload: { maxMb: number; maxPx: number }; onUploaded: (m: Media) => void; wide?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  async function send(file: File) {
+    setBusy(true);
+    setError(null);
+    const body = new FormData();
+    body.set("productId", productId);
+    body.set("kind", kind);
+    const blob = await shrinkForUpload(file, kind, upload.maxPx, upload.maxMb * 1024 * 1024 * 0.95);
+    body.set("file", blob, file.name);
+    const r = await fetch("/api/admin/shop/template/upload", { method: "POST", body }).catch(() => null);
+    const b = (await r?.json().catch(() => ({}))) as { media?: Media; error?: string } | undefined;
+    setBusy(false);
+    if (r?.ok && b?.media) onUploaded(b.media);
+    else setError(b?.error ?? "Couldn't upload that file.");
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        disabled={busy}
+        aria-busy={busy || undefined}
+        onClick={() => ref.current?.click()}
+        className={cn("grid place-items-center rounded-[10px] border border-dashed border-[#DD07C4]/60 bg-pink-tint/40 text-[12px] font-bold text-pink-dark disabled:opacity-60", wide ? "h-12 px-5 text-[14px]" : "h-16 w-16")}
+        data-testid={`template-upload-${kind}`}
+      >
+        {busy ? "Uploading…" : wide ? "Upload a photo" : "+ Upload"}
+      </button>
+      <input
+        ref={ref}
+        type="file"
+        accept={kind === "overlay" ? "image/png,image/webp" : "image/jpeg,image/png,image/webp"}
+        className="sr-only"
+        aria-label={kind === "overlay" ? "Upload an overlay" : "Upload a photo of the blank product"}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) void send(f);
+        }}
+      />
+      {error && (
+        <p role="alert" className="max-w-[260px] text-[12px] font-bold text-[#a1251b]">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Editor({
+  productId,
+  media,
+  setMedia,
+  published,
+  sizes,
+  samples,
+  upload,
+}: {
+  productId: string;
+  media: Media[];
+  setMedia: React.Dispatch<React.SetStateAction<Media[]>>;
+  published: Template | null;
+  sizes: Size[];
+  samples: string[];
+  upload: { maxMb: number; maxPx: number };
+}) {
   const router = useRouter();
   const uid = useId();
   const draftKey = `shop-template-draft:${productId}`;
-  const startFrom = useMemo<Template>(() => published ?? defaultTemplate({ media_id: media[0].id, url: media[0].url, w: media[0].width, h: media[0].height }), [published, media]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const startFrom = useMemo<Template>(() => published ?? defaultTemplate({ media_id: media[0].id, url: media[0].url, w: media[0].width, h: media[0].height }), [published]);
   const [t, setT] = useState<Template>(startFrom);
   const [restored, setRestored] = useState(false);
   const [sizeId, setSizeId] = useState(sizes[0]?.id ?? "");
@@ -98,6 +228,7 @@ export function ShopTemplateEditor({ productId, media, published, sizes }: { pro
   const areaRef = useRef<HTMLDivElement>(null);
   const drag = useRef<HandleId | null>(null);
   const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
+  const live = useRef<(HTMLCanvasElement | null)[]>([]);
   const size = sizes.find((s) => s.id === sizeId) ?? null;
   const dirty = JSON.stringify(t) !== JSON.stringify(startFrom);
   const [overlayClear, setOverlayClear] = useState<number | null>(null);
@@ -140,34 +271,46 @@ export function ShopTemplateEditor({ productId, media, published, sizes }: { pro
     }
   }, [t, dirty, draftKey]);
 
-  // Test renders with the shared drawing routine.
+  // Live previews (sample pictures) and test renders, drawn with the same routine customers see,
+  // at most once per frame while a corner is being dragged.
+  const frame = useRef<number | null>(null);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const [bg, ov] = await Promise.all([loadImg(t.background.url), t.overlay ? loadImg(t.overlay.url) : Promise.resolve(null)]);
-        if (cancelled) return;
-        SAMPLES.forEach(([, pw, ph], i) => {
-          const el = canvases.current[i];
-          if (!el) return;
-          const out = previewSize(t, 360);
-          el.width = out.w;
-          el.height = out.h;
-          const ctx = el.getContext("2d") as unknown as PreviewCtx;
-          const pic = samplePicture(pw, ph);
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      void (async () => {
+        try {
+          const [bg, ov, ...pics] = await Promise.all([cachedImg(t.background.url), t.overlay ? cachedImg(t.overlay.url) : Promise.resolve(null), ...samples.map((u) => cachedImg(u).catch(() => null))]);
+          if (cancelled) return;
           const aspect = size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h);
           const placement = size?.placement ?? (t.zone.kind === "wrap" ? "wrap_zone" : "cover");
-          const crop = placement === "contain" ? { x: 0, y: 0, w: pw, h: ph } : centredCrop(pw, ph, aspect, 1);
-          drawPreview(ctx, { template: t, background: bg, overlay: ov, picture: pic, crop, placement, backgroundColour: size?.background ?? null, targetAspect: aspect, size: out, makeCanvas: browserCanvas, flatMax: 700 });
-        });
-      } catch {
-        /* the photo didn't load; the editor still works */
-      }
-    })();
+          const draw = (el: HTMLCanvasElement | null, pic: CanvasImageSource, pw: number, ph: number, width: number) => {
+            if (!el) return;
+            const out = previewSize(t, width);
+            el.width = out.w;
+            el.height = out.h;
+            const ctx = el.getContext("2d") as unknown as PreviewCtx;
+            const crop = placement === "contain" ? { x: 0, y: 0, w: pw, h: ph } : centredCrop(pw, ph, aspect, 1);
+            drawPreview(ctx, { template: t, background: bg, overlay: ov, picture: pic as never, crop, placement, backgroundColour: size?.background ?? null, targetAspect: aspect, size: out, makeCanvas: browserCanvas, flatMax: 900 });
+          };
+          pics.forEach((img, i) => img && draw(live.current[i], img, img.naturalWidth, img.naturalHeight, 640));
+          SAMPLES.forEach(([, pw, ph], i) => draw(canvases.current[i], samplePicture(pw, ph), pw, ph, 360));
+        } catch {
+          /* the photo didn't load; the editor still works */
+        }
+      })();
+    });
     return () => {
       cancelled = true;
     };
-  }, [t, size]);
+  }, [t, size, samples]);
+
+  const added = (m: Media, which: "background" | "overlay") => {
+    setMedia((list) => [m, ...list.filter((x) => x.id !== m.id)]);
+    const v = { media_id: m.id, url: m.url, w: m.width, h: m.height };
+    setT((p) => (which === "background" ? { ...p, background: v } : { ...p, overlay: v }));
+  };
 
   const bgW = t.background.w;
   const bgH = t.background.h;
@@ -269,13 +412,15 @@ export function ShopTemplateEditor({ productId, media, published, sizes }: { pro
             </label>
           );
         })}
+        <UploadTile productId={productId} kind={which} upload={upload} onUploaded={(m) => added(m, which)} />
       </div>
     </fieldset>
   );
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <section aria-label="Zone" className="rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
+      <section aria-label="Zone" className="grid content-start gap-5 rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)] 2xl:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
+        <div className="min-w-0">
         {restored && (
           <p role="status" className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[14px] text-[#7a4a00]">
             Your unpublished draft was restored.
@@ -328,6 +473,34 @@ export function ShopTemplateEditor({ productId, media, published, sizes }: { pro
           <p role="alert" className="mt-3 rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[14px] text-[#7a4a00]">
             {aspectWarning}
           </p>
+        )}
+        </div>
+        {samples.length > 0 && (
+          <div aria-labelledby={`${uid}-live`} role="group" className="flex min-w-0 flex-col gap-3" data-testid="template-live-preview">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id={`${uid}-live`} className="text-[17px] font-extrabold">
+                Live preview
+              </h2>
+              {sizes.length > 1 && (
+                <label className="flex items-center gap-2 text-[13px]">
+                  Size
+                  <select value={sizeId} onChange={(e) => setSizeId(e.target.value)} className="h-9 rounded-[10px] border border-line bg-white px-2">
+                    {sizes.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+            <p className="text-[13px] text-ink-2">How customers will see it with a picture. It changes as you edit.</p>
+            <div className="grid grid-cols-2 gap-3 2xl:grid-cols-1">
+              {samples.map((u, i) => (
+                <canvas key={u} ref={(el) => { live.current[i] = el; }} role="img" aria-label={`Live preview with sample picture ${i + 1}`} className="w-full rounded-[12px] bg-black/[0.04]" />
+              ))}
+            </div>
+          </div>
         )}
       </section>
 
@@ -410,7 +583,7 @@ export function ShopTemplateEditor({ productId, media, published, sizes }: { pro
             <h2 id={`${uid}-tests`} className="text-[17px] font-extrabold">
               Test renders
             </h2>
-            {sizes.length > 0 && (
+            {sizes.length > 0 && (samples.length === 0 || sizes.length === 1) && (
               <label className="flex items-center gap-2 text-[13px]">
                 Size
                 <select value={sizeId} onChange={(e) => setSizeId(e.target.value)} className="h-9 rounded-[10px] border border-line bg-white px-2">

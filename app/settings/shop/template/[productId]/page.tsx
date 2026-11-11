@@ -5,6 +5,8 @@ import { getCatalog } from "@/lib/shop";
 import { target } from "@/lib/shop/fit";
 import { parseVariantRules } from "@/lib/shop/rules";
 import { parseTemplate } from "@/lib/shop/template";
+import { uploadedTemplateMedia } from "@/lib/shop/template-media";
+import { getSettings } from "@/lib/settings";
 import { ShopTemplateEditor } from "@/components/admin/shop/ShopTemplateEditor";
 import { TrackPageView } from "@/components/TrackPageView";
 
@@ -38,9 +40,10 @@ export default async function ShopTemplatePage({ params }: { params: Promise<{ p
     const t = target(r.rules);
     return [{ id: v.id, title: v.title, aspect: t.w / t.h, placement: r.rules.placement, background: r.rules.background }];
   });
-  // The product's photos, plus any studio photo the saved template uses from Shopify Files.
+  // The product's photos, photos uploaded here for it, and any studio photo the saved template uses from Shopify Files.
   const published = parseTemplate(p.template?.value);
-  const media = p.media.map((m) => ({ id: m.id, url: m.url, alt: m.alt, width: m.width ?? 1000, height: m.height ?? 1000 }));
+  const [uploads, s] = await Promise.all([uploadedTemplateMedia(p.legacyId), getSettings(["shop.template_sample_pictures", "shop.template_upload_max_mb", "shop.template_upload_max_px"] as const)]);
+  const media = [...p.media.map((m) => ({ id: m.id, url: m.url, alt: m.alt, width: m.width ?? 1000, height: m.height ?? 1000 })), ...uploads];
   for (const [m, alt] of [[published?.background, "Studio photo"], [published?.overlay, "Studio overlay"]] as const) {
     if (m && !media.some((x) => x.id === m.media_id)) media.push({ id: m.media_id, url: m.url, alt, width: m.w, height: m.h });
   }
@@ -51,16 +54,10 @@ export default async function ShopTemplatePage({ params }: { params: Promise<{ p
         ← Shop: products &amp; discounts
       </Link>
       <h1 className="mt-1 text-[30px] font-extrabold tracking-tight">Preview template: {p.title}</h1>
-      <p className="text-[15px] text-ink-2">Pick the photo of the blank product, then drag the corners to where the picture goes. It stays a draft on this computer until you publish it to Shopify.</p>
-      {media.length === 0 ? (
-        <p role="alert" className="mt-4 rounded-[14px] bg-[#fff1d6] p-4 text-[15px] text-[#7a4a00]">
-          This product has no photos in Shopify. Add a photo of the blank product there first.
-        </p>
-      ) : (
-        <div className="mt-5">
-          <ShopTemplateEditor productId={p.id} media={media} published={published} sizes={sizes} />
-        </div>
-      )}
+      <p className="text-[15px] text-ink-2">Pick or upload a photo of the blank product, then drag the corners to where the picture goes. The live preview shows it with sample pictures. It stays a draft on this computer until you publish it to Shopify.</p>
+      <div className="mt-5">
+        <ShopTemplateEditor productId={p.id} media={media} published={published} sizes={sizes} samples={s["shop.template_sample_pictures"]} upload={{ maxMb: s["shop.template_upload_max_mb"], maxPx: s["shop.template_upload_max_px"] }} />
+      </div>
     </div>
   );
 }

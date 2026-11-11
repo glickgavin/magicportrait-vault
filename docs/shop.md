@@ -352,3 +352,8 @@ Needed from people before part 5 can be tested live:
 
 - Shopify app access: `read_customers` (the VIP tag), `read_discounts`, and `write_products` (the template and product fields), added to the r_orders app the app already uses. Settings › Data sources shows the access the app has and flags anything missing.
 - The two Shopify discounts, the Store collection set to sort manually, and the `mmp_shop` metafield definitions on the products.
+
+### Template editor: live preview and uploads (11 Nov)
+- **Live preview:** beside the zone (under it on narrower screens) the editor draws the product with the pictures in `shop.template_sample_pictures` (default `/shop-samples/portrait.jpg` and `/shop-samples/square.jpg`, both in `public/`), with the same routine customers see, redrawn at most once per frame while a corner is dragged. The Size picker sits there and also drives the test renders.
+- **Upload:** "+ Upload" in both the photo and the overlay choices, and "Upload a photo" when a product has no photos. The browser shrinks big files first (`shop.template_upload_max_px`, `shop.template_upload_max_mb`; Vercel takes 4.5 MB at most); the server checks it's a JPEG, PNG or WebP of at least 400 px on its short side, keeps photos as JPEG and overlays as WebP, and refuses an overlay without see-through parts. Files go to the public `theme-assets` bucket under `shop-templates/<product id>/<random>-<w>x<h>.<ext>` (blank product photos aren't private), never to the product in Shopify, which the app may not change outside `mmp_shop`. Publish accepts them for that product only, and the server renderer loads them alongside `shop.template_image_hosts`.
+
