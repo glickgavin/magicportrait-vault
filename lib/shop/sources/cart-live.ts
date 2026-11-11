@@ -63,6 +63,18 @@ function map(c: RawCart): RemoteCart {
   };
 }
 
+/** The shopper's IP from the request (Vercel sets x-forwarded-for), or null outside a request. */
+export async function buyerIp(): Promise<string | null> {
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || (h.get("x-real-ip") ?? "").trim();
+    return /^[0-9a-f:.]{3,45}$/i.test(ip) ? ip : null;
+  } catch {
+    return null;
+  }
+}
+
 export type StorefrontConfig = { domain: string; apiVersion: string; publicToken?: string; privateToken?: string };
 
 export class ShopCartLive implements ShopCartSource {
@@ -71,8 +83,13 @@ export class ShopCartLive implements ShopCartSource {
 
   private async gql<T>(query: string, variables: Record<string, unknown>, attempt = 0): Promise<T> {
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (this.cfg.privateToken) headers["shopify-storefront-private-token"] = this.cfg.privateToken;
-    else if (this.cfg.publicToken) headers["x-shopify-storefront-access-token"] = this.cfg.publicToken;
+    if (this.cfg.privateToken) {
+      headers["shopify-storefront-private-token"] = this.cfg.privateToken;
+      // With a private token Shopify asks for the shopper's IP, so its bot protection treats each
+      // customer separately instead of all of them as our one server.
+      const ip = await buyerIp();
+      if (ip) headers["shopify-storefront-buyer-ip"] = ip;
+    } else if (this.cfg.publicToken) headers["x-shopify-storefront-access-token"] = this.cfg.publicToken;
     const res = await fetch(`https://${this.cfg.domain}/api/${this.cfg.apiVersion}/graphql.json`, { method: "POST", headers, body: JSON.stringify({ query, variables }), cache: "no-store" });
     if ((res.status === 429 || res.status >= 500) && attempt < 3) {
       await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
