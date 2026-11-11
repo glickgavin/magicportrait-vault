@@ -44,6 +44,12 @@ async function currentDiscount(email: string): Promise<{ customerType: CustomerT
   return { customerType, code: (await discountSettingFor(customerType)).code };
 }
 
+/** Same crop by value: the database hands jsonb back with its keys in its own order, so JSON text can't be compared. */
+export function sameCrop(a: Rect | null | undefined, b: Rect | null | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
+
 /**
  * The preview the customer saw, for the order line and customer service. Drawn after the response so
  * adding never waits for it; checkout draws any that are still missing.
@@ -93,7 +99,7 @@ export async function addToCart(email: string, input: z.infer<typeof addLineSche
     cartLines(cart.id),
     pic.kind === "new_upload" ? Promise.resolve(pic.id.slice(2)) : rememberExternalImage(email, { kind: pic.kind, url: (pic.source as { url: string }).url, ref: pic.ref, session: pic.sessionId, width: img.width, height: img.height }),
   ]);
-  const same = lines.find((l) => l.variant_id === sv.variant.id && l.image_id === imageRowId && l.page === input.page && JSON.stringify(l.crop) === JSON.stringify(crop));
+  const same = lines.find((l) => l.variant_id === sv.variant.id && l.image_id === imageRowId && l.page === input.page && sameCrop(l.crop, crop));
   if (same) {
     const qty = Math.min(s["shop.cart_line_max_qty"], same.quantity + input.quantity);
     await Promise.all([updateLine(same.id, { quantity: qty }), updateCart(cart.id, {})]);

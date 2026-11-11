@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { withPending, type PendingLines } from "@/components/shop/CartView";
 import { afterResponse, mapLimit, opName } from "@/lib/perf";
+import { sameCrop } from "@/lib/shop/cart";
 
 type Cart = Parameters<typeof withPending>[0];
 const line = (o: Partial<Cart["lines"][number]> = {}) =>
@@ -56,5 +57,15 @@ describe("perf helpers", () => {
       ran = true;
     });
     expect(ran).toBe(true);
+  });
+});
+
+describe("adding the same thing again adds to its line", () => {
+  it("compares crops by value, whatever order the database returns the keys in", () => {
+    const fromDb = JSON.parse('{"h": 900, "w": 900, "x": 62, "y": 0}');
+    expect(sameCrop(fromDb, { x: 62, y: 0, w: 900, h: 900 })).toBe(true);
+    expect(sameCrop(fromDb, { x: 62, y: 1, w: 900, h: 900 })).toBe(false);
+    expect(sameCrop(null, null)).toBe(true);
+    expect(sameCrop(null, { x: 0, y: 0, w: 1, h: 1 })).toBe(false);
   });
 });

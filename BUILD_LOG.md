@@ -453,3 +453,20 @@ What changed:
 - **Every customer page** shows a loading placeholder the moment a link is tapped (`app/(customer)/loading.tsx`).
 - **Cold starts**: the layout no longer loads the canvas and image libraries (light `lib/shop/cart-count.ts`, renderer and sharp imported only when used).
 - **Logs**: `[perf] <step> <ms>ms` for any outside call slower than `vault.slow_call_log_ms` (new, default 500): Shopify Admin/Storefront by operation name, the Shopify token, Imagen, the mirror, preview drawing. Step and time only.
+- **Portraits without Shopify** (`knownPortraits`): add to cart and Product ideas find the picture from Imagen for the sessions already cached on the member row (full profile only if it isn't there); the "Change picture" strip streams in (React `use`).
+- **Events**: `track()` writes `activity_log` first and sends the PostHog capture and the immediate Klaviyo send after the response.
+- **Bug: adding the same thing twice made a new line** every time, because the crop was compared as JSON text and jsonb hands keys back as `{h, w, x, y}`. Now compared by value (`sameCrop`).
+
+Measured on the branch preview from Gavin's browser (same data as live):
+| | Before (live code) | After, fresh server | After, warm |
+|---|---|---|---|
+| Something on screen after tapping a link | 2.9 s (nothing until the page) | 0.02–0.09 s (placeholder) | same |
+| `/` | 1.8 s | 3.2 s (first request on a new server) | 0.66–0.93 s |
+| `/gifts` | 2.2–3.1 s | products 0.6 s, pictures 2.3 s | 0.7 s |
+| `/products`, `/portraits` | 1.8–2.1 s | 0.9–1.2 s | 0.6–0.8 s |
+| `/cart` | 1.0–1.9 s | 1.8 s | 0.76–0.92 s |
+| Product ideas after tapping a picture | 2.1–2.3 s | 0.85 s | |
+| Add to cart (badge updated) | 3.4 s, then a full page reload | 1.85 s, no reload | |
+| Cart + / − / Remove | nothing until the reload | 0.04 s on screen; saved within 4 s | |
+
+Still slow, and why: Shopify's orders search is 1.1–1.4 s per read, the mirror (us-west-1) 0.6 s on a new connection, and Storefront cart mutations 0.9–1.7 s each. A server only remembers what it read itself, and Vercel spreads one person's requests (pages and their prefetches) across several servers, so the 60-second memory often misses.
