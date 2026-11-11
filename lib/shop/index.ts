@@ -40,7 +40,18 @@ export async function getCatalog(opts: { fresh?: boolean } = {}): Promise<Catalo
 
 export type CustomerType = "normal" | "vip";
 
-/** VIP when the Shopify customer carries shop.vip_customer_tag (any case). No customer, or Shopify down: normal. */
+/** The VIP tags from shop.vip_customer_tag: one or more, separated by commas (any case). */
+export function vipTags(setting: string): string[] {
+  return setting.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+}
+
+/** VIP when the customer carries any of the VIP tags. */
+export function isVip(customerTags: string[] | null | undefined, setting: string): boolean {
+  const want = new Set(vipTags(setting));
+  return Boolean(customerTags?.some((t) => want.has(t.trim().toLowerCase())));
+}
+
+/** VIP when the Shopify customer carries any of shop.vip_customer_tag's tags (any case). No customer, or Shopify down: normal. */
 const typeCache = new Map<string, { at: number; type: CustomerType }>();
 
 export async function customerTypeFor(email: string, opts: { fresh?: boolean } = {}): Promise<CustomerType> {
@@ -48,11 +59,10 @@ export async function customerTypeFor(email: string, opts: { fresh?: boolean } =
   const e = email.trim().toLowerCase();
   const hit = typeCache.get(e);
   if (!opts.fresh && hit && Date.now() - hit.at < s["shop.customer_type_cache_minutes"] * 60_000) return hit.type;
-  const tag = s["shop.vip_customer_tag"].trim().toLowerCase();
   let type: CustomerType = "normal";
   try {
     const tags = await (await getShopCatalogSource()).customerTags(e);
-    type = tags?.some((t) => t.trim().toLowerCase() === tag) ? "vip" : "normal";
+    type = isVip(tags, s["shop.vip_customer_tag"]) ? "vip" : "normal";
   } catch {
     return "normal"; // not cached, so the next request asks Shopify again
   }

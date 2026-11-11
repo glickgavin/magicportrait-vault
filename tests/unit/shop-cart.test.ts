@@ -143,3 +143,15 @@ describe("the shop stays hidden by default", () => {
     expect(canSeeShop({ enabled: false, superUserPreview: false }, { isSuperUser: true })).toBe(false);
   });
 });
+
+describe("VIP tags", () => {
+  it("accepts one tag or several separated by commas, in any case", async () => {
+    const { isVip, vipTags } = await import("@/lib/shop/index");
+    expect(vipTags("VIP, member-active ,")).toEqual(["vip", "member-active"]);
+    expect(isVip(["Member-Active", "newsletter"], "VIP, member-active")).toBe(true);
+    expect(isVip(["vip"], "VIP")).toBe(true);
+    expect(isVip(["VIP, member-active"], "VIP")).toBe(false);
+    expect(isVip(["newsletter"], "VIP, member-active")).toBe(false);
+    expect(isVip(null, "VIP")).toBe(false);
+  });
+});

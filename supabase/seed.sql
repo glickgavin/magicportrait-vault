@@ -124,7 +124,7 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('shop.product_cache_minutes', '5'::jsonb, 'number', 'shop', 'Product cache (minutes)', null, null, 'seed', now()),
   ('shop.discount_code_normal', '"SITEWIDE OFF"'::jsonb, 'text', 'shop', 'Discount code: normal customers', 'A Shopify discount code limited to the Store collection. Empty: no discount.', null, 'seed', now()),
   ('shop.discount_code_vip', '""'::jsonb, 'text', 'shop', 'Discount code: VIP customers', 'Empty: VIPs get the normal code.', null, 'seed', now()),
-  ('shop.vip_customer_tag', '"VIP"'::jsonb, 'text', 'shop', 'VIP customer tag', 'The Shopify customer tag that marks a VIP.', null, 'seed', now()),
+  ('shop.vip_customer_tag', '"VIP"'::jsonb, 'text', 'shop', 'VIP customer tags', 'The Shopify customer tags that mark a VIP, separated by commas, e.g. VIP, member-active. A customer with any one of them is a VIP (any case).', null, 'seed', now()),
   ('shop.discount_label_normal', '"Member price"'::jsonb, 'text', 'shop', 'Discount label: normal', null, null, 'seed', now()),
   ('shop.discount_label_vip', '"VIP price"'::jsonb, 'text', 'shop', 'Discount label: VIP', null, null, 'seed', now()),
   ('shop.default_min_short_side_px', '1000'::jsonb, 'number', 'shop', 'Default smallest picture for a size (short side, px)', 'Used when a variant has no mmp_shop.min_short_side_px.', null, 'seed', now()),

@@ -248,7 +248,7 @@ export const REGISTRY = {
   "shop.product_cache_minutes": num("shop", 5, { label: "Product cache (minutes)", min: 0, max: 60 }),
   "shop.discount_code_normal": text("shop", "SITEWIDE OFF", { label: "Discount code: normal customers", description: "A Shopify discount code limited to the Store collection. Empty: no discount.", max: 60 }),
   "shop.discount_code_vip": text("shop", "", { label: "Discount code: VIP customers", description: "Empty: VIPs get the normal code.", max: 60 }),
-  "shop.vip_customer_tag": text("shop", "VIP", { label: "VIP customer tag", description: "The Shopify customer tag that marks a VIP.", allowEmpty: false, max: 60 }),
+  "shop.vip_customer_tag": text("shop", "VIP", { label: "VIP customer tags", description: "The Shopify customer tags that mark a VIP, separated by commas, e.g. VIP, member-active. A customer with any one of them is a VIP (any case).", allowEmpty: false, max: 300 }),
   "shop.discount_label_normal": text("shop", "Member price", { label: "Discount label: normal", allowEmpty: false, max: 40 }),
   "shop.discount_label_vip": text("shop", "VIP price", { label: "Discount label: VIP", allowEmpty: false, max: 40 }),
   "shop.default_min_short_side_px": num("shop", 1000, { label: "Default smallest picture for a size (short side, px)", description: "Used when a variant has no mmp_shop.min_short_side_px.", min: 100, max: 20000 }),
