@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { withPending, type PendingLines } from "@/components/shop/CartView";
-import { mapLimit, opName } from "@/lib/perf";
+import { afterResponse, mapLimit, opName } from "@/lib/perf";
 
 type Cart = Parameters<typeof withPending>[0];
 const line = (o: Partial<Cart["lines"][number]> = {}) =>
@@ -49,5 +49,12 @@ describe("perf helpers", () => {
     });
     expect(out).toEqual(["0:5", "1:1", "2:4", "3:2", "4:3", "5:0"]);
     expect(most).toBe(2);
+  });
+  it("afterResponse runs the work at once outside a request (scripts, crons in tests)", async () => {
+    let ran = false;
+    await afterResponse(async () => {
+      ran = true;
+    });
+    expect(ran).toBe(true);
   });
 });

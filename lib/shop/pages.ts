@@ -138,7 +138,8 @@ function ideaView(i: Idea, pct: number | null): IdeaView | null {
 
 /** Product ideas for one of their pictures; null when the picture isn't theirs. */
 export async function ideasData(user: SessionUser, page: ShopPage, imageId: string) {
-  // The picture, the pricing and the catalog side by side (pictureFor and listPictures share one read per request).
+  // The picture, the pricing, the catalog and the "Change picture" strip all side by side.
+  const listP = listPictures(user.email).catch(() => ({ portraits: [], photos: [], partial: true }));
   const [pic, s, pricing, catalog] = await Promise.all([
     pictureFor(user.email, imageId),
     getSettings(["shop.top_picks_count", "shop.change_strip_count", "shop.cart_line_max_qty"] as const),
@@ -157,7 +158,7 @@ export async function ideasData(user: SessionUser, page: ShopPage, imageId: stri
   const n = s["shop.top_picks_count"];
   const top = ideas.slice(0, n);
   const rest = ideas.slice(n);
-  const list = await listPictures(user.email).catch(() => ({ portraits: [], photos: [], partial: true }));
+  const list = await listP;
   const others = await Promise.all(
     [...list.portraits, ...list.photos]
       .filter((p) => p.id !== pic.id)

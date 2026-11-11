@@ -58,6 +58,10 @@ async function mirrorPictures(email: string, props: MirrorImageProps, keepMs: nu
   return value;
 }
 
+function portraitsOf(profile: Awaited<ReturnType<typeof getVaultProfile>>) {
+  return profile.sessions.flatMap((g) => g.portraits.map((p) => ({ imageId: p.imageId, sessionId: p.sessionId, imageUrl: p.imageUrl, width: p.width, height: p.height, createdAt: p.createdAt, ordered: p.ordered })));
+}
+
 /** Everything one person can pick from. Memoised per request; the outside reads run side by side. */
 export const listPictures = cache(async (email: string): Promise<PictureList> => {
   const s = await getSettings([
@@ -85,7 +89,7 @@ export const listPictures = cache(async (email: string): Promise<PictureList> =>
     newUploadsFor(email),
   ]);
   if (profile.unavailable.length) partial = true;
-  const portraits = profile.sessions.flatMap((g) => g.portraits.map((p) => ({ imageId: p.imageId, sessionId: p.sessionId, imageUrl: p.imageUrl, width: p.width, height: p.height, createdAt: p.createdAt, ordered: p.ordered })));
+  const portraits = portraitsOf(profile);
   const orderedTiles = orderedPhotoTiles(profile.rawOrders, hosts);
 
   // Each dropped tile's file is looked up once per server, several at a time.
@@ -123,6 +127,16 @@ export async function pictureFor(email: string, id: string): Promise<ShopImage |
   if (id.startsWith("n_")) {
     const r = await newUploadById(email, id.slice(2));
     return r ? { id, kind: "new_upload", source: { storagePath: r.storage_path! }, width: r.width, height: r.height, createdAt: r.created_at, ordered: false, ref: null, sessionId: null } : null;
+  }
+  if (id.startsWith("p_")) {
+    // A portrait is found in the person's own portraits alone: no need to read the mirror's photos.
+    const found = buildImageList({ portraits: portraitsOf(await getVaultProfile(email)), pastUploads: [], photoTiles: [], newUploads: [] }).portraits.find((i) => i.id === id);
+    if (!found) return null;
+    if ((!found.width || !found.height) && "url" in found.source) {
+      const k = (await knownSizes(email, [found.source.url])).get(found.source.url);
+      if (k) [found.width, found.height] = [k.width, k.height];
+    }
+    return found;
   }
   const list = await listPictures(email);
   return [...list.portraits, ...list.photos].find((i) => i.id === id) ?? null;

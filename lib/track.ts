@@ -1,4 +1,5 @@
 import "server-only";
+import { afterResponse } from "@/lib/perf";
 import { PostHog } from "posthog-node";
 import { EVENTS, isEventName, scrubProps, type EventName } from "@/lib/events";
 import { db } from "@/lib/db/client";
@@ -64,11 +65,14 @@ export async function track(event: EventName, props: Record<string, unknown> = {
 
   const client = posthog();
   if (client) {
-    try {
-      await client.captureImmediate({ distinctId, event, properties });
-    } catch (e) {
-      console.warn(`[track] posthog failed for ${event}: ${(e as Error).message}`);
-    }
+    // Sent after the response, so a tap never waits for PostHog (outside a request it's sent now).
+    await afterResponse(async () => {
+      try {
+        await client.captureImmediate({ distinctId, event, properties });
+      } catch (e) {
+        console.warn(`[track] posthog failed for ${event}: ${(e as Error).message}`);
+      }
+    });
   }
 
   let result: TrackResult = { activityId: null, outboxId: null };
@@ -93,8 +97,12 @@ export async function track(event: EventName, props: Record<string, unknown> = {
       const d = data as { activity_id: number; outbox_id: string | null };
       result = { activityId: d.activity_id, outboxId: d.outbox_id };
       if (d.outbox_id && outbox?.status !== "skipped") {
-        const { flushRow } = await import("@/lib/klaviyo");
-        await flushRow(d.outbox_id).catch(() => undefined); // send at once; cron retries
+        const outboxId = d.outbox_id;
+        // Sent straight after the response; the cron retries anything that fails.
+        await afterResponse(async () => {
+          const { flushRow } = await import("@/lib/klaviyo");
+          await flushRow(outboxId).catch(() => undefined);
+        });
       }
     } catch (e) {
       console.error(`[track] activity_log write failed for ${event} (${maskEmail(email)}): ${(e as Error).message}`);
