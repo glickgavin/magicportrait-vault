@@ -39,6 +39,8 @@ export type ShopProduct = {
   page: string | null;
   /** `mmp_shop.occasions`, as stored; [] when unset. */
   occasions: string[];
+  /** `mmp_shop.short_description`: the shop's own short text (lines starting "- " are bullets); null when unset. */
+  shortDescription?: string | null;
   /** `mmp_shop.template` JSON text; null when unset. */
   template: { value: string; updatedAt: string | null } | null;
   variants: ShopVariant[];

@@ -382,6 +382,10 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 - **Smallest picture:** `shop.default_min_short_side_px` set to 512 (Gavin, 11 Nov): 95% of portraits are 512 × 512 and the live tiles print from them. When nothing fits, the Ideas page now says whether the picture is too small ("This picture is 512 px across, and our products need at least … px") or the wrong shape.
 - **Editor change:** a template's background and overlay may now be Shopify Files (not the product's gallery), so the studio photos never show on product pages. Settings › Shop › the template editor lists them beside the product's photos, and Publish accepts only the product's own photos or the ones its saved template already uses.
 
+## Product sheet copy (11 Nov)
+- The sheet shows Shopify's description as paragraphs and bullet lists (`lib/shop/description.ts`, text only, never raw HTML).
+- New `mmp_shop.short_description` (multi-line text) wins over it: Gavin asked for 4 to 5 lines on a phone. Written for all 11 Store products from their existing descriptions, sizes and SKUs and measured at 390 px with the site font (4 lines each, 5 for Acrylic Print). The products' own descriptions were left as they are, because six of them are also on the Lovable, Shop and TikTok channels.
+
 ## Decisions (shop)
 - **Shop lines don't reuse portrait keys** (`_tile_id`, `_imagegen_session_id`, `_gelato_product_uid`…); they use `_shop_*` keys, so /redeem and the existing print pipelines can't pick them up. Changed from the first spec draft.
 - **A size with no print rules is dropped, not the whole product;** the product is hidden only when no available size has rules. Settings lists the sizes that need rules.

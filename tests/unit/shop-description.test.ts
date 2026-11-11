@@ -24,3 +24,9 @@ describe("product descriptions from Shopify", () => {
     expect(descriptionBlocks("", "")).toEqual([]);
   });
 });
+
+describe("the shop's short description", () => {
+  it("is written as plain lines, with '- ' lines as bullets", () => {
+    expect(descriptionBlocks(null, "Your portrait on a mug.\n- Dishwasher safe\n- 11 oz")).toEqual([{ kind: "p", text: "Your portrait on a mug." }, { kind: "list", items: ["Dishwasher safe", "11 oz"] }]);
+  });
+});

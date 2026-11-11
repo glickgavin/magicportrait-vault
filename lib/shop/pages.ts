@@ -99,7 +99,8 @@ function ideaView(i: Idea, pct: number | null): IdeaView | null {
   return {
     handle: i.entry.product.handle,
     title: i.entry.product.title,
-    description: descriptionBlocks(i.entry.product.descriptionHtml, i.entry.product.description),
+    // The shop's own short text when it has one, else the product's full Shopify description.
+    description: i.entry.product.shortDescription ? descriptionBlocks(null, i.entry.product.shortDescription) : descriptionBlocks(i.entry.product.descriptionHtml, i.entry.product.description),
     position: i.entry.product.position,
     occasions: i.entry.product.occasions,
     template,

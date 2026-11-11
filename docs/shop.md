@@ -87,6 +87,7 @@ Everything about a product lives in Shopify, including its sizes and the rules f
 | Product images, including a photo of the blank product | The product's media | The template editor picks the blank photo from these |
 | Which page: Gifts, Products or All | Product metafield `mmp_shop.page` | All shows it on both pages |
 | Occasions, e.g. Christmas, Birthday, For Mom | Product metafield `mmp_shop.occasions`, a list | The Gifts page's chips and sections |
+| Short description for the product sheet | Product metafield `mmp_shop.short_description` (multi-line text: a sentence or two, then `- ` lines for bullets; about 4 to 5 lines on a phone) | The product sheet. Empty: the product's own Shopify description, shown with its paragraphs and lists. Kept separate so the full description on other sales channels never changes |
 | Product type, e.g. Mugs, Wall art | Shopify's own Product type field | The Products page's chips and sections |
 | Maker, maker's code, print size and fit rules | Variant metafields, namespace `mmp_shop` | See Product rules |
 | Where the picture sits on the blank photo | Product metafield `mmp_shop.template` | Saved by the template editor in Settings |

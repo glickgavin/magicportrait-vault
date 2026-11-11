@@ -17,6 +17,7 @@ const Q_PRODUCTS = `query ShopStoreProducts($id: ID!, $after: String, $ns: Strin
         media(first: 20) { nodes { id alt mediaContentType preview { image { url width height } } } }
         page: metafield(namespace: $ns, key: "page") { value }
         occasions: metafield(namespace: $ns, key: "occasions") { value }
+        shortDescription: metafield(namespace: $ns, key: "short_description") { value }
         template: metafield(namespace: $ns, key: "template") { value updatedAt }
         variants(first: 100) {
           nodes {
@@ -119,6 +120,7 @@ type Raw = {
         media: { nodes: { id: string; alt: string | null; mediaContentType: string; preview: { image: { url: string; width: number | null; height: number | null } | null } | null }[] };
         page: { value: string } | null;
         occasions: { value: string } | null;
+        shortDescription: { value: string } | null;
         template: { value: string; updatedAt: string | null } | null;
         variants: {
           nodes: {
@@ -191,6 +193,7 @@ export class ShopCatalogLive implements ShopCatalogSource {
             .map((m) => ({ id: m.id, url: m.preview!.image!.url, alt: m.alt, width: m.preview!.image!.width, height: m.preview!.image!.height })),
           page: p.page?.value ?? null,
           occasions: parseList(p.occasions?.value),
+          shortDescription: p.shortDescription?.value?.trim() || null,
           template: p.template ? { value: p.template.value, updatedAt: p.template.updatedAt } : null,
           variants: p.variants.nodes.map((v) => ({
             id: v.id,

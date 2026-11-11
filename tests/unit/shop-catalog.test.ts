@@ -109,7 +109,7 @@ describe("writes stay inside mmp_shop", () => {
   });
   it("defines every field in the namespace, products and variants", () => {
     const specs = fieldSpecs(["Christmas"]);
-    expect(specs.filter((s) => s.ownerType === "PRODUCT").map((s) => s.key)).toEqual(["page", "occasions", "template"]);
+    expect(specs.filter((s) => s.ownerType === "PRODUCT").map((s) => s.key)).toEqual(["page", "occasions", "short_description", "template"]);
     expect(specs.find((s) => s.key === "occasions")?.choices).toEqual(["Christmas"]);
     expect(fieldSpecs([]).find((s) => s.key === "occasions")?.choices).toBeUndefined();
   });

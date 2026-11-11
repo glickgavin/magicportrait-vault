@@ -13,6 +13,7 @@ export function fieldSpecs(occasionChoices: string[]): FieldDefinitionSpec[] {
   return [
     { ownerType: "PRODUCT", key: "page", name: "Shop page", type: "single_line_text_field", description: "Which My Magic Portraits page shows this product: Gifts, Products or All (both).", choices: [...PAGE_CHOICES] },
     { ownerType: "PRODUCT", key: "occasions", name: "Shop occasions", type: "list.single_line_text_field", description: "Occasions this product suits, for the Gifts page.", choices: occasionChoices.length ? occasionChoices : undefined },
+    { ownerType: "PRODUCT", key: "short_description", name: "Shop short description", type: "multi_line_text_field", description: "What My Magic Portraits shows on the product sheet instead of the full description: a sentence or two, then lines starting with \"- \" for bullets. About 4 to 5 lines on a phone. Empty: the product's own description." },
     { ownerType: "PRODUCT", key: "template", name: "Shop preview template", type: "json", description: "Where the picture sits on the blank product photo. Set by the template editor in My Magic Portraits Settings." },
     { ownerType: "PRODUCTVARIANT", key: "maker", name: "Shop maker", type: "single_line_text_field", description: "Who makes it: gelato, prodigi or in_house.", choices: [...MAKERS] },
     { ownerType: "PRODUCTVARIANT", key: "maker_sku", name: "Shop maker's product code", type: "single_line_text_field", description: "The maker's product code, e.g. a Gelato product uid or a Prodigi SKU." },
