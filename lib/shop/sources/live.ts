@@ -76,6 +76,31 @@ const Q_DISCOUNT = `query ShopDiscountByCode($code: String!) {
   }
 }`;
 
+const Q_AUTOMATIC = `query ShopAutomaticDiscount($q: String!) {
+  discountNodes(first: 10, query: $q) {
+    nodes {
+      discount {
+        __typename
+        ... on DiscountAutomaticBasic {
+          title status startsAt endsAt summary
+          combinesWith { productDiscounts orderDiscounts shippingDiscounts }
+          customerGets {
+            value {
+              __typename
+              ... on DiscountPercentage { percentage }
+              ... on DiscountAmount { amount { amount currencyCode } }
+            }
+            items {
+              __typename
+              ... on DiscountCollections { collections(first: 20) { nodes { id } } }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
+
 const Q_CUSTOMER = `query ShopCustomerTags($q: String!) { customers(first: 1, query: $q) { nodes { tags } } }`;
 
 type Raw = {
@@ -271,11 +296,22 @@ export class ShopCatalogLive implements ShopCatalogSource {
         };
       } | null;
     };
+    type C = NonNullable<N["codeDiscountNodeByCode"]>["codeDiscount"] & { summary?: string };
     const d = await this.gql<N>(Q_DISCOUNT, { code });
-    const c = d.codeDiscountNodeByCode?.codeDiscount;
+    let c: C | undefined = d.codeDiscountNodeByCode?.codeDiscount;
+    let automatic = false;
+    if (!c) {
+      // Not a code: it may be an automatic discount, named by its title (e.g. a membership discount for customer segments).
+      const q = `method:automatic AND title:"${code.replace(/["\\]/g, "")}"`;
+      const a = await this.gql<{ discountNodes: { nodes: { discount: C }[] } }>(Q_AUTOMATIC, { q });
+      c = a.discountNodes.nodes.map((n) => n.discount).find((x) => x.__typename === "DiscountAutomaticBasic" && (x.title ?? "").trim().toLowerCase() === code.trim().toLowerCase());
+      automatic = Boolean(c);
+    }
     if (!c) return null;
     const items = c.customerGets?.items;
     return {
+      automatic,
+      summary: c.summary ?? null,
       code,
       status: c.status ?? "UNKNOWN",
       title: c.title ?? c.__typename,

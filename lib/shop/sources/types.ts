@@ -57,6 +57,10 @@ export type DiscountInfo = {
   combinesWithShipping: boolean;
   startsAt: string | null;
   endsAt: string | null;
+  /** An automatic discount (found by its title, no code to apply): Shopify applies it itself at checkout. */
+  automatic?: boolean;
+  /** Shopify's own one-line summary, e.g. "65% off entire order • For 5 customer segments". */
+  summary?: string | null;
 };
 
 export type WriteResult = { ok: true } | { ok: false; reason: string };

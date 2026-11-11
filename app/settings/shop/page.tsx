@@ -24,6 +24,9 @@ function discountLine(info: DiscountInfo | null, code: string | null, collection
   const scope = info.collections === null ? "everything" : info.collections.includes(collectionGid) ? "the Store collection" : "other products (not the Store collection)";
   const combines = info.combinesWithProduct || info.combinesWithOrder ? "Combines with other discounts." : "Doesn't combine with other discounts.";
   const tone = info.status !== "ACTIVE" ? "amber" : info.collections !== null && !info.collections.includes(collectionGid) ? "amber" : "green";
+  if (info.automatic) {
+    return { tone, text: `Automatic discount (no code), ${info.status === "ACTIVE" ? "active" : info.status.toLowerCase()}: ${info.summary ?? `${value} on ${scope}`}${info.endsAt ? `, ends ${info.endsAt.slice(0, 10)}` : ""}. Prices here show it; Shopify applies it at checkout when it recognises the customer as one of its segments.` };
+  }
   return { tone, text: `${info.status === "ACTIVE" ? "Active" : info.status.toLowerCase()}: ${value} on ${scope}${info.endsAt ? `, ends ${info.endsAt.slice(0, 10)}` : ", no end date"}. ${combines}` };
 }
 

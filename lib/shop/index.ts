@@ -93,6 +93,13 @@ async function discountInfoCached(code: string | null): Promise<DiscountInfo | n
   return info;
 }
 
+/** The codes to put on a Shopify cart: none for an automatic discount (Shopify applies that itself). */
+export async function cartCodesFor(code: string | null): Promise<string[]> {
+  if (!code) return [];
+  const info = await discountInfoCached(code);
+  return info?.automatic ? [] : [code];
+}
+
 /** The code and label for a customer type; an empty VIP code falls back to the normal one. */
 export async function discountSettingFor(type: CustomerType): Promise<{ code: string | null; label: string }> {
   const s = await getSettings(["shop.discount_code_normal", "shop.discount_code_vip", "shop.discount_label_normal", "shop.discount_label_vip"] as const);

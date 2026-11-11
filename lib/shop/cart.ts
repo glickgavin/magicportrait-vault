@@ -8,7 +8,7 @@ import { maskEmail } from "@/lib/utils";
 import type { CatalogEntry, SellableVariant } from "./catalog";
 import { cropAllowed, fitVariant, target, type Rect } from "./fit";
 import { discounted } from "./money";
-import { customerTypeFor, discountSettingFor, getCatalog, pricingFor, type CustomerType } from "./index";
+import { cartCodesFor, customerTypeFor, discountSettingFor, getCatalog, pricingFor, type CustomerType } from "./index";
 import { cartAttributes, cartIdFromOrder, lineAttributes, sameAttrs } from "./order-lines";
 import { ensureSize, pictureBytes, pictureFor } from "./pictures";
 import { renderPreview } from "./render";
@@ -213,7 +213,7 @@ async function syncShopify(email: string, cart: ShopCartRow, checked: Checked[],
     };
   };
   const attrs = cartAttributes({ cartId: cart.id, gift });
-  const codes = cart.discount_code ? [cart.discount_code] : [];
+  const codes = await cartCodesFor(cart.discount_code);
   let remote = cart.shopify_cart_id ? await src.get(cart.shopify_cart_id).catch(() => null) : null;
   if (!remote) {
     if (!usable.length) throw new Error("empty");
