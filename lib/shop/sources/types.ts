@@ -29,6 +29,8 @@ export type ShopProduct = {
   handle: string;
   title: string;
   description: string;
+  /** Shopify's formatted description; shown as paragraphs and lists, never as raw HTML. */
+  descriptionHtml?: string | null;
   productType: string;
   status: "ACTIVE" | "DRAFT" | "ARCHIVED" | "UNLISTED";
   position: number; // order in the Store collection, from 0

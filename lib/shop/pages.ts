@@ -5,6 +5,7 @@ import type { SessionUser } from "@/lib/auth/types";
 import { getSettings } from "@/lib/settings";
 import { canSeeShop } from "./access";
 import { forPage, type CatalogEntry } from "./catalog";
+import { descriptionBlocks, type DescriptionBlock } from "./description";
 import { ideasFor, target, type Idea } from "./fit";
 import { getCatalog, pricingFor, type CustomerType } from "./index";
 import { discounted, lowest } from "./money";
@@ -90,7 +91,7 @@ export type VariantView = {
   minShortSidePx: number;
   maxCropPct: number;
 };
-export type IdeaView = { handle: string; title: string; description: string; position: number; occasions: string[]; template: Template; from: string; fromDiscounted: string | null; variants: VariantView[] };
+export type IdeaView = { handle: string; title: string; description: DescriptionBlock[]; position: number; occasions: string[]; template: Template; from: string; fromDiscounted: string | null; variants: VariantView[] };
 
 function ideaView(i: Idea, pct: number | null): IdeaView | null {
   const template = parseTemplate(i.entry.product.template?.value);
@@ -98,7 +99,7 @@ function ideaView(i: Idea, pct: number | null): IdeaView | null {
   return {
     handle: i.entry.product.handle,
     title: i.entry.product.title,
-    description: i.entry.product.description,
+    description: descriptionBlocks(i.entry.product.descriptionHtml, i.entry.product.description),
     position: i.entry.product.position,
     occasions: i.entry.product.occasions,
     template,

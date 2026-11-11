@@ -142,7 +142,15 @@ function ProductSheet({ page, idea, picture, pricing, maxQty, onClose }: { page:
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="animate-fade fixed inset-0 z-50 bg-black/50" />
-        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[94dvh] flex-col overflow-y-auto rounded-t-[24px] bg-white pb-6 shadow-xl lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[920px] lg:max-w-[calc(100vw-48px)] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[24px]" aria-describedby={undefined}>
+        <Dialog.Content
+          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[94dvh] flex-col overflow-y-auto rounded-t-[24px] bg-white pb-6 shadow-xl outline-none lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[920px] lg:max-w-[calc(100vw-48px)] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[24px]"
+          aria-describedby={undefined}
+          // Focus the sheet itself when it opens, not the close button (whose focus ring looked like a stray pink box).
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement | null)?.focus();
+          }}
+        >
           <div aria-hidden="true" className="mx-auto mt-2.5 h-[5px] w-10 rounded-full bg-black/15 lg:hidden" />
           <Dialog.Close asChild>
             <button type="button" aria-label={t("shop.close")} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-[12px]">
@@ -164,7 +172,24 @@ function ProductSheet({ page, idea, picture, pricing, maxQty, onClose }: { page:
               <div className="flex flex-col gap-1">
                 <Dialog.Title className="text-[22px] font-extrabold leading-7 lg:text-[28px]">{idea.title}</Dialog.Title>
                 <Price price={v.price} discounted={v.discounted} currency={pricing.currency} size="lg" />
-                {idea.description && <p className="text-[14px] leading-6 text-ink-2">{idea.description}</p>}
+                {idea.description.length > 0 && (
+                  <div className="mt-1 flex flex-col gap-2.5 text-[14px] leading-[22px] text-ink-2" data-testid="product-description">
+                    {idea.description.map((b, i) =>
+                      b.kind === "p" ? (
+                        <p key={i}>{b.text}</p>
+                      ) : (
+                        <ul key={i} className="flex flex-col gap-1.5">
+                          {b.items.map((item, j) => (
+                            <li key={j} className="flex gap-2.5">
+                              <span aria-hidden="true" className="mt-[9px] h-1.5 w-1.5 flex-none rounded-full bg-pink-link/70" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ),
+                    )}
+                  </div>
+                )}
               </div>
               {multi && (
                 <fieldset>

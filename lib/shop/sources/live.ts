@@ -13,7 +13,7 @@ const Q_PRODUCTS = `query ShopStoreProducts($id: ID!, $after: String, $ns: Strin
     products(first: 50, after: $after, sortKey: COLLECTION_DEFAULT) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        id legacyResourceId handle title description productType status
+        id legacyResourceId handle title description descriptionHtml productType status
         media(first: 20) { nodes { id alt mediaContentType preview { image { url width height } } } }
         page: metafield(namespace: $ns, key: "page") { value }
         occasions: metafield(namespace: $ns, key: "occasions") { value }
@@ -113,6 +113,7 @@ type Raw = {
         handle: string;
         title: string;
         description: string;
+        descriptionHtml: string | null;
         productType: string;
         status: ShopProduct["status"];
         media: { nodes: { id: string; alt: string | null; mediaContentType: string; preview: { image: { url: string; width: number | null; height: number | null } | null } | null }[] };
@@ -181,6 +182,7 @@ export class ShopCatalogLive implements ShopCatalogSource {
           handle: p.handle,
           title: p.title,
           description: p.description ?? "",
+          descriptionHtml: p.descriptionHtml ?? null,
           productType: p.productType ?? "",
           status: p.status,
           position: out.length,
