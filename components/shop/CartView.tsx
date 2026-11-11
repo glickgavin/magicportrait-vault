@@ -60,8 +60,8 @@ export function CartView({ cart: saved, maxQty, maxMessage, label }: { cart: Car
   const router = useRouter();
   const [pending, setPending] = useState<PendingLines>({});
   const [refreshing, startRefresh] = useTransition();
-  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const sending = useRef(0);
+  const timers = useRef<Record<string, { timer: ReturnType<typeof setTimeout>; quantity: number | null }>>({});
+  const sending = useRef(new Set<Promise<void>>());
   const cart = withPending(saved, pending);
   const [giftFor, setGiftFor] = useState(cart.giftFor);
   const [message, setMessage] = useState(cart.giftMessage);
@@ -72,24 +72,29 @@ export function CartView({ cart: saved, maxQty, maxMessage, label }: { cart: Car
 
   // The server's answer replaces the guesses once nothing else is waiting to be saved.
   useEffect(() => {
-    if (!sending.current && !Object.keys(timers.current).length) setPending({});
+    if (!sending.current.size && !Object.keys(timers.current).length) setPending({});
   }, [saved]);
-  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
+  useEffect(() => () => Object.values(timers.current).forEach((w) => clearTimeout(w.timer)), []);
 
-  async function send(id: string, quantity: number | null) {
+  function send(id: string, quantity: number | null): Promise<void> {
     delete timers.current[id];
-    sending.current++;
-    const r = await fetch(`/api/shop/cart/lines/${id}`, quantity === null ? { method: "DELETE" } : { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ quantity }) }).catch(() => null);
-    sending.current--;
-    if (!r?.ok) {
-      setPending((p) => {
-        const next = { ...p };
-        delete next[id];
-        return next;
-      });
-      setState((st) => ({ ...st, error: t("shop.checkoutErrors.other") }));
-    }
-    startRefresh(() => router.refresh());
+    const p = (async () => {
+      const r = await fetch(`/api/shop/cart/lines/${id}`, quantity === null ? { method: "DELETE" } : { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ quantity }) }).catch(() => null);
+      if (!r?.ok) {
+        setPending((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setState((st) => ({ ...st, error: t("shop.checkoutErrors.other") }));
+      }
+    })();
+    sending.current.add(p);
+    void p.finally(() => {
+      sending.current.delete(p);
+      startRefresh(() => router.refresh());
+    });
+    return p;
   }
 
   /** Shows the change at once; quick taps on + or − are saved together a moment later. */
@@ -97,8 +102,17 @@ export function CartView({ cart: saved, maxQty, maxMessage, label }: { cart: Car
     const next = { ...pending, [id]: quantity };
     setPending(next);
     announceCartCount(withPending(saved, next).count);
-    clearTimeout(timers.current[id]);
-    timers.current[id] = setTimeout(() => void send(id, quantity), quantity === null ? 0 : 350);
+    clearTimeout(timers.current[id]?.timer);
+    timers.current[id] = { quantity, timer: setTimeout(() => void send(id, quantity), quantity === null ? 0 : 350) };
+  }
+
+  /** Saves every change still waiting, so checkout reads the cart as the customer sees it. */
+  async function saveAll() {
+    for (const [id, w] of Object.entries(timers.current)) {
+      clearTimeout(w.timer);
+      void send(id, w.quantity);
+    }
+    await Promise.all([...sending.current]);
   }
 
   async function checkout() {
@@ -107,6 +121,7 @@ export function CartView({ cart: saved, maxQty, maxMessage, label }: { cart: Car
       return;
     }
     setState({ busy: true, error: null, nameError: false });
+    await saveAll();
     const r = await fetch("/api/shop/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cart.hasGift ? { giftFor, giftMessage: message } : {}) });
     const b = (await r.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string };
     if (r.ok && b.checkoutUrl) {
@@ -254,7 +269,7 @@ export function CartView({ cart: saved, maxQty, maxMessage, label }: { cart: Car
             </div>
             {summary.atCheckout && <span className="text-[13px] font-bold text-pink-dark">{t("shop.discountAtCheckout", { label })}</span>}
             <span className="text-[13px] text-ink-2">{cart.figures || cart.pct ? t("shop.shippingNote") : t("shop.pricesNote")}</span>
-            <button type="button" disabled={state.busy || blocked || unsaved} onClick={() => void checkout()} className="bg-primary-gradient shadow-primary mt-3 h-13 rounded-[12px] py-3.5 text-[16px] font-extrabold text-white disabled:opacity-50">
+            <button type="button" disabled={state.busy || blocked} onClick={() => void checkout()} className="bg-primary-gradient shadow-primary mt-3 h-13 rounded-[12px] py-3.5 text-[16px] font-extrabold text-white disabled:opacity-50">
               {state.busy ? t("shop.checkingOut") : t("shop.checkout")}
             </button>
             {state.error && (
