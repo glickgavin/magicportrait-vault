@@ -7,7 +7,7 @@ import { fieldSpecs, normalisePage, pageLabel } from "./fields";
 import { discountInfo, discountSettingFor, getCatalog, invalidateCatalog } from "./index";
 import { getShopCatalogSource } from "./sources";
 import type { DiscountInfo, ShopFieldDefinition } from "./sources/types";
-import { templateSchema, type Template } from "./template";
+import { parseTemplate, templateSchema, type Template } from "./template";
 
 /** Settings › Shop (docs/shop.md). Every write here is CLAUDE.md allowed write 5: `mmp_shop` only. */
 
@@ -202,11 +202,14 @@ export async function publishTemplate(actor: { email: string }, input: { product
   if (input.template.overlay && input.template.overlay.media_id === input.template.background.media_id) {
     return { ok: false, status: 422, error: "The overlay is the same photo as the background, so it would cover the customer's picture. Choose no overlay." };
   }
-  const media = new Map(entry.product.media.map((m) => [m.id, m]));
+  // Photos allowed: the product's own, plus the ones its saved template already uses (studio photos kept
+  // in Shopify Files, so they stay out of the product's gallery). Nothing else, so no outside image can be set here.
+  const allowed = new Map(entry.product.media.map((m) => [m.id, m.url]));
+  const saved = parseTemplate(entry.product.template?.value);
+  for (const m of [saved?.background, saved?.overlay]) if (m) allowed.set(m.media_id, m.url);
   for (const [what, m] of [["background", input.template.background], ["overlay", input.template.overlay]] as const) {
     if (!m) continue;
-    const own = media.get(m.media_id);
-    if (!own || own.url !== m.url) return { ok: false, status: 400, error: `The ${what} must be one of this product's photos in Shopify.` };
+    if (allowed.get(m.media_id) !== m.url) return { ok: false, status: 400, error: `The ${what} must be one of this product's photos in Shopify, or the one its template already uses.` };
   }
   const t: Template = { ...input.template, updated_at: new Date().toISOString() };
   const r = await (await getShopCatalogSource()).setProductTemplate(input.productId, ns, JSON.stringify(t));

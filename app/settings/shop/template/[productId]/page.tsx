@@ -38,6 +38,12 @@ export default async function ShopTemplatePage({ params }: { params: Promise<{ p
     const t = target(r.rules);
     return [{ id: v.id, title: v.title, aspect: t.w / t.h, placement: r.rules.placement, background: r.rules.background }];
   });
+  // The product's photos, plus any studio photo the saved template uses from Shopify Files.
+  const published = parseTemplate(p.template?.value);
+  const media = p.media.map((m) => ({ id: m.id, url: m.url, alt: m.alt, width: m.width ?? 1000, height: m.height ?? 1000 }));
+  for (const [m, alt] of [[published?.background, "Studio photo"], [published?.overlay, "Studio overlay"]] as const) {
+    if (m && !media.some((x) => x.id === m.media_id)) media.push({ id: m.media_id, url: m.url, alt, width: m.w, height: m.h });
+  }
   return (
     <div>
       <TrackPageView event="settings_viewed" props={{ section: "shop_template" }} />
@@ -46,13 +52,13 @@ export default async function ShopTemplatePage({ params }: { params: Promise<{ p
       </Link>
       <h1 className="mt-1 text-[30px] font-extrabold tracking-tight">Preview template: {p.title}</h1>
       <p className="text-[15px] text-ink-2">Pick the photo of the blank product, then drag the corners to where the picture goes. It stays a draft on this computer until you publish it to Shopify.</p>
-      {p.media.length === 0 ? (
+      {media.length === 0 ? (
         <p role="alert" className="mt-4 rounded-[14px] bg-[#fff1d6] p-4 text-[15px] text-[#7a4a00]">
           This product has no photos in Shopify. Add a photo of the blank product there first.
         </p>
       ) : (
         <div className="mt-5">
-          <ShopTemplateEditor productId={p.id} media={p.media.map((m) => ({ id: m.id, url: m.url, alt: m.alt, width: m.width ?? 1000, height: m.height ?? 1000 }))} published={parseTemplate(p.template?.value)} sizes={sizes} />
+          <ShopTemplateEditor productId={p.id} media={media} published={published} sizes={sizes} />
         </div>
       )}
     </div>

@@ -375,6 +375,11 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 - **PostHog funnel not created yet:** none of the shop events exist in PostHog until the shop is used, and a funnel on events PostHog hasn't seen would be empty. Its definition is in `docs/analytics.md`; add it to the dashboard after the first super-user preview.
 - **Settings › Shop › Shopify access** lists the four Admin permissions the shop needs, whether a Storefront token is set and whether the fulfilment secret is set.
 
+## Studio templates (11 Nov)
+- **Why:** the product previews are what sell the shop, and corners dragged onto stock photos never line up exactly. Each Store product now has a studio scene rendered in Blender (`scripts/mockups/`, docs/shop.md › Studio templates). Because the print area is known in 3D, the zone matches it to the pixel, the picture takes the product's real shading (`blend: multiply`), and the overlay adds the shine and clips the edges.
+- **Checked** through the shop's own `drawPreview` with a made-up picture for all 11 products, at draft and at final size.
+- **Editor change:** a template's background and overlay may now be Shopify Files (not the product's gallery), so the studio photos never show on product pages. Settings › Shop › the template editor lists them beside the product's photos, and Publish accepts only the product's own photos or the ones its saved template already uses.
+
 ## Decisions (shop)
 - **Shop lines don't reuse portrait keys** (`_tile_id`, `_imagegen_session_id`, `_gelato_product_uid`…); they use `_shop_*` keys, so /redeem and the existing print pipelines can't pick them up. Changed from the first spec draft.
 - **A size with no print rules is dropped, not the whole product;** the product is hidden only when no available size has rules. Settings lists the sizes that need rules.

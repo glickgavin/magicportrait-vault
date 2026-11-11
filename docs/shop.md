@@ -146,7 +146,32 @@ How it's drawn:
 
 The template is one JSON value (`lib/shop/template.ts`): `background` and `overlay` (a product photo's media id, URL and size), `zone` (`corners` with four points, or `wrap` with left, right, top, bottom, curve and spread), `mask` (none, rounded with a radius, circle) and `blend` (normal, or multiply to let the product's shading show through). Coordinates are fractions of the background photo.
 
-The template editor in Settings works like the card template editor. A draft stays in the browser until Publish writes it to Shopify; Publish refuses any background or overlay that isn't one of the product's own Shopify photos. It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
+The template editor in Settings works like the card template editor. A draft stays in the browser until Publish writes it to Shopify; Publish refuses any background or overlay that isn't one of the product's own Shopify photos or one its saved template already uses (the studio photos below). It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
+
+### Studio templates
+
+Each Store product has a studio template made in Blender (`scripts/mockups/`), so the picture lines up with the product exactly instead of by dragged corners:
+
+- **Three renders per product:** the scene with the print area plain white (`base`), the print area black and glossy so only its shine shows (`gloss`), and the print area alone in white on black (`mask`).
+- **Background** (`<product>-base.jpg`): the base render, with the print area evened to white. The template uses `blend: multiply`, so the picture takes on the product's real shading.
+- **Overlay** (`<product>-overlay.webp`): clear except for the thin strip around the print area where the warped picture could spill over (redrawn from the scene) and the print area's own shine. A puzzle's overlay also carries its cut lines. Its files are small, about 15–50 KB.
+- **Zone:** four corners projected from the 3D print area (fitted from the mask behind acrylic, where refraction moves it), the mug's wrap fitted to its cylinder, and a circle mask for the ornament.
+- **Where they live:** in Shopify's Files (Content › Files), named `mmp-shop-<product>-base.jpg` and `-overlay.webp`, not in the product's own photos, so nothing changes on any product page. The editor lists them next to the product's photos and still lets a super user move the corners.
+- **Re-rendering:** `BLENDER_PY=<python with bpy> scripts/mockups/render.sh <out dir> 1200 64 [products]` (install bpy with `pip install bpy==5.3.0` in a venv). It also draws a check preview of each product with a made-up picture through `lib/shop/preview.ts`.
+
+| Product | Scene | Print shape of the zone |
+|---|---|---|
+| Acrylic Block | Standing on an oak table, a vase and candle behind | 5:7 |
+| Acrylic Square Block | The same, turned the other way | 1:1 |
+| Magic Poster | On an oak hanger above a sideboard | 3:4 |
+| Acrylic Print | On steel standoffs above a sideboard, seen at an angle | 3:4 |
+| Acrylic Glass Art | Floating on the wall above a sideboard | 2:3 |
+| Masterpiece | Black-edged foam board above a sideboard | 2:3 |
+| Magic Portrait Tile | A single black-edged tile above a sideboard | 1:1 |
+| Magic Pillow with Photo | On a linen sofa with a terracotta cushion | 1:1 |
+| Magic Mug with Photo | White mug with a black rim, inside and handle, on a cork coaster | 1:1 (one side) |
+| Magic Xmas Ornaments | Round ceramic ornament on a red ribbon, tree lights behind | 1:1, circle |
+| Magic Puzzle | On a table with its box lid and a cup of tea, 12 × 9 cuts drawn | 4:3 |
 
 ## Cart and checkout
 
