@@ -154,6 +154,7 @@ export const EVENTS = {
   admin_shop_occasions_updated: biz,
   admin_shop_fields_created: biz,
   admin_shop_template_published: biz,
+  admin_shop_template_uploaded: biz,
 
   // Lifecycle (server)
   vault_signin_link_used: biz,

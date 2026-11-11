@@ -202,14 +202,17 @@ export async function publishTemplate(actor: { email: string }, input: { product
   if (input.template.overlay && input.template.overlay.media_id === input.template.background.media_id) {
     return { ok: false, status: 422, error: "The overlay is the same photo as the background, so it would cover the customer's picture. Choose no overlay." };
   }
-  // Photos allowed: the product's own, plus the ones its saved template already uses (studio photos kept
-  // in Shopify Files, so they stay out of the product's gallery). Nothing else, so no outside image can be set here.
+  // Photos allowed: the product's own, the ones its saved template already uses (studio photos kept
+  // in Shopify Files, so they stay out of the product's gallery), and photos uploaded for it in the editor.
+  // Nothing else, so no outside image can be set here.
   const allowed = new Map(entry.product.media.map((m) => [m.id, m.url]));
   const saved = parseTemplate(entry.product.template?.value);
   for (const m of [saved?.background, saved?.overlay]) if (m) allowed.set(m.media_id, m.url);
+  const { uploadedTemplateMedia } = await import("./template-media");
+  for (const m of await uploadedTemplateMedia(entry.product.legacyId)) allowed.set(m.id, m.url);
   for (const [what, m] of [["background", input.template.background], ["overlay", input.template.overlay]] as const) {
     if (!m) continue;
-    if (allowed.get(m.media_id) !== m.url) return { ok: false, status: 400, error: `The ${what} must be one of this product's photos in Shopify, or the one its template already uses.` };
+    if (allowed.get(m.media_id) !== m.url) return { ok: false, status: 400, error: `The ${what} must be one of this product's photos in Shopify, one uploaded for it here, or the one its template already uses.` };
   }
   const t: Template = { ...input.template, updated_at: new Date().toISOString() };
   const r = await (await getShopCatalogSource()).setProductTemplate(input.productId, ns, JSON.stringify(t));

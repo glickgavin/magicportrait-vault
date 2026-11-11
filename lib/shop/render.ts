@@ -30,7 +30,9 @@ export async function loadTemplateImage(url: string): Promise<Image | null> {
     } catch {
       return null;
     }
-    if (u.protocol !== "https:" || !s["shop.template_image_hosts"].includes(u.hostname)) return null;
+    // The product's Shopify media (allowed hosts), or a photo uploaded in the template editor.
+    const { isUploadedTemplateUrl } = await import("./template-media");
+    if (u.protocol !== "https:" || !(s["shop.template_image_hosts"].includes(u.hostname) || isUploadedTemplateUrl(u.toString()))) return null;
     const r = await fetch(u, { signal: AbortSignal.timeout(s["shop.image_fetch_timeout_ms"]), cache: "no-store" }).catch(() => null);
     if (r?.ok) {
       const b = Buffer.from(await r.arrayBuffer());
