@@ -154,3 +154,45 @@ async function readProfile(e: string, opts: ProfileOpts): Promise<VaultProfile> 
   if (keepMs > 0) remember(e, profile, started);
   return profile;
 }
+
+/**
+ * Just the person's portraits, as fast as possible: from this server's kept profile, else from Imagen
+ * for the sessions already cached on their member row, without asking Shopify. For finding one of their
+ * own pictures (add to cart, Product ideas); callers fall back to getVaultProfile when the picture isn't
+ * here. Never kept, and its "ordered" labels may miss orders that only Shopify knows about.
+ */
+export async function knownPortraits(email: string): Promise<VaultProfile["sessions"] | null> {
+  const e = email.trim().toLowerCase();
+  const [s, member] = await Promise.all([
+    getSettings([
+      "vault.profile_memory_seconds",
+      "vault.include_recommendation_children",
+      "vault.imagen_public_image_base_url",
+      "gift.unlock_rule",
+      "gift.qualifying_product_ids",
+      "links.order_session_url_template",
+      "links.start_portrait_url",
+    ] as const),
+    getMember(e).catch(() => null),
+  ]);
+  const kept = memory.get(e);
+  if (kept && Date.now() - kept.at < s["vault.profile_memory_seconds"] * 1000) return kept.profile.sessions;
+  const ids = [...new Set((member?.imagen_sessions ?? []).map((x) => x.imagen_session_id))];
+  if (!ids.length) return null;
+  try {
+    const { imagen } = await getSources();
+    const rows = await timed("imagen.portraits", () => imagen.portraits(ids, { includeChildren: s["vault.include_recommendation_children"], imageBaseUrl: s["vault.imagen_public_image_base_url"] }));
+    return buildProfile({
+      email: e,
+      orders: [],
+      mirrorSessions: member!.imagen_sessions.map((x) => ({ imagenSessionId: x.imagen_session_id, lptempSessionId: x.lptemp_session_id, firstSeenAt: "", lastSeenAt: "" })),
+      rows,
+      unlockRule: s["gift.unlock_rule"],
+      qualifyingProductIds: s["gift.qualifying_product_ids"],
+      orderUrlTemplate: s["links.order_session_url_template"],
+      startPortraitUrl: s["links.start_portrait_url"],
+    }).sessions;
+  } catch {
+    return null;
+  }
+}

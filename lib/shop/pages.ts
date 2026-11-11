@@ -158,13 +158,17 @@ export async function ideasData(user: SessionUser, page: ShopPage, imageId: stri
   const n = s["shop.top_picks_count"];
   const top = ideas.slice(0, n);
   const rest = ideas.slice(n);
-  const list = await listP;
-  const others = await Promise.all(
-    [...list.portraits, ...list.photos]
-      .filter((p) => p.id !== pic.id)
-      .slice(0, s["shop.change_strip_count"])
-      .map(async (p) => ({ id: p.id, url: await pictureLink(p) })),
-  );
+  // Streamed: the ideas show first, the "Change picture" strip follows when the full list is read.
+  const others: Promise<{ id: string; url: string | null }[]> = listP
+    .then((list) =>
+      Promise.all(
+        [...list.portraits, ...list.photos]
+          .filter((p) => p.id !== pic.id)
+          .slice(0, s["shop.change_strip_count"])
+          .map(async (p) => ({ id: p.id, url: await pictureLink(p) })),
+      ),
+    )
+    .catch(() => []);
   return {
     picture: { id: img.id, kind: img.kind, url: await pictureLink(img), width: img.width, height: img.height, ordered: img.ordered },
     sizeKnown: Boolean(img.width && img.height),

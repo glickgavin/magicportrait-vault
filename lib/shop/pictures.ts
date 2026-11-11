@@ -8,7 +8,7 @@ import { getSettings } from "@/lib/settings";
 import { putObject, signedUrl } from "@/lib/storage";
 import { track } from "@/lib/track";
 import { maskEmail } from "@/lib/utils";
-import { getVaultProfile } from "@/lib/vault/profile";
+import { getVaultProfile, knownPortraits } from "@/lib/vault/profile";
 import { buildImageList, isAllowedUrl, looksLikeImageId, orderedPhotoTiles, type RawPhotoTile, type ShopImage } from "./images";
 import { getShopImagesSource } from "./sources";
 import type { MirrorImageProps, ShopImagesSource } from "./sources/images";
@@ -58,7 +58,7 @@ async function mirrorPictures(email: string, props: MirrorImageProps, keepMs: nu
   return value;
 }
 
-function portraitsOf(profile: Awaited<ReturnType<typeof getVaultProfile>>) {
+function portraitsOf(profile: { sessions: Awaited<ReturnType<typeof getVaultProfile>>["sessions"] }) {
   return profile.sessions.flatMap((g) => g.portraits.map((p) => ({ imageId: p.imageId, sessionId: p.sessionId, imageUrl: p.imageUrl, width: p.width, height: p.height, createdAt: p.createdAt, ordered: p.ordered })));
 }
 
@@ -129,8 +129,11 @@ export async function pictureFor(email: string, id: string): Promise<ShopImage |
     return r ? { id, kind: "new_upload", source: { storagePath: r.storage_path! }, width: r.width, height: r.height, createdAt: r.created_at, ordered: false, ref: null, sessionId: null } : null;
   }
   if (id.startsWith("p_")) {
-    // A portrait is found in the person's own portraits alone: no need to read the mirror's photos.
-    const found = buildImageList({ portraits: portraitsOf(await getVaultProfile(email)), pastUploads: [], photoTiles: [], newUploads: [] }).portraits.find((i) => i.id === id);
+    // A portrait is found in the person's own portraits alone: no need for the mirror's photos, and
+    // usually not for Shopify either (the sessions we already know); the full profile only if it's not there.
+    const find = (sessions: Awaited<ReturnType<typeof getVaultProfile>>["sessions"]) => buildImageList({ portraits: portraitsOf({ sessions }), pastUploads: [], photoTiles: [], newUploads: [] }).portraits.find((i) => i.id === id);
+    const quick = await knownPortraits(email);
+    const found = (quick && find(quick)) || find((await getVaultProfile(email)).sessions);
     if (!found) return null;
     if ((!found.width || !found.height) && "url" in found.source) {
       const k = (await knownSizes(email, [found.source.url])).get(found.source.url);
