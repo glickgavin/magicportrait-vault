@@ -3,7 +3,7 @@ import { db } from "@/lib/db/client";
 import { getSetting } from "@/lib/settings";
 import { addDays, dayIn, DEFAULT_BIZ_TZ, startOfDayIn } from "@/lib/biztime";
 
-export const RANGES = { today: "Today", "7d": "7 days", "30d": "30 days", all: "All time" } as const;
+export const RANGES = { today: "Today", yesterday: "Yesterday", "7d": "7 days", mtd: "MTD", "30d": "30 days", all: "All time" } as const;
 export type Range = keyof typeof RANGES;
 
 export const KPI_LABELS: Record<string, string> = {
@@ -19,14 +19,33 @@ export const KPI_LABELS: Record<string, string> = {
 
 /**
  * The period and the one before it, in business time (`brand.timezone`, Pacific by default):
- * "Today" starts at midnight there; "7 days" / "30 days" are today plus the 6 / 29 days before it.
- * The previous period is the same number of days just before.
+ * "Today" starts at midnight there; "Yesterday" is the whole day before (compared with the day
+ * before that); "7 days" / "30 days" are today plus the 6 / 29 days before it, compared with the same
+ * number of days just before; "MTD" is the 1st of this month until now, compared with the same stretch
+ * of last month (its 1st until the same day and time, capped at the month's end).
  */
 export function periods(range: Range, now = new Date(), tz = DEFAULT_BIZ_TZ): { from: Date; to: Date; prevFrom: Date | null; prevTo: Date | null } {
   const to = now;
   if (range === "all") return { from: new Date("2020-01-01T00:00:00Z"), to, prevFrom: null, prevTo: null };
-  const days = range === "today" ? 1 : range === "7d" ? 7 : 30;
   const today = dayIn(tz, now);
+  if (range === "yesterday") {
+    const from = startOfDayIn(tz, addDays(today, -1));
+    return { from, to: startOfDayIn(tz, today), prevFrom: startOfDayIn(tz, addDays(today, -2)), prevTo: from };
+  }
+  if (range === "mtd") {
+    const first = `${today.slice(0, 8)}01`;
+    const from = startOfDayIn(tz, first);
+    const [y, m] = first.split("-").map(Number);
+    const prevFirst = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10);
+    const prevFrom = startOfDayIn(tz, prevFirst);
+    // Same day of the month and time of day, last month (never past the end of that month).
+    const dayOfMonth = Number(today.slice(8, 10));
+    const sinceMidnight = now.getTime() - startOfDayIn(tz, today).getTime();
+    const prevDay = addDays(prevFirst, dayOfMonth - 1);
+    const prevTo = new Date(Math.min(startOfDayIn(tz, prevDay).getTime() + sinceMidnight, from.getTime()));
+    return { from, to, prevFrom, prevTo };
+  }
+  const days = range === "today" ? 1 : range === "7d" ? 7 : 30;
   const firstDay = addDays(today, -(days - 1));
   const from = startOfDayIn(tz, firstDay);
   const prevFrom = startOfDayIn(tz, addDays(firstDay, -days));
@@ -58,7 +77,8 @@ export async function kpis(range: Range, now = new Date(), tz?: string, staff = 
 /** Cards per business day (Pacific by default), oldest first, with empty days as 0. */
 export async function cardsPerDay(range: Range, now = new Date(), tz?: string, staff = false) {
   const zone = tz ?? (await bizTz());
-  const p = periods(range === "all" ? "30d" : range === "today" ? "7d" : range, now, zone);
+  // Single days show the week around them; "All time" shows the last 30 days.
+  const p = periods(range === "all" ? "30d" : range === "today" || range === "yesterday" ? "7d" : range, now, zone);
   const r = await db().rpc("insights_cards_per_day_tz", { p_from: p.from.toISOString(), p_to: p.to.toISOString(), p_tz: zone, p_staff: staff });
   const byDay = new Map(((r.data ?? []) as { day: string; n: number }[]).map((d) => [d.day, d.n]));
   const out: { day: string; n: number }[] = [];
