@@ -435,5 +435,5 @@ Every size: maker's code = the variant's SKU, Adjust off, placement cover (the m
 | 5 | Templates for each product | Done 11 Nov: studio templates for all 11 |
 | 6 | Turn on `shop.super_user_preview`, test on the branch preview, buy one item end to end (VIP code, `SITEWIDE OFF`, the order prints, the cart shows paid) | |
 | 7 | Run `pnpm test` and `pnpm e2e` in a session that can reach the container registries | |
-| 8 | Merge `claude/shop`; add the shop funnel to the PostHog dashboard | |
-| 9 | Turn on `shop.enabled`; add a promotion bar if wanted | |
+| 8 | Merge `claude/shop`; add the shop funnel to the PostHog dashboard | Merged 11 Nov; funnel still to add once shop events arrive |
+| 9 | Turn on `shop.enabled`; add a promotion bar if wanted | Live for everyone on merge, 11 Nov (Gavin's choice, with `shop.enabled` already on) |
