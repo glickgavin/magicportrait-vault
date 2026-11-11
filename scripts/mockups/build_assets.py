@@ -192,7 +192,11 @@ def main():
     inside = g[binm]
     # Behind acrylic the whole face carries a faint haze of reflection: keep only the clear highlights.
     floor = float(np.percentile(inside, 45 if info.get("behind_glass") else 8)) if inside.size else 0.0
-    a_gloss = np.clip((g - floor) * (1.5 if info.get("behind_glass") else 1.25), 0, 0.85) * m
+    a_gloss = np.clip((g - floor) * (1.5 if info.get("behind_glass") else 1.25), 0, 0.85)
+    # Drop the faint render noise (invisible, but it makes the file ten times bigger) and soften what's left.
+    a_gloss = np.where(a_gloss < 0.035, 0, a_gloss)
+    a_gloss = cv2.GaussianBlur(a_gloss.astype(np.float32), (0, 0), 1.2) * m
+    a_gloss = np.where(a_gloss < 0.01, 0, a_gloss)
     # Outside the print area the overlay only needs to cover where the warped picture can reach: the zone,
     # grown a few pixels. Everywhere else the background already shows, so the overlay stays clear (small file).
     reach = cv2.dilate((zmask > 0).astype(np.uint8), np.ones((9, 9), np.uint8)).astype(np.float32)
@@ -224,7 +228,7 @@ def main():
     Image.fromarray((np.clip(bg, 0, 1) * 255 + 0.5).astype(np.uint8)).save(f"{out}/{name}-base.jpg", quality=92, subsampling=0, optimize=True)
     ov = Image.fromarray((np.clip(rgba, 0, 1) * 255 + 0.5).astype(np.uint8), "RGBA")
     ov.save(f"{out}/{name}-overlay.png", optimize=True)
-    ov.save(f"{out}/{name}-overlay.webp", quality=90, method=6, exact=True)
+    ov.save(f"{out}/{name}-overlay.webp", quality=88, method=6)
     template = {
         "v": 1,
         "background": {"media_id": "", "url": "", "w": W, "h": H},
