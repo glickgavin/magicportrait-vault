@@ -174,7 +174,23 @@ Each Store product has a studio template made in Blender (`scripts/mockups/`), s
 | Magic Xmas Ornaments | Round ceramic ornament on a red ribbon, tree lights behind | 1:1, circle |
 | Magic Puzzle | On a table with its box lid and a cup of tea, 12 × 9 cuts drawn | 4:3 |
 
-### Room photos (Settings › Shop › Room photos)
+### Furnished rooms
+
+Lifestyle versions of the studio templates (`scripts/mockups/rooms.py`): the product in a furnished room, with scanned furniture (credits and licences in `scripts/mockups/ASSETS.md`), a photo wood texture, window daylight and depth of field. They go through the same three passes and `build_assets.py`, so each is a normal template: a background, an overlay and an exact zone.
+
+| Room | Product | Print shape | Scene |
+|---|---|---|---|
+| `room-pillow-sofa` | Magic Pillow (12 × 12 linen) | 1:1 | On a champagne velvet sofa, rust cushion behind, lamp on a side table |
+| `room-masterpiece-sideboard` | Masterpiece (16 × 24) | 2:3 | Above a walnut sideboard with flowers, books and a candle |
+| `room-puzzle-table` | Magic Puzzle | 3:4, upright | Finished on an oak dining table, lid and tea beside it, velvet chairs behind |
+| `room-block-sideboard` | Acrylic Block (5 × 7) | 5:7 | On the walnut sideboard by the window |
+| `room-block-desk` | Acrylic Block (5 × 7) | 5:7 | On an oak desk with a laptop, tea, notebook and lamp |
+
+- **Make them:** `scripts/mockups/fetch_assets.sh` once, then `BLENDER_PY=<python with bpy> MOCKUP_ASSETS=<assets> scripts/mockups/render.sh <out> 1200 96 room-pillow-sofa ...` (about 15 minutes a room on 2 CPUs).
+- **See them with pictures:** `scripts/mockups/room_gallery.sh <out> <gallery dir> 1000` draws every room with every picture in `public/shop-samples/scenes/` through the shop's own preview routine.
+- **The puzzle stands upright** (3:4, 9 × 12 pieces), because Magic Portraits pictures are portrait; the puzzle's print rules aren't set yet, so its variants need a 3:4 print area to match.
+
+### AI room photos (Settings › Shop › AI room photos)
 
 Lifestyle photos of Store products in furnished rooms, for product pages, emails and, later, templates. A super user picks a scene and a sample picture; the server asks an image model through **Vercel AI Gateway** (the deployment's OIDC token authenticates, so the app holds no key) and keeps the result.
 

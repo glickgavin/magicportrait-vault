@@ -14,3 +14,8 @@ supabase/.temp/
 supabase/.branches/
 .vitest/
 .tmp/
+
+# Mockup renders: the bundled preview script and downloaded scanned models (scripts/mockups/fetch_assets.sh)
+scripts/mockups/.preview_test.mjs
+scripts/mockups/.assets/
+scripts/mockups/__pycache__/

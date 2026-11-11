@@ -8,7 +8,7 @@ import { SceneStudio } from "@/components/admin/shop/SceneStudio";
 import { TrackPageView } from "@/components/TrackPageView";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Shop: room photos" };
+export const metadata = { title: "Shop: AI room photos" };
 
 export default async function ShopScenesPage() {
   await requireSuperUser();
@@ -25,7 +25,7 @@ export default async function ShopScenesPage() {
       <Link href="/settings/shop" className="link text-[14px] font-bold">
         ← Shop: products &amp; discounts
       </Link>
-      <h1 className="mt-1 text-[30px] font-extrabold tracking-tight">Room photos</h1>
+      <h1 className="mt-1 text-[30px] font-extrabold tracking-tight">AI room photos</h1>
       <p className="max-w-[860px] text-[15px] text-ink-2">
         Lifestyle photos of the Store products in furnished rooms, made by an image model from each product&apos;s studio photo and a sample picture. Each one takes about 30–60 seconds and is charged to the team&apos;s Vercel AI Gateway. The scenes and the wording sent to the model are in Settings (shop.scene_presets, shop.scene_products, shop.scene_prompt_rules).
       </p>
