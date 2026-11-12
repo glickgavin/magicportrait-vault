@@ -101,6 +101,9 @@ export default async function ShopSettings() {
                 </div>
                 <p className="mt-1 text-[14px] text-ink-2">
                   In the collection&apos;s order, which is the order on both pages. Sizes, prices and print rules are edited in Shopify.{" "}
+                  <Link href="/settings/shop/library" className="link font-bold">
+                    Photo library →
+                  </Link>{" "}
                   <Link href="/settings/shop/scenes" className="link font-bold">
                     AI room photos →
                   </Link>

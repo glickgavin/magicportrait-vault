@@ -190,6 +190,13 @@ Lifestyle versions of the studio templates (`scripts/mockups/rooms.py`): the pro
 - **See them with pictures:** `scripts/mockups/room_gallery.sh <out> <gallery dir> 1000` draws every room with every picture in `public/shop-samples/scenes/` through the shop's own preview routine.
 - **The puzzle stands upright** (3:4, 9 × 12 pieces), because Magic Portraits pictures are portrait; the puzzle's print rules aren't set yet, so its variants need a 3:4 print area to match.
 
+### Photo library (Settings › Shop › Photo library)
+
+Every room and studio photo, for building products: the furnished rooms (each with its empty template and the 12 sample pictures on it) and the studio photos, filterable by product, with Download and Copy link. `scripts/mockups/export_library.py` copies them into `public/shop-library/` and writes `lib/shop/photo-library.ts`, which the page and the template editor read; rooms match Store products by Shopify handle.
+
+- **Use a room as a product's template:** the room's "Use as the … template" link opens the product's template editor with the room highlighted. **Use this room** uploads its photo and overlay through the normal template upload (so they're kept in `theme-assets` like any upload) and sets the zone, shape and shading. It stays a draft until **Publish to Shopify**.
+- **Photos with sample pictures** are for product pages, emails and ads. The app doesn't write product photos to Shopify, so they're added there by hand.
+
 ### AI room photos (Settings › Shop › AI room photos)
 
 Lifestyle photos of Store products in furnished rooms, for product pages, emails and, later, templates. A super user picks a scene and a sample picture; the server asks an image model through **Vercel AI Gateway** (the deployment's OIDC token authenticates, so the app holds no key) and keeps the result.

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/Button";
 import { centredCrop } from "@/lib/shop/fit";
 import { drawPreview, previewSize, type MakeCanvas, type PreviewCtx } from "@/lib/shop/preview";
+import type { LibraryRoom } from "@/lib/shop/photo-library";
 import { defaultTemplate, zoneAspect, zoneMapper, type Template } from "@/lib/shop/template";
 import { cn } from "@/lib/utils";
 
@@ -122,6 +123,8 @@ export function ShopTemplateEditor({
   sizes,
   samples = [],
   upload,
+  rooms = [],
+  focusRoom = null,
 }: {
   productId: string;
   media: Media[];
@@ -129,10 +132,27 @@ export function ShopTemplateEditor({
   sizes: Size[];
   samples?: string[];
   upload: { maxMb: number; maxPx: number };
+  rooms?: LibraryRoom[];
+  focusRoom?: string | null;
 }) {
   const [media, setMedia] = useState<Media[]>(initialMedia);
   if (!media.length && !published) return <FirstPhoto productId={productId} upload={upload} onUploaded={(m) => setMedia([m])} />;
-  return <Editor productId={productId} media={media} setMedia={setMedia} published={published} sizes={sizes} samples={samples} upload={upload} />;
+  return <Editor productId={productId} media={media} setMedia={setMedia} published={published} sizes={sizes} samples={samples} upload={upload} rooms={rooms} focusRoom={focusRoom} />;
+}
+
+/** Sends one of the photo library's files (an app file) through the template upload, so it's kept like any upload. */
+async function sendLibraryFile(productId: string, kind: "background" | "overlay", src: string): Promise<Media> {
+  const res = await fetch(src);
+  if (!res.ok) throw new Error("Couldn't load that room's photo.");
+  const blob = await res.blob();
+  const body = new FormData();
+  body.set("productId", productId);
+  body.set("kind", kind);
+  body.set("file", new File([blob], src.split("/").pop() ?? `${kind}.jpg`, { type: blob.type || (kind === "overlay" ? "image/webp" : "image/jpeg") }));
+  const r = await fetch("/api/admin/shop/template/upload", { method: "POST", body }).catch(() => null);
+  const b = (await r?.json().catch(() => ({}))) as { media?: Media; error?: string } | undefined;
+  if (!r?.ok || !b?.media) throw new Error(b?.error ?? "Couldn't upload that room's photo.");
+  return b.media;
 }
 
 /** No photo yet: upload the blank product photo to start. */
@@ -206,6 +226,8 @@ function Editor({
   sizes,
   samples,
   upload,
+  rooms,
+  focusRoom,
 }: {
   productId: string;
   media: Media[];
@@ -214,6 +236,8 @@ function Editor({
   sizes: Size[];
   samples: string[];
   upload: { maxMb: number; maxPx: number };
+  rooms: LibraryRoom[];
+  focusRoom: string | null;
 }) {
   const router = useRouter();
   const uid = useId();
@@ -319,6 +343,37 @@ function Editor({
     const v = { media_id: m.id, url: m.url, w: m.width, h: m.height };
     setT((p) => (which === "background" ? { ...p, background: v } : { ...p, overlay: v }));
   };
+
+  // A room from the photo library: its photo and overlay are uploaded for this product, then the zone,
+  // shape and shading come from the room. It's a draft like any other change until Publish.
+  const [roomBusy, setRoomBusy] = useState<string | null>(null);
+  const roomRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focusRoom && rooms.some((r) => r.id === focusRoom)) roomRef.current?.scrollIntoView({ block: "center" });
+  }, [focusRoom, rooms]);
+  async function applyRoom(r: LibraryRoom) {
+    setRoomBusy(r.id);
+    setMsg(null);
+    try {
+      const bg = await sendLibraryFile(productId, "background", r.background.src);
+      const ov = r.overlay ? await sendLibraryFile(productId, "overlay", r.overlay.src) : null;
+      setMedia((list) => [...(ov ? [bg, ov] : [bg]), ...list.filter((x) => x.id !== bg.id && x.id !== ov?.id)]);
+      setT((p) => ({
+        ...p,
+        background: { media_id: bg.id, url: bg.url, w: bg.width, h: bg.height },
+        overlay: ov ? { media_id: ov.id, url: ov.url, w: ov.width, h: ov.height } : null,
+        zone: r.zone,
+        mask: r.mask,
+        blend: r.blend,
+      }));
+      setMsg({ ok: true, text: "The room is in the editor. Check the live preview, then publish to Shopify." });
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't use that room." });
+    } finally {
+      setRoomBusy(null);
+    }
+  }
+  const inUse = (r: LibraryRoom) => JSON.stringify(t.zone) === JSON.stringify(r.zone) && t.background.w === r.background.w && t.background.h === r.background.h;
 
   const bgW = t.background.w;
   const bgH = t.background.h;
@@ -522,6 +577,30 @@ function Editor({
       </section>
 
       <div className="flex flex-col gap-5">
+        {rooms.length > 0 && (
+          <section ref={roomRef} aria-labelledby={`${uid}-rooms`} className="flex flex-col gap-3 rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]" data-testid="template-rooms">
+            <div>
+              <h2 id={`${uid}-rooms`} className="text-[17px] font-extrabold">
+                Rooms from the photo library
+              </h2>
+              <p className="text-[13px] text-ink-2">A furnished room made for this product. Using it fills in the photo, overlay and zone; nothing changes in the shop until you publish.</p>
+            </div>
+            <ul className="flex flex-col gap-3">
+              {rooms.map((r) => (
+                <li key={r.id} className={cn("flex items-center gap-3 rounded-[14px] border p-2", r.id === focusRoom ? "border-[#DD07C4]" : "border-line")}>
+                  <img src={r.photos[0]?.src ?? r.background.src} alt="" className="h-16 w-16 flex-none rounded-[10px] object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] leading-snug">{r.scene}</p>
+                    {inUse(r) && <p className="text-[12px] font-bold text-[#1f6b35]">In the editor now</p>}
+                  </div>
+                  <Button size="sm" variant={inUse(r) ? "secondary" : "primary"} disabled={roomBusy !== null} onClick={() => void applyRoom(r)}>
+                    {roomBusy === r.id ? "Adding…" : "Use this room"}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section aria-label="Template settings" className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
           {mediaField("background")}
           <fieldset>

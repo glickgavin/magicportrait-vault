@@ -492,3 +492,7 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 - Decision: the room puzzle is upright (3:4) to suit portrait pictures. Its print rules still need a 3:4 print area.
 - Next: Gavin picks the rooms to use, then they're uploaded as each product's template (Shopify Files, like the studio ones) or kept as extra product photos.
 
+### Photo library (12 Nov)
+- Settings › Shop › Photo library: the 5 furnished rooms (60 photos with sample pictures, plus each empty template) and the 11 studio photos, in `public/shop-library/` (8 MB) with `lib/shop/photo-library.ts` made by `scripts/mockups/export_library.py`.
+- The template editor lists the rooms for its product: Use this room uploads the room's photo and overlay through the existing upload route and sets zone, mask and blend, as a draft until Publish.
+
