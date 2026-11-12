@@ -174,6 +174,39 @@ Each Store product has a studio template made in Blender (`scripts/mockups/`), s
 | Magic Xmas Ornaments | Round ceramic ornament on a red ribbon, tree lights behind | 1:1, circle |
 | Magic Puzzle | On a table with its box lid and a cup of tea, 12 × 9 cuts drawn | 4:3 |
 
+### Furnished rooms
+
+Lifestyle versions of the studio templates (`scripts/mockups/rooms.py`): the product in a furnished room, with scanned furniture (credits and licences in `scripts/mockups/ASSETS.md`), a photo wood texture, window daylight and depth of field. They go through the same three passes and `build_assets.py`, so each is a normal template: a background, an overlay and an exact zone.
+
+| Room | Product | Print shape | Scene |
+|---|---|---|---|
+| `room-pillow-sofa` | Magic Pillow (12 × 12 linen) | 1:1 | On a champagne velvet sofa, rust cushion behind, lamp on a side table |
+| `room-masterpiece-sideboard` | Masterpiece (16 × 24) | 2:3 | Above a walnut sideboard with flowers, books and a candle |
+| `room-puzzle-table` | Magic Puzzle | 3:4, upright | Finished on an oak dining table, lid and tea beside it, velvet chairs behind |
+| `room-block-sideboard` | Acrylic Block (5 × 7) | 5:7 | On the walnut sideboard by the window |
+| `room-block-desk` | Acrylic Block (5 × 7) | 5:7 | On an oak desk with a laptop, tea, notebook and lamp |
+
+- **Make them:** `scripts/mockups/fetch_assets.sh` once, then `BLENDER_PY=<python with bpy> MOCKUP_ASSETS=<assets> scripts/mockups/render.sh <out> 1200 96 room-pillow-sofa ...` (about 15 minutes a room on 2 CPUs).
+- **See them with pictures:** `scripts/mockups/room_gallery.sh <out> <gallery dir> 1000` draws every room with every picture in `public/shop-samples/scenes/` through the shop's own preview routine.
+- **The puzzle stands upright** (3:4, 9 × 12 pieces), because Magic Portraits pictures are portrait; the puzzle's print rules aren't set yet, so its variants need a 3:4 print area to match.
+
+### Photo library (Settings › Shop › Photo library)
+
+Every room and studio photo, for building products: the furnished rooms (each with its empty template and the 12 sample pictures on it) and the studio photos, filterable by product, with Download and Copy link. `scripts/mockups/export_library.py` copies them into `public/shop-library/` and writes `lib/shop/photo-library.ts`, which the page and the template editor read; rooms match Store products by Shopify handle.
+
+- **Use a room as a product's template:** the room's "Use as the … template" link opens the product's template editor with the room highlighted. **Use this room** uploads its photo and overlay through the normal template upload (so they're kept in `theme-assets` like any upload) and sets the zone, shape and shading. It stays a draft until **Publish to Shopify**.
+- **Photos with sample pictures** are for product pages, emails and ads. The app doesn't write product photos to Shopify, so they're added there by hand.
+
+### AI room photos (Settings › Shop › AI room photos)
+
+Lifestyle photos of Store products in furnished rooms, for product pages, emails and, later, templates. A super user picks a scene and a sample picture; the server asks an image model through **Vercel AI Gateway** (the deployment's OIDC token authenticates, so the app holds no key) and keeps the result.
+
+- **What the model gets:** the instructions in `shop.scene_prompt_rules` with `{product}` (from `shop.scene_products`) and `{scene}` (from `shop.scene_presets`) put in, the product's studio photo (its template background) for shape and material only, and the sample picture cropped to the product's print shape (`print_aspect`).
+- **Scenes:** `shop.scene_presets` starts with 12, three each for the pillow, the Masterpiece, the puzzle and the acrylic block, each with its own sample picture from `public/shop-samples/scenes/` (listed in `shop.scene_sample_pictures`). A scene can use any sample picture and an extra one-line instruction.
+- **Model and cost:** `shop.scene_model` (default `google/gemini-3-pro-image`), `shop.scene_image_size` (2K) and `shop.scene_daily_limit` (60 kept per UTC day). Each photo is charged to the team's AI Gateway credit.
+- **Where they live:** the public `theme-assets` bucket under `shop-scenes/<product handle>/<yyyymmdd>.<scene>.<picture>.<id>.<w>x<h>.jpg` (product photos, not customer data), never in Shopify. The name carries everything the gallery shows.
+- **Route:** `POST /api/admin/shop/scene` (multipart: presetId, picture, pictureName, note) and `DELETE` (JSON: key), super users only, 404 otherwise. Event `admin_shop_scene_made`.
+
 ## Cart and checkout
 
 Our cart and a Shopify cart move together. Ours holds the pictures and crops; Shopify's holds the prices and discounts, so the cart always shows what checkout will charge.

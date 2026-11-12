@@ -210,8 +210,8 @@ def main():
 
     if info.get("puzzle"):
         # Cut lines: a dark groove with a light edge, drawn flat and warped into place.
-        pw, ph = 2400, 1800
-        cols, rows = 12, 9
+        cols, rows = info.get("puzzle_grid", [12, 9])  # pieces across and down the picture
+        pw, ph = cols * 200, rows * 200
         cuts = puzzle_cuts(pw, ph, cols, rows)
         dark = np.zeros((ph, pw), np.uint8)
         light = np.zeros((ph, pw), np.uint8)

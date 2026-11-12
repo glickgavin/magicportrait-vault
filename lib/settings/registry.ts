@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_SCENE_PRESETS, DEFAULT_SCENE_PRODUCTS, DEFAULT_SCENE_RULES, scenePresetsSchema, sceneProductsSchema } from "../shop/scene-presets.ts";
 
 /** IANA time zone check (kept here, not imported, so scripts/gen-seed.ts runs under plain Node). */
 const isTimeZone = (tz: string) => {
@@ -299,6 +300,32 @@ export const REGISTRY = {
   "shop.template_upload_max_px": num("shop", 2400, { label: "Template uploads: longest side kept (px)", description: "Uploaded template photos and overlays are scaled down to this.", min: 800, max: 6000 }),
   "shop.template_upload_max_mb": num("shop", 4, { label: "Template uploads: largest file sent (MB)", description: "The editor shrinks big photos before sending; the server refuses anything larger. Vercel's own limit is 4.5 MB.", min: 1, max: 4 }),
   "shop.template_image_hosts": list("shop", ["cdn.shopify.com"], { label: "Template photo hosts", description: "Where blank product photos and overlays may be loaded from (the product's own Shopify media).", item: host, max: 10 }),
+  "shop.scene_model": text("shop", "google/gemini-3-pro-image", {
+    label: "Room photos: image model",
+    description: "The Vercel AI Gateway model that makes room photos in Settings › Shop › Room photos (creator/model). It must take pictures in and give a picture back.",
+    pattern: /^[a-z0-9-]+\/[a-z0-9._-]+$/,
+  }),
+  "shop.scene_image_size": choice("shop", ["1K", "2K", "4K"] as const, "2K", { label: "Room photos: size", description: "Asked of the model. 2K is about 1800 × 2200 px for a 4:5 photo; 4K costs nearly twice as much." }),
+  "shop.scene_daily_limit": num("shop", 60, { label: "Room photos: most made per day", description: "Each one is charged to the team's AI Gateway (about $0.13 at 2K with the default model).", min: 0, max: 1000 }),
+  "shop.scene_prompt_rules": text("shop", DEFAULT_SCENE_RULES, {
+    label: "Room photos: instructions to the model",
+    description: "Sent with every room photo. {product} becomes the product's description and {scene} the scene's.",
+    max: 6000,
+    allowEmpty: false,
+  }),
+  "shop.scene_products": json("shop", DEFAULT_SCENE_PRODUCTS, sceneProductsSchema, {
+    label: "Room photos: products",
+    description: "For each Store product (by Shopify handle): how to describe it to the model, and the shape of its print area, which the picture is cropped to first.",
+  }),
+  "shop.scene_presets": json("shop", DEFAULT_SCENE_PRESETS, scenePresetsSchema, {
+    label: "Room photos: scenes",
+    description: "Each scene: an id, the product's handle, a label, the sample picture it uses by default (a path in the app), the scene description and the photo's shape.",
+  }),
+  "shop.scene_sample_pictures": list(
+    "shop",
+    DEFAULT_SCENE_PRESETS.map((p) => p.picture),
+    { label: "Room photos: sample pictures", description: "The pictures a scene can use instead of its own (paths in the app).", item: z.string().max(500).regex(/^\/[A-Za-z0-9._\-/]+\.(jpg|jpeg|png|webp)$/), max: 40 },
+  ),
   "shop.preview_width_px": num("shop", 800, { label: "Preview image width (px)", min: 200, max: 2400 }),
   "shop.currency": text("shop", "USD", { label: "Shop currency (ISO code)", description: "How prices are written on the shop's pages; the cart and checkout use Shopify's own figures.", pattern: /^[A-Z]{3}$/ }),
   "shop.customer_type_cache_minutes": num("shop", 10, { label: "VIP check cache (minutes)", min: 0, max: 1440 }),

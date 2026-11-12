@@ -7,15 +7,17 @@ import { parseVariantRules } from "@/lib/shop/rules";
 import { parseTemplate } from "@/lib/shop/template";
 import { uploadedTemplateMedia } from "@/lib/shop/template-media";
 import { getSettings } from "@/lib/settings";
+import { LIBRARY_ROOMS } from "@/lib/shop/photo-library";
 import { ShopTemplateEditor } from "@/components/admin/shop/ShopTemplateEditor";
 import { TrackPageView } from "@/components/TrackPageView";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Shop: preview template" };
 
-export default async function ShopTemplatePage({ params }: { params: Promise<{ productId: string }> }) {
+export default async function ShopTemplatePage({ params, searchParams }: { params: Promise<{ productId: string }>; searchParams: Promise<{ room?: string | string[] }> }) {
   await requireSuperUser();
   const { productId } = await params;
+  const room = (await searchParams).room;
   if (!/^\d{1,20}$/.test(productId)) notFound();
   let entries;
   try {
@@ -56,7 +58,16 @@ export default async function ShopTemplatePage({ params }: { params: Promise<{ p
       <h1 className="mt-1 text-[30px] font-extrabold tracking-tight">Preview template: {p.title}</h1>
       <p className="text-[15px] text-ink-2">Pick or upload a photo of the blank product, then drag the corners to where the picture goes. The live preview shows it with sample pictures. It stays a draft on this computer until you publish it to Shopify.</p>
       <div className="mt-5">
-        <ShopTemplateEditor productId={p.id} media={media} published={published} sizes={sizes} samples={s["shop.template_sample_pictures"]} upload={{ maxMb: s["shop.template_upload_max_mb"], maxPx: s["shop.template_upload_max_px"] }} />
+        <ShopTemplateEditor
+          productId={p.id}
+          media={media}
+          published={published}
+          sizes={sizes}
+          samples={s["shop.template_sample_pictures"]}
+          upload={{ maxMb: s["shop.template_upload_max_mb"], maxPx: s["shop.template_upload_max_px"] }}
+          rooms={LIBRARY_ROOMS.filter((r) => r.product === p.handle)}
+          focusRoom={typeof room === "string" ? room : null}
+        />
       </div>
     </div>
   );

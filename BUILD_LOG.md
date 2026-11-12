@@ -480,3 +480,19 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 - Everything else reads all: Settings › Customers, sign-in (refresh, which also feeds Klaviyo), the health check, `/api/shop/pictures`.
 - Known limits of the newest-only view: the home page's "choose your mug photo" count covers the newest orders only (the Orders page lists them all), and a portrait whose only order is an older, cancelled one on the same email can show "Ordered" until Show more.
 
+### AI room photos (11 Nov, parked)
+- Settings › Shop › AI room photos: AI lifestyle photos of Store products (pillow on a sofa, Masterpiece on a wall, puzzle on a table, acrylic block on a sideboard or desk), made through Vercel AI Gateway with the deployment's OIDC token. 12 starter scenes with 12 sample pictures; scenes, product wording, model, size and daily limit are settings. Photos are kept in theme-assets/shop-scenes/.
+- Decision: the model gets the product's studio render for shape only and the picture pre-cropped to the print shape, so the printed area matches what the customer orders.
+- Next: pick favourites, then use them as product photos and/or as templates (a blank version of the same room, with the zone fitted).
+- Parked: the team's AI Gateway is on the free tier, which doesn't allow image models. Gavin chose 3D rooms instead; the page stays super-user only and works once paid credit is added.
+
+### Furnished 3D rooms (11 Nov)
+- `scripts/mockups/rooms.py`: five furnished rooms built on the studio-template pipeline (pillow on a velvet sofa, Masterpiece over a walnut sideboard, puzzle on a dining table, acrylic block on a sideboard and on a desk), with scanned Wayfair/Khronos furniture (CC BY 4.0, credit line in `scripts/mockups/ASSETS.md`), window daylight and a photo wood texture. Each comes out as a normal template (background, overlay, zone).
+- 12 sample pictures in `public/shop-samples/scenes/`; `room_gallery.sh` draws every room with each.
+- Decision: the room puzzle is upright (3:4) to suit portrait pictures. Its print rules still need a 3:4 print area.
+- Next: Gavin picks the rooms to use, then they're uploaded as each product's template (Shopify Files, like the studio ones) or kept as extra product photos.
+
+### Photo library (12 Nov)
+- Settings › Shop › Photo library: the 5 furnished rooms (60 photos with sample pictures, plus each empty template) and the 11 studio photos, in `public/shop-library/` (8 MB) with `lib/shop/photo-library.ts` made by `scripts/mockups/export_library.py`.
+- The template editor lists the rooms for its product: Use this room uploads the room's photo and overlay through the existing upload route and sets zone, mask and blend, as a draft until Publish.
+
