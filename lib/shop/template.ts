@@ -170,6 +170,13 @@ export function zoneAspect(zone: Template["zone"], bgW: number, bgH: number): nu
     }
     return w / dist(m(0.5, 0), m(0.5, 1));
   }
+  if (isBent(zone)) {
+    // Curved edges pull in between the corners, so measure across the picture, not along its edges.
+    const at = [0.25, 0.5, 0.75];
+    const w = at.reduce((s, t) => s + dist(m(0, t), m(1, t)), 0);
+    const h = at.reduce((s, t) => s + dist(m(t, 0), m(t, 1)), 0);
+    return w / h;
+  }
   const w = (dist(m(0, 0), m(1, 0)) + dist(m(0, 1), m(1, 1))) / 2;
   const h = (dist(m(0, 0), m(0, 1)) + dist(m(1, 0), m(1, 1))) / 2;
   return w / h;

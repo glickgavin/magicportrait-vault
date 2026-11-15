@@ -183,6 +183,13 @@ describe("template maths", () => {
     const t = templateSchema.parse(fixtureTemplate("acrylic"));
     expect(zoneAspect(t.zone, 1000, 1000)).toBeCloseTo(0.72, 2);
     expect(zoneAspect(templateSchema.parse(fixtureTemplate("ornament")).zone, 1000, 1000)).toBeCloseTo(1, 6);
+    // Curved edges: measured across the middle. Sides pulled in by 10% of the width each make a
+    // 0.8 × 0.6 zone 0.6 × 0.6 halfway down.
+    const points = [[0.1, 0.2], [0.9, 0.2], [0.9, 0.8], [0.1, 0.8]] as never;
+    expect(zoneAspect({ kind: "corners", points }, 1000, 1000)).toBeCloseTo(0.8 / 0.6, 6);
+    const bent = zoneAspect({ kind: "corners", points, bend: { ...NO_BEND, left: [0.1], right: [0.1] } }, 1000, 1000);
+    expect(bent).toBeLessThan(0.8 / 0.6);
+    expect(bent).toBeGreaterThan(0.6 / 0.6);
   });
   it("refuses templates without a background or with a broken zone", () => {
     const good = JSON.stringify(fixtureTemplate("poster"));
