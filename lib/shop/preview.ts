@@ -5,7 +5,7 @@
  * as a mesh of small triangles, which both canvases can draw with plain affine transforms.
  */
 import type { Rect } from "./fit";
-import { mesh, zoneMapper, type Point, type Template } from "./template";
+import { isBent, mesh, zoneMapper, type Point, type Template } from "./template";
 
 export type PreviewImage = { width: number; height: number };
 
@@ -162,7 +162,8 @@ export function drawPreview(ctx: PreviewCtx, input: PreviewInput) {
 
   const flat = flatPicture(input);
   const map = zoneMapper(t.zone, t.background.w, t.background.h);
-  const [cols, rows] = t.zone.kind === "wrap" ? [32, 12] : [8, 8];
+  // Curved edges need more, smaller triangles to look smooth; flat quads are fine with 8 × 8.
+  const [cols, rows] = t.zone.kind === "wrap" ? [32, 12] : isBent(t.zone) ? [12, 12] : [8, 8];
   const grid = mesh((u, v) => {
     const p = map(u, v);
     return { x: p.x * sx, y: p.y * sy };

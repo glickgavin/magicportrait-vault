@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { centredCrop } from "@/lib/shop/fit";
 import { drawPreview, previewSize, type MakeCanvas, type PreviewCtx } from "@/lib/shop/preview";
 import type { LibraryRoom } from "@/lib/shop/photo-library";
-import { defaultTemplate, zoneAspect, zoneMapper, type Template } from "@/lib/shop/template";
+import { BEND_RANGE, bendStops, defaultTemplate, homography, isBent, NO_BEND, zoneAspect, zoneMapper, type BendEdge, type Point, type Template } from "@/lib/shop/template";
 import { cn } from "@/lib/utils";
 
 type Media = { id: string; url: string; alt: string | null; width: number; height: number };
@@ -114,7 +114,20 @@ async function shrinkForUpload(file: File, kind: "background" | "overlay", maxPx
 
 const clamp = (v: number) => Math.min(1.2, Math.max(-0.2, Math.round(v * 1000) / 1000));
 
-type HandleId = "c0" | "c1" | "c2" | "c3" | "left" | "right" | "top" | "bottom";
+/** Corners, a mug's edges, or a curve point on one edge (`bend:top:2`). */
+type HandleId = "c0" | "c1" | "c2" | "c3" | "left" | "right" | "top" | "bottom" | `bend:${BendEdge}:${number}`;
+const EDGE_NAMES: Record<BendEdge, string> = { top: "top", right: "right", bottom: "bottom", left: "left" };
+const ORDINAL = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth"];
+const clampBend = (v: number) => Math.min(BEND_RANGE.max, Math.max(BEND_RANGE.min, Math.round(v * 10000) / 10000));
+
+/** The straight edge's point under curve point `i` of `edge`, on a photo 1 × 1. */
+function straightPoint(points: [number, number][], edge: BendEdge, t: number): Point {
+  const flat = homography(points.map(([x, y]) => ({ x, y })) as [Point, Point, Point, Point]);
+  if (edge === "top") return flat(t, 0);
+  if (edge === "bottom") return flat(t, 1);
+  if (edge === "left") return flat(0, t);
+  return flat(1, t);
+}
 
 export function ShopTemplateEditor({
   productId,
@@ -366,7 +379,7 @@ function Editor({
         mask: r.mask,
         blend: r.blend,
       }));
-      setMsg({ ok: true, text: "The room is in the editor. Check the live preview, then publish to Shopify." });
+      setMsg({ ok: true, text: "It's in the editor. Check the live preview, then publish to Shopify." });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't use that room." });
     } finally {
@@ -380,27 +393,49 @@ function Editor({
   const outline = useMemo(() => {
     const m = zoneMapper(t.zone, 1, 1);
     const pts: string[] = [];
-    const n = t.zone.kind === "wrap" ? 24 : 1;
-    for (let i = 0; i <= n; i++) pts.push(`${m(i / n, 0).x * 100},${m(i / n, 0).y * 100}`);
-    for (let i = n; i >= 0; i--) pts.push(`${m(i / n, 1).x * 100},${m(i / n, 1).y * 100}`);
+    const add = (p: Point) => pts.push(`${p.x * 100},${p.y * 100}`);
+    const n = t.zone.kind === "wrap" || isBent(t.zone) ? 48 : 1;
+    for (let i = 0; i <= n; i++) add(m(i / n, 0));
+    for (let i = 1; i <= n; i++) add(m(1, i / n));
+    for (let i = n - 1; i >= 0; i--) add(m(i / n, 1));
+    for (let i = n - 1; i > 0; i--) add(m(0, i / n));
     return pts.join(" ");
   }, [t.zone]);
 
   const handles = useMemo(() => {
     const z = t.zone;
-    if (z.kind === "corners") return z.points.map(([x, y], i) => ({ id: `c${i}` as HandleId, x, y, label: ["Top left", "Top right", "Bottom right", "Bottom left"][i] }));
+    if (z.kind === "corners") {
+      const corners = z.points.map(([x, y], i) => ({ id: `c${i}` as HandleId, x, y, label: `${["Top left", "Top right", "Bottom right", "Bottom left"][i]} corner`, small: false }));
+      if (!z.bend) return corners;
+      const m = zoneMapper(z, 1, 1);
+      const at = (edge: BendEdge, t: number) => (edge === "top" ? m(t, 0) : edge === "bottom" ? m(t, 1) : edge === "left" ? m(0, t) : m(1, t));
+      const curve = (Object.keys(EDGE_NAMES) as BendEdge[]).flatMap((edge) =>
+        bendStops(z.bend![edge]).map((t, i) => ({ id: `bend:${edge}:${i}` as HandleId, ...at(edge, t), label: `${ORDINAL[i]} curve point on the ${EDGE_NAMES[edge]} edge`, small: true })),
+      );
+      return [...corners, ...curve];
+    }
     const m = zoneMapper(z, 1, 1);
     return [
-      { id: "left" as HandleId, ...m(0, 0.5), label: "Left edge" },
-      { id: "right" as HandleId, ...m(1, 0.5), label: "Right edge" },
-      { id: "top" as HandleId, ...m(0.5, 0), label: "Top edge" },
-      { id: "bottom" as HandleId, ...m(0.5, 1), label: "Bottom edge" },
+      { id: "left" as HandleId, ...m(0, 0.5), label: "Left edge", small: false },
+      { id: "right" as HandleId, ...m(1, 0.5), label: "Right edge", small: false },
+      { id: "top" as HandleId, ...m(0.5, 0), label: "Top edge", small: false },
+      { id: "bottom" as HandleId, ...m(0.5, 1), label: "Bottom edge", small: false },
     ];
   }, [t.zone]);
 
   const move = useCallback((id: HandleId, x: number, y: number) => {
     setT((prev) => {
       const z = prev.zone;
+      if (z.kind === "corners" && z.bend && id.startsWith("bend:")) {
+        // A curve point only moves across its edge: top and bottom up and down, the sides left and right.
+        const [, edge, k] = id.split(":") as [string, BendEdge, string];
+        const i = Number(k);
+        const line = z.bend[edge];
+        const base = straightPoint(z.points, edge, bendStops(line)[i]);
+        const inward = edge === "top" ? y - base.y : edge === "bottom" ? base.y - y : edge === "left" ? x - base.x : base.x - x;
+        const next = line.map((v, j) => (j === i ? clampBend(inward) : v));
+        return { ...prev, zone: { ...z, bend: { ...z.bend, [edge]: next } } };
+      }
       if (z.kind === "corners" && id.startsWith("c")) {
         const i = Number(id.slice(1));
         const points = z.points.map((p, k) => (k === i ? [clamp(x), clamp(y)] : p)) as typeof z.points;
@@ -519,7 +554,10 @@ function Editor({
               key={h.id}
               type="button"
               aria-label={`${h.label}: move with the arrow keys`}
-              className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#DD07C4] shadow focus:outline-none focus-visible:ring-4 focus-visible:ring-[#DD07C4]/40"
+              className={cn(
+                "absolute -translate-x-1/2 -translate-y-1/2 rounded-full shadow focus:outline-none focus-visible:ring-4 focus-visible:ring-[#DD07C4]/40",
+                h.small ? "h-4 w-4 border-2 border-[#DD07C4] bg-white" : "h-6 w-6 border-2 border-white bg-[#DD07C4]",
+              )}
               style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%` }}
               onPointerDown={(e) => {
                 (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -581,9 +619,9 @@ function Editor({
           <section ref={roomRef} aria-labelledby={`${uid}-rooms`} className="flex flex-col gap-3 rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]" data-testid="template-rooms">
             <div>
               <h2 id={`${uid}-rooms`} className="text-[17px] font-extrabold">
-                Rooms from the photo library
+                From the photo library
               </h2>
-              <p className="text-[13px] text-ink-2">A furnished room made for this product. Using it fills in the photo, overlay and zone; nothing changes in the shop until you publish.</p>
+              <p className="text-[13px] text-ink-2">Furnished rooms and blank-product photos made for this product. Using one fills in the photo, overlay and zone (curved edges too); nothing changes in the shop until you publish.</p>
             </div>
             <ul className="flex flex-col gap-3">
               {rooms.map((r) => (
@@ -594,7 +632,7 @@ function Editor({
                     {inUse(r) && <p className="text-[12px] font-bold text-[#1f6b35]">In the editor now</p>}
                   </div>
                   <Button size="sm" variant={inUse(r) ? "secondary" : "primary"} disabled={roomBusy !== null} onClick={() => void applyRoom(r)}>
-                    {roomBusy === r.id ? "Adding…" : "Use this room"}
+                    {roomBusy === r.id ? "Adding…" : r.setting === "room" ? "Use this room" : "Use this photo"}
                   </Button>
                 </li>
               ))}
@@ -619,6 +657,19 @@ function Editor({
               ))}
             </div>
           </fieldset>
+          {t.zone.kind === "corners" && (
+            <div className="flex flex-col gap-1">
+              <label className="flex items-center gap-2 text-[14px] font-bold">
+                <input
+                  type="checkbox"
+                  checked={Boolean(t.zone.bend)}
+                  onChange={(e) => setT((p) => (p.zone.kind === "corners" ? { ...p, zone: e.target.checked ? { ...p.zone, bend: NO_BEND } : { kind: "corners", points: p.zone.points } } : p))}
+                />
+                Curved edges, for a cushion or other soft product
+              </label>
+              {t.zone.bend && <p className="text-[13px] text-ink-2">Drag the small dots onto the product&apos;s edges. The picture follows the curve, so nothing is cut off where the edges pull in.</p>}
+            </div>
+          )}
           {t.zone.kind === "wrap" && (
             <div className="grid gap-3">
               <label className="flex flex-col gap-1 text-[14px] font-bold">

@@ -1,12 +1,15 @@
 """Copies the furnished rooms and the studio photos into the app's photo library (Settings › Shop › Photo library).
 
-python3 scripts/mockups/export_library.py <render.sh out dir with rooms> <room_gallery.sh dir> <studio previews dir>
+python3 scripts/mockups/export_library.py <render.sh out dir with rooms> <room_gallery.sh dir> <studio previews dir> [<blanks dir>]
 Writes public/shop-library/ (rooms: background, overlay, one photo per sample picture; studio photos) and
 lib/shop/photo-library.ts, the list the library page and the template editor read.
+<blanks dir> holds templates made from photos of blank products by blank_template.py: <id>-base.jpg,
+<id>-overlay.png, <id>-template.json, and photos/<picture>/<id>.jpg drawn with preview_test.ts.
 """
 import json
 import os
 import shutil
+import subprocess
 import sys
 
 from PIL import Image
@@ -14,6 +17,7 @@ from PIL import Image
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(REPO, "public", "shop-library")
 renders, gallery, studio = sys.argv[1:4]
+blanks = sys.argv[4] if len(sys.argv) > 4 else None
 
 # Room: (product handle in Shopify, product title, print shape, what the scene shows)
 ROOMS = {
@@ -22,6 +26,10 @@ ROOMS = {
     "room-puzzle-table": ("magic-puzzle", "Magic Puzzle", "3:4", "Finished on an oak dining table, upright, with the box lid, a cup of tea, flowers and velvet chairs behind."),
     "room-block-sideboard": ("acrylic-block", "Acrylic Block", "5:7", "Standing on the walnut sideboard by the window, between books with a candle and a vase of flowers."),
     "room-block-desk": ("acrylic-block", "Acrylic Block", "5:7", "On an oak desk with a laptop, a cup of tea, a notebook and a lamp."),
+}
+# Blank product photo made into a template: (product handle, product title, print shape, what it shows)
+BLANKS = {
+    "blank-pillow-linen": ("magic-pillow-with-photo", "Magic Pillow with Photo", "1:1", "The Prodigi linen cushion on a white backdrop, with curved edges so the whole picture shows."),
 }
 # Studio template name: (product handle, product title, sample picture shown on it)
 STUDIO = {
@@ -71,8 +79,26 @@ for room, (handle, title, aspect, scene) in ROOMS.items():
             w, h = save_jpg(src, f"{d}/photos/{p}.jpg")
             photos.append({"picture": p, "src": rel(f"{d}/photos/{p}.jpg"), "w": w, "h": h})
     rooms.append({
-        "id": room, "product": handle, "productTitle": title, "printAspect": aspect, "scene": scene,
+        "id": room, "product": handle, "productTitle": title, "printAspect": aspect, "scene": scene, "setting": "room",
         "background": {"src": rel(f"{d}/background.jpg"), "w": bw, "h": bh}, "overlay": overlay,
+        "zone": t["zone"], "mask": t["mask"], "blend": t["blend"], "photos": photos,
+    })
+for room, (handle, title, aspect, scene) in (BLANKS.items() if blanks else []):
+    t = json.load(open(f"{blanks}/{room}-template.json"))
+    d = os.path.join(OUT, "blanks", room)
+    bw, bh = save_jpg(f"{blanks}/{room}-base.jpg", f"{d}/background.jpg", px=2400, q=88)
+    ov = Image.open(f"{blanks}/{room}-overlay.png").convert("RGBA")
+    ov.thumbnail((2400, 2400))
+    ov.save(f"{d}/overlay.webp", quality=90, method=6)
+    photos = []
+    for p in PICTURES:
+        src = f"{blanks}/photos/{p}/{room}.jpg"
+        if os.path.exists(src):
+            w, h = save_jpg(src, f"{d}/photos/{p}.jpg")
+            photos.append({"picture": p, "src": rel(f"{d}/photos/{p}.jpg"), "w": w, "h": h})
+    rooms.append({
+        "id": room, "product": handle, "productTitle": title, "printAspect": aspect, "scene": scene, "setting": "studio",
+        "background": {"src": rel(f"{d}/background.jpg"), "w": bw, "h": bh}, "overlay": {"src": rel(f"{d}/overlay.webp"), "w": ov.width, "h": ov.height},
         "zone": t["zone"], "mask": t["mask"], "blend": t["blend"], "photos": photos,
     })
 for name, (handle, title, pic) in STUDIO.items():
@@ -90,6 +116,8 @@ export type LibraryRoom = {{
   productTitle: string;
   printAspect: string;
   scene: string;
+  /** A furnished room, or a photo of the blank product on a plain backdrop. */
+  setting: "room" | "studio";
   background: LibraryImage;
   overlay: LibraryImage | null;
   zone: Template["zone"];
@@ -110,5 +138,6 @@ export function pictureLabel(slug: string): string {{
 }}
 '''
 open(os.path.join(REPO, "lib", "shop", "photo-library.ts"), "w").write(ts)
+subprocess.run(["npx", "prettier", "--write", os.path.join(REPO, "lib", "shop", "photo-library.ts")], cwd=REPO, check=True, capture_output=True)
 total = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(OUT) for f in fs)
 print(f"{len(rooms)} rooms, {sum(len(r['photos']) for r in rooms)} room photos, {len(shots)} studio photos, {total / 1e6:.1f} MB")

@@ -14,6 +14,8 @@ export default async function ShopLibraryPage() {
   const entries = await getCatalog().catch(() => null);
   const editors = Object.fromEntries((entries ?? []).map((e) => [e.product.handle, `/settings/shop/template/${e.product.legacyId}`]));
   const photos = LIBRARY_ROOMS.reduce((n, r) => n + r.photos.length, 0);
+  const rooms = LIBRARY_ROOMS.filter((r) => r.setting === "room").length;
+  const blanks = LIBRARY_ROOMS.length - rooms;
   return (
     <div>
       <TrackPageView event="settings_viewed" props={{ section: "shop_library" }} />
@@ -22,7 +24,7 @@ export default async function ShopLibraryPage() {
       </Link>
       <h1 className="mt-1 text-[30px] font-extrabold tracking-tight">Photo library</h1>
       <p className="max-w-[860px] text-[15px] text-ink-2">
-        Furnished rooms and studio photos for the Store products: {LIBRARY_ROOMS.length} rooms with {photos} photos, and {LIBRARY_STUDIO.length} studio photos. Each room is a ready template: open it in the product&apos;s template editor, check the live preview, then publish. The photos with sample pictures can be downloaded for product pages, emails and ads.
+        Furnished rooms, blank products and studio photos for the Store products: {rooms} rooms and {blanks} blank {blanks === 1 ? "product" : "products"} with {photos} photos, and {LIBRARY_STUDIO.length} studio photos. Each room and blank product is a ready template: open it in the product&apos;s template editor, check the live preview, then publish. The photos with sample pictures can be downloaded for product pages, emails and ads.
       </p>
       {!entries && (
         <p role="alert" className="mt-3 rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[14px] text-[#7a4a00]">

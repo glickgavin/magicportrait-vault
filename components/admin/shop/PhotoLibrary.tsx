@@ -70,7 +70,7 @@ export function PhotoLibrary({ rooms, studio, editors }: { rooms: LibraryRoom[];
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px] md:items-end">
               <div className="min-w-0">
                 <p className="text-[12px] font-extrabold uppercase tracking-[0.1em] text-pink-dark">
-                  {r.productTitle} · print {r.printAspect} · room
+                  {r.productTitle} · print {r.printAspect} · {r.setting === "room" ? "room" : "blank product"}
                 </p>
                 <h2 id={`room-${r.id}`} className="mt-1 text-[19px] font-extrabold leading-snug">
                   {r.scene}

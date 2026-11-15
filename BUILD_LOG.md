@@ -496,3 +496,9 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 - Settings › Shop › Photo library: the 5 furnished rooms (60 photos with sample pictures, plus each empty template) and the 11 studio photos, in `public/shop-library/` (8 MB) with `lib/shop/photo-library.ts` made by `scripts/mockups/export_library.py`.
 - The template editor lists the rooms for its product: Use this room uploads the room's photo and overlay through the existing upload route and sets zone, mask and blend, as a draft until Publish.
 
+### Blank linen cushion template, curved edges (15 Nov)
+- Gavin's Prodigi blank linen cushion photo made into a Magic Pillow template by `scripts/mockups/blank_template.py`: outline from the fabric's texture, fabric evened toward white for multiply, overlay see-through inside the outline, corners just outside it.
+- Gavin asked for the top of the picture to be the top of the cushion: with straight edges the dip in the cushion's top and its pulled-in sides trimmed up to about 100 px of the picture (dogs' ears). Four-corner zones now take optional curved edges (`zone.bend`, 1–9 points per edge, `lib/shop/template.ts`); the fitted curves leave at most about 10 px trimmed along the top. Templates without `bend` draw exactly as before (golden images unchanged).
+- Editor: "Curved edges, for a cushion or other soft product" adds draggable curve points (also arrow keys).
+- Photo library: the cushion is in it as a blank product (`public/shop-library/blanks/blank-pillow-linen/`, 12 sample photos), so "Use this photo" in the Magic Pillow editor sets photo, overlay, corners and curves in one go. Not published to Shopify.
+

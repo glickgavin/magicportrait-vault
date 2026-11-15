@@ -9,6 +9,8 @@ export type LibraryRoom = {
   productTitle: string;
   printAspect: string;
   scene: string;
+  /** A furnished room, or a photo of the blank product on a plain backdrop. */
+  setting: "room" | "studio";
   background: LibraryImage;
   overlay: LibraryImage | null;
   zone: Template["zone"];
@@ -31,6 +33,7 @@ export const LIBRARY_ROOMS: LibraryRoom[] = [
     printAspect: "1:1",
     scene:
       "On a champagne velvet sofa, a rust cushion behind it, a lamp on the side table and daylight from the window.",
+    setting: "room",
     background: {
       src: "/shop-library/rooms/room-pillow-sofa/background.jpg",
       w: 1200,
@@ -136,6 +139,7 @@ export const LIBRARY_ROOMS: LibraryRoom[] = [
     productTitle: "Masterpiece",
     printAspect: "2:3",
     scene: "Above a walnut sideboard with flowers, books and a lit candle.",
+    setting: "room",
     background: {
       src: "/shop-library/rooms/room-masterpiece-sideboard/background.jpg",
       w: 1200,
@@ -242,6 +246,7 @@ export const LIBRARY_ROOMS: LibraryRoom[] = [
     printAspect: "3:4",
     scene:
       "Finished on an oak dining table, upright, with the box lid, a cup of tea, flowers and velvet chairs behind.",
+    setting: "room",
     background: {
       src: "/shop-library/rooms/room-puzzle-table/background.jpg",
       w: 1200,
@@ -348,6 +353,7 @@ export const LIBRARY_ROOMS: LibraryRoom[] = [
     printAspect: "5:7",
     scene:
       "Standing on the walnut sideboard by the window, between books with a candle and a vase of flowers.",
+    setting: "room",
     background: {
       src: "/shop-library/rooms/room-block-sideboard/background.jpg",
       w: 1200,
@@ -453,6 +459,7 @@ export const LIBRARY_ROOMS: LibraryRoom[] = [
     productTitle: "Acrylic Block",
     printAspect: "5:7",
     scene: "On an oak desk with a laptop, a cup of tea, a notebook and a lamp.",
+    setting: "room",
     background: {
       src: "/shop-library/rooms/room-block-desk/background.jpg",
       w: 1200,
@@ -547,6 +554,119 @@ export const LIBRARY_ROOMS: LibraryRoom[] = [
       {
         picture: "rottweiler-plumber",
         src: "/shop-library/rooms/room-block-desk/photos/rottweiler-plumber.jpg",
+        w: 1200,
+        h: 1200,
+      },
+    ],
+  },
+  {
+    id: "blank-pillow-linen",
+    product: "magic-pillow-with-photo",
+    productTitle: "Magic Pillow with Photo",
+    printAspect: "1:1",
+    scene:
+      "The Prodigi linen cushion on a white backdrop, with curved edges so the whole picture shows.",
+    setting: "studio",
+    background: {
+      src: "/shop-library/blanks/blank-pillow-linen/background.jpg",
+      w: 2000,
+      h: 2000,
+    },
+    overlay: {
+      src: "/shop-library/blanks/blank-pillow-linen/overlay.webp",
+      w: 2000,
+      h: 2000,
+    },
+    zone: {
+      kind: "corners",
+      points: [
+        [0.13907, 0.15506],
+        [0.8622, 0.15962],
+        [0.87502, 0.82006],
+        [0.136, 0.8297],
+      ],
+      bend: {
+        top: [0.0176, 0.0401, 0.0475, 0.0464, 0.0365, 0.0321, 0.0049],
+        right: [0.0104, 0.0614, 0.0645, 0.0667, 0.0177],
+        bottom: [0.0, 0.0, 0.0],
+        left: [0.0076, 0.0481, 0.0544, 0.0513, 0.0485],
+      },
+    },
+    mask: {
+      kind: "none",
+      radius: 0,
+    },
+    blend: "multiply",
+    photos: [
+      {
+        picture: "beagle-peg",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/beagle-peg.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "shepherd-peg",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/shepherd-peg.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "beagle-peg-2",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/beagle-peg-2.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "admiral-teddy",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/admiral-teddy.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "admiral-cat",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/admiral-cat.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "tommy-boy",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/tommy-boy.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "bartholomew",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/bartholomew.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "husky-journal",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/husky-journal.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "frenchie-journal",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/frenchie-journal.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "cat-plumber",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/cat-plumber.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "lamb-plumber",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/lamb-plumber.jpg",
+        w: 1200,
+        h: 1200,
+      },
+      {
+        picture: "rottweiler-plumber",
+        src: "/shop-library/blanks/blank-pillow-linen/photos/rottweiler-plumber.jpg",
         w: 1200,
         h: 1200,
       },
