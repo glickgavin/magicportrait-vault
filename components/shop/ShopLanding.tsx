@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Images } from "lucide-react";
 import type { CardView, LandingPictures, LandingPreview, landingData, ShopPage } from "@/lib/shop/pages";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -52,34 +52,38 @@ function ProductCard({ p, preview, pic, base, choose, currency }: { p: CardView;
   );
 }
 
-/** The picture on the products, their other pictures (one tap switches) and Change photo. */
+/** Choose your picture: the one on the products, three more (one tap switches) and the gallery (every picture, upload). */
 function PictureBar({ gifts, pictures, base, filter, choose }: { gifts: boolean; pictures: LandingPictures; base: string; filter: string | null; choose: string }) {
   const pic = pictures.selected!;
+  const others = pictures.others.filter((o) => o.url).slice(0, 3);
+  const tile = "aspect-square overflow-hidden rounded-[14px] bg-black/5";
   return (
-    <aside aria-labelledby="start-title" className="flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] md:flex-row md:items-center md:gap-5 md:p-5" data-testid="picture-bar">
-      <div className="flex items-center gap-3 md:min-w-0 md:flex-1">
-        <img src={pic.url} alt={t("shop.selectedPicture")} className="ph-no-capture h-16 w-16 flex-none rounded-[12px] object-cover object-top ring-[3px] ring-magenta" referrerPolicy="no-referrer" />
-        <div className="min-w-0">
-          <h2 id="start-title" className="text-[18px] font-extrabold">
-            {t(gifts ? "shop.shownOnGifts" : "shop.shownOnProducts")}
-          </h2>
-          {pictures.others.length > 0 && <p className="text-[14px] text-ink-2">{t("shop.shownSub")}</p>}
-        </div>
+    <aside aria-labelledby="start-title" className="flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] md:flex-row md:items-center md:gap-6 md:p-5" data-testid="picture-bar">
+      <div className="md:min-w-0 md:flex-1">
+        <h2 id="start-title" className="text-[20px] font-extrabold">
+          {t("shop.choosePicture")}
+        </h2>
+        <p className="text-[14px] text-ink-2">{t(gifts ? "shop.shownSubGifts" : "shop.shownSub")}</p>
       </div>
-      {pictures.others.length > 0 && (
-        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:max-w-[420px] md:px-0">
-          {pictures.others.map((o, i) =>
-            o.url ? (
-              <Link key={o.id} href={withParams(base, filter, o.id)} scroll={false} aria-label={t("shop.showPicture", { n: i + 2 })} className="h-14 w-14 flex-none overflow-hidden rounded-[10px] bg-black/5 focus:outline-none focus-visible:ring-4 focus-visible:ring-magenta/40">
-                <img src={o.url} alt="" className="ph-no-capture h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
-              </Link>
-            ) : null,
-          )}
-        </div>
-      )}
-      <Link href={choose} className="flex h-12 flex-none items-center justify-center rounded-[12px] border border-[#B8059F]/35 bg-white px-5 text-[16px] font-extrabold text-pink-dark md:w-[180px]">
-        {t("shop.changePhoto")}
-      </Link>
+      <ul className="grid grid-cols-5 gap-2 md:w-[480px] md:flex-none md:gap-3">
+        <li className={cn(tile, "ring-[3px] ring-magenta ring-offset-2")}>
+          <img src={pic.url} alt={t("shop.selectedPicture")} className="ph-no-capture h-full w-full object-cover object-top" referrerPolicy="no-referrer" />
+        </li>
+        {others.map((o, i) => (
+          <li key={o.id} className={tile}>
+            <Link href={withParams(base, filter, o.id)} scroll={false} aria-label={t("shop.showPicture", { n: i + 2 })} className="block h-full w-full focus:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-magenta/40">
+              <img src={o.url!} alt="" className="ph-no-capture h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
+            </Link>
+          </li>
+        ))}
+        {/* Always there: every picture, and Upload. */}
+        <li className={cn(tile, "col-start-5 bg-pink-tint")}>
+          <Link href={choose} aria-label={t("shop.galleryLabel")} className="flex h-full w-full flex-col items-center justify-center gap-1 text-pink-dark focus:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-magenta/40">
+            <Images className="h-7 w-7" aria-hidden="true" />
+            <span className="text-[12px] font-extrabold">{t("shop.gallery")}</span>
+          </Link>
+        </li>
+      </ul>
     </aside>
   );
 }
