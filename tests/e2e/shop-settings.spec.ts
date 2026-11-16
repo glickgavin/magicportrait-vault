@@ -77,5 +77,37 @@ test.describe("Settings › Shop", () => {
     });
     expect(r.status()).toBe(400);
   });
+
+  test("print rules: a size gets its maker, code and print area and the product shows", async ({ page }) => {
+    await signInWithLink(page, "super@example.com", "/");
+    await page.goto("/settings/shop");
+    const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
+    const href = await tile.getByRole("link", { name: /print rules/ }).getAttribute("href");
+    await page.goto(href!);
+    await expect(page.getByRole("heading", { name: "Print rules: Magic Portrait Tile" })).toBeVisible();
+    await expectNoAxeViolations(page);
+    const size = page.getByTestId("rules-size").first();
+    await size.getByLabel("Maker", { exact: true }).selectOption("prodigi");
+    await size.getByLabel("Maker's product code").fill("GLOBAL-TILE-8X8");
+    await size.getByLabel("Print area (px)").fill("2400 by 2400");
+    await expect(page.getByText("print area must be width x height")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save to Shopify" })).toBeDisabled();
+    await size.getByLabel("Print area (px)").fill("2400x2400");
+    await page.getByRole("button", { name: "Save to Shopify" }).click();
+    await expect(page.getByText("Saved to Shopify.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByTestId("rules-size").first().getByText("READY")).toBeVisible();
+    await expect(page.getByTestId("rules-size").first().getByLabel("Maker's product code")).toHaveValue("GLOBAL-TILE-8X8");
+    // Put it back (the fixtures are shared by the other tests): clearing removes the fields again.
+    const again = page.getByTestId("rules-size").first();
+    await again.getByLabel("Maker", { exact: true }).selectOption("");
+    await again.getByLabel("Maker's product code").fill("");
+    await again.getByLabel("Print area (px)").fill("");
+    await page.getByRole("button", { name: "Save to Shopify" }).click();
+    await expect(page.getByText("Saved to Shopify.")).toBeVisible();
+    // The API refuses anything outside the rules.
+    const bad = await page.request.post("/api/admin/shop/rules", { data: { productId: "gid://shopify/Product/1", variants: [{ variantId: "gid://shopify/ProductVariant/1", rules: { maker: "x" } }] } });
+    expect(bad.status()).toBe(400);
+  });
 });
 
