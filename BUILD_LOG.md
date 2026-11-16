@@ -496,3 +496,9 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 - Settings › Shop › Photo library: the 5 furnished rooms (60 photos with sample pictures, plus each empty template) and the 11 studio photos, in `public/shop-library/` (8 MB) with `lib/shop/photo-library.ts` made by `scripts/mockups/export_library.py`.
 - The template editor lists the rooms for its product: Use this room uploads the room's photo and overlay through the existing upload route and sets zone, mask and blend, as a draft until Publish.
 
+
+## 16 Nov: the customer's own picture on Gifts and Products
+- **Done.** Gifts and Products pick the person's newest picture (or `?pic=`, checked as theirs) and draw it on every product card that suits it; a bar shows it, their other pictures (one tap switches) and **Change photo**. Cards open Product ideas with that product's sheet open. No pictures yet: the old "Start with a picture" box. `landingPictures` in `lib/shop/pages.ts`.
+- **Fixed: hidden shop pages answered 200.** The loading placeholders (perf work) make every customer page stream, so a page's own `notFound()` showed the not-found page with status 200. `proxy.ts` now answers `/gifts`, `/products` and `/cart` with a real 404 while the shop is hidden from that person.
+- **Known:** a shop page for a picture that isn't theirs still shows the not-found page with status 200 (same streaming cause). The server re-checks ownership and shows nothing of the picture; checking ownership in the proxy would need Imagen calls on every request.
+- **Shop e2e fixed:** the local stack needed `supabase db reset` (it predated the shop settings, so the tests' setting changes did nothing); the test seed lifts the shop upload/cart/checkout limits; `getByLabel("Page", { exact: true })`; the cart helper waits for the cart's refresh; the template test accepts Make or Edit. All 29 shop e2e tests pass at 390 and 1280.

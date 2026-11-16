@@ -44,6 +44,8 @@ Two pages, Gifts and Products, lead into the same four screens. Both are for sig
 | "Who's it for?" | Asked before checkout: their name and an optional gift message | Not asked |
 | Copy | Written for giving | Written for owning |
 
+**Their own picture on the landing page** (16 Nov). When the person has any picture, Gifts and Products pick their newest one (or the one in `?pic=`, checked as theirs; anything else falls back to the newest). Every product card then shows a live preview of that picture on the product, drawn with the cheapest size that suits it, with the top kept and nothing stretched. A bar above the products shows the picture, a strip of their other pictures (one tap switches, `?pic=<id>`) and **Change photo** (the Choose a picture screen, with Upload). A card opens Product ideas for that picture with the product's sheet already open. Products the picture doesn't suit keep the product's own photo and lead to Choose a picture. The products show at once; the previews stream in after (`landingPictures` in `lib/shop/pages.ts`). Someone with no pictures yet gets the old "Start with a picture" box.
+
 After the page, both run the same screens: Choose a picture, Product ideas, Product sheet and Cart. A product can appear on both pages.
 
 *(Diagram: shop flow · 7 steps, 1 loop)*

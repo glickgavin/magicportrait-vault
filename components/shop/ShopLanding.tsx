@@ -1,33 +1,111 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import type { landingData, RecentPicture, ShopPage } from "@/lib/shop/pages";
+import type { CardView, LandingPictures, LandingPreview, landingData, ShopPage } from "@/lib/shop/pages";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { TrackPageView } from "@/components/TrackPageView";
 import { Price } from "./Price";
+import { ShopPreview } from "./ShopPreview";
 
 type Data = Awaited<ReturnType<typeof landingData>>;
 
-/** The person's newest pictures; they stream in after the products so the page shows at once. */
-async function RecentTiles({ recent, base }: { recent: Promise<RecentPicture[]>; base: string }) {
-  const list = await recent;
-  return list.map((p, i) =>
-    p.url ? (
-      <Link key={p.id} href={`${base}/i/${p.id}`} aria-label={t("shop.usePicture", { n: i + 1 })} className="aspect-square overflow-hidden rounded-[12px] bg-black/5">
-        <img src={p.url} alt="" className="ph-no-capture h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
+const tileSkeleton = [0, 1, 2].map((i) => <div key={i} aria-hidden="true" className="aspect-square animate-pulse rounded-[12px] bg-black/5" />);
+
+type Pic = NonNullable<LandingPictures["selected"]>;
+const withParams = (base: string, filter: string | null, pic: string | null) => {
+  const q = new URLSearchParams();
+  if (filter) q.set("filter", filter);
+  if (pic) q.set("pic", pic);
+  const s = q.toString();
+  return s ? `${base}?${s}` : base;
+};
+
+/** One product: drawn with the person's picture when it suits it, else the product's own photo. */
+function ProductCard({ p, preview, pic, base, choose, currency }: { p: CardView; preview: LandingPreview | undefined; pic: Pic | null; base: string; choose: string; currency: string }) {
+  const href = preview && pic ? `${base}/i/${pic.id}?product=${encodeURIComponent(p.handle)}` : choose;
+  return (
+    <li>
+      <Link href={href} className="flex h-full flex-col gap-2 rounded-[20px] bg-white p-2.5 text-ink shadow-[0_1px_4px_rgba(0,0,0,0.04)]" data-testid="shop-card" data-preview={preview && pic ? "yours" : "product"}>
+        <span className="block aspect-square w-full overflow-hidden rounded-[14px] bg-black/5">
+          {preview && pic ? (
+            <ShopPreview
+              template={preview.template}
+              pictureUrl={pic.url}
+              crop={preview.crop}
+              placement={preview.placement}
+              aspect={preview.aspect}
+              background={preview.background}
+              pictureSize={pic.width && pic.height ? { width: pic.width, height: pic.height } : null}
+              width={320}
+              alt={t("shop.previewOn", { product: p.title })}
+              className="h-full w-full rounded-none object-cover object-top"
+            />
+          ) : p.image ? (
+            <img src={p.image} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
+          ) : null}
+        </span>
+        <span className="px-1 text-[15px] font-bold leading-5">{p.title}</span>
+        <Price price={p.from} discounted={p.fromDiscounted} currency={currency} from={p.many} className="px-1 pb-1" />
       </Link>
-    ) : null,
+    </li>
   );
 }
 
-const tileSkeleton = [0, 1, 2].map((i) => <div key={i} aria-hidden="true" className="aspect-square animate-pulse rounded-[12px] bg-black/5" />);
+/** The picture on the products, their other pictures (one tap switches) and Change photo. */
+function PictureBar({ gifts, pictures, base, filter, choose }: { gifts: boolean; pictures: LandingPictures; base: string; filter: string | null; choose: string }) {
+  const pic = pictures.selected!;
+  return (
+    <aside aria-labelledby="start-title" className="flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] md:flex-row md:items-center md:gap-5 md:p-5" data-testid="picture-bar">
+      <div className="flex items-center gap-3 md:min-w-0 md:flex-1">
+        <img src={pic.url} alt={t("shop.selectedPicture")} className="ph-no-capture h-16 w-16 flex-none rounded-[12px] object-cover object-top ring-[3px] ring-magenta" referrerPolicy="no-referrer" />
+        <div className="min-w-0">
+          <h2 id="start-title" className="text-[18px] font-extrabold">
+            {t(gifts ? "shop.shownOnGifts" : "shop.shownOnProducts")}
+          </h2>
+          {pictures.others.length > 0 && <p className="text-[14px] text-ink-2">{t("shop.shownSub")}</p>}
+        </div>
+      </div>
+      {pictures.others.length > 0 && (
+        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:max-w-[420px] md:px-0">
+          {pictures.others.map((o, i) =>
+            o.url ? (
+              <Link key={o.id} href={withParams(base, filter, o.id)} scroll={false} aria-label={t("shop.showPicture", { n: i + 2 })} className="h-14 w-14 flex-none overflow-hidden rounded-[10px] bg-black/5 focus:outline-none focus-visible:ring-4 focus-visible:ring-magenta/40">
+                <img src={o.url} alt="" className="ph-no-capture h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
+              </Link>
+            ) : null,
+          )}
+        </div>
+      )}
+      <Link href={choose} className="flex h-12 flex-none items-center justify-center rounded-[12px] border border-[#B8059F]/35 bg-white px-5 text-[16px] font-extrabold text-pink-dark md:w-[180px]">
+        {t("shop.changePhoto")}
+      </Link>
+    </aside>
+  );
+}
+
+/** Before they have any picture (or while it loads): the old "Start with a picture" box. */
+function StartBox({ gifts, topPicks, choose, loading }: { gifts: boolean; topPicks: number; choose: string; loading: boolean }) {
+  return (
+    <aside aria-labelledby="start-title" className="flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] md:flex-row md:items-center md:gap-5 md:p-5">
+      <div className="md:min-w-0 md:flex-1">
+        <h2 id="start-title" className="text-[18px] font-extrabold">
+          {t("shop.startTitle")}
+        </h2>
+        <p className="text-[14px] text-ink-2">{t(gifts ? "shop.startSubGifts" : "shop.startSubProducts", { count: topPicks })}</p>
+      </div>
+      {loading && <div className="grid grid-cols-4 gap-2 md:w-[296px] md:flex-none">{tileSkeleton}</div>}
+      <Link href={choose} className="bg-primary-gradient shadow-primary flex h-12 items-center justify-center rounded-[12px] px-5 text-[16px] font-extrabold text-white md:w-[220px] md:flex-none">
+        {t(gifts ? "shop.seeGiftIdeas" : "shop.seeProductIdeas")}
+      </Link>
+    </aside>
+  );
+}
 
 /** The Gifts page (browse by occasion) or the Products page (browse by product type). */
-export function ShopLanding({ page, data, recent }: { page: ShopPage; data: Data; recent: Promise<RecentPicture[]> }) {
+export function ShopLanding({ page, data, pictures }: { page: ShopPage; data: Data; pictures: Promise<LandingPictures> }) {
   const gifts = page === "gifts";
   const base = `/${page}`;
-  const choose = (product?: string) => `${base}/choose${product ? `?product=${encodeURIComponent(product)}` : ""}`;
   return (
     <div className="mx-auto flex max-w-[1120px] flex-col gap-8">
       <TrackPageView event={gifts ? "page_view_gifts" : "page_view_products"} props={{ filter: data.chosen ?? "all", customer_type: data.pricing.customerType, products: data.total }} />
@@ -56,49 +134,11 @@ export function ShopLanding({ page, data, recent }: { page: ShopPage; data: Data
             </nav>
           )}
         </section>
-        <aside aria-labelledby="start-title" className="flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] md:flex-row md:items-center md:gap-5 md:p-5">
-          <div className="md:min-w-0 md:flex-1">
-            <h2 id="start-title" className="text-[18px] font-extrabold">
-              {t("shop.startTitle")}
-            </h2>
-            <p className="text-[14px] text-ink-2">{t(gifts ? "shop.startSubGifts" : "shop.startSubProducts", { count: data.topPicks })}</p>
-          </div>
-          <div className="grid grid-cols-4 gap-2 md:w-[296px] md:flex-none">
-            <Suspense fallback={tileSkeleton}>
-              <RecentTiles recent={recent} base={base} />
-            </Suspense>
-            <Link href={choose()} className="flex aspect-square items-center justify-center rounded-[12px] bg-black/5 text-[14px] font-bold text-ink">
-              {t("shop.more")}
-            </Link>
-          </div>
-          <Link href={choose()} className="bg-primary-gradient shadow-primary flex h-12 items-center justify-center rounded-[12px] px-5 text-[16px] font-extrabold text-white md:w-[220px] md:flex-none">
-            {t(gifts ? "shop.seeGiftIdeas" : "shop.seeProductIdeas")}
-          </Link>
-        </aside>
       </div>
 
-      {data.sections.length === 0 && <p className="text-[15px] text-ink-2">{t("shop.noProducts")}</p>}
-      {data.sections.map((sec, i) => (
-        <section key={sec.title || `more-${i}`} aria-labelledby={`sec-${i}`} className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 id={`sec-${i}`} className="text-[22px] font-extrabold lg:text-[26px]">
-              {sec.title || t(gifts ? "shop.otherGifts" : "shop.otherProducts")}
-            </h2>
-            {data.pricing.pct != null && <span className="rounded-full bg-pink-tint px-2.5 py-1 text-[12px] font-bold text-pink-dark">{t("shop.priceApplied", { label: data.pricing.label })}</span>}
-          </div>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
-            {sec.products.map((p) => (
-              <li key={p.handle}>
-                <Link href={choose(p.handle)} className="flex h-full flex-col gap-2 rounded-[20px] bg-white p-2.5 text-ink shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-                  {p.image ? <img src={p.image} alt="" className="aspect-square w-full rounded-[14px] object-cover object-top" loading="lazy" /> : <span className="aspect-square w-full rounded-[14px] bg-black/5" aria-hidden="true" />}
-                  <span className="px-1 text-[15px] font-bold leading-5">{p.title}</span>
-                  <Price price={p.from} discounted={p.fromDiscounted} currency={data.pricing.currency} from={p.many} className="px-1 pb-1" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      <Suspense fallback={<Body page={page} data={data} pictures={null} />}>
+        <WithPictures page={page} data={data} pictures={pictures} />
+      </Suspense>
 
       {gifts && data.groups.length > 1 && !data.chosen && (
         <section aria-labelledby="by-occasion" className="flex flex-col gap-3">
@@ -120,4 +160,38 @@ export function ShopLanding({ page, data, recent }: { page: ShopPage; data: Data
       <p className="text-[13px] text-ink-2">{t("shop.shipsNote")}</p>
     </div>
   );
+}
+
+/** The picture box and the product sections; `pictures` is null while the person's pictures load. */
+function Body({ page, data, pictures }: { page: ShopPage; data: Data; pictures: LandingPictures | null }) {
+  const gifts = page === "gifts";
+  const base = `/${page}`;
+  const choose = (product?: string) => `${base}/choose${product ? `?product=${encodeURIComponent(product)}` : ""}`;
+  const pic = pictures?.selected ?? null;
+  return (
+    <>
+      {pic ? <PictureBar gifts={gifts} pictures={pictures!} base={base} filter={data.chosen} choose={choose()} /> : <StartBox gifts={gifts} topPicks={data.topPicks} choose={choose()} loading={pictures === null} />}
+      {data.sections.length === 0 && <p className="text-[15px] text-ink-2">{t("shop.noProducts")}</p>}
+      {data.sections.map((sec, i) => (
+        <section key={sec.title || `more-${i}`} aria-labelledby={`sec-${i}`} className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 id={`sec-${i}`} className="text-[22px] font-extrabold lg:text-[26px]">
+              {sec.title || t(gifts ? "shop.otherGifts" : "shop.otherProducts")}
+            </h2>
+            {data.pricing.pct != null && <span className="rounded-full bg-pink-tint px-2.5 py-1 text-[12px] font-bold text-pink-dark">{t("shop.priceApplied", { label: data.pricing.label })}</span>}
+          </div>
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
+            {sec.products.map((p) => (
+              <ProductCard key={p.handle} p={p} preview={pictures?.previews[p.handle]} pic={pic} base={base} choose={choose(p.handle)} currency={data.pricing.currency} />
+            ))}
+          </ul>
+        </section>
+      ))}
+
+    </>
+  );
+}
+
+async function WithPictures({ page, data, pictures }: { page: ShopPage; data: Data; pictures: Promise<LandingPictures> }) {
+  return <Body page={page} data={data} pictures={await pictures} />;
 }
