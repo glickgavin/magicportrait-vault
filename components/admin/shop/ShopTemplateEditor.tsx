@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { centredCrop } from "@/lib/shop/fit";
+import { defaultCrop } from "@/lib/shop/fit";
 import { drawPreview, previewSize, type MakeCanvas, type PreviewCtx } from "@/lib/shop/preview";
 import type { LibraryRoom } from "@/lib/shop/photo-library";
 import { defaultTemplate, zoneAspect, zoneMapper, type Template } from "@/lib/shop/template";
@@ -315,7 +315,7 @@ function Editor({
             el.width = out.w;
             el.height = out.h;
             const ctx = el.getContext("2d") as unknown as PreviewCtx;
-            const crop = placement === "contain" ? { x: 0, y: 0, w: pw, h: ph } : centredCrop(pw, ph, aspect, 1);
+            const crop = placement === "contain" ? { x: 0, y: 0, w: pw, h: ph } : defaultCrop(pw, ph, aspect, 1);
             drawPreview(ctx, { template: t, background: bg, overlay: ov, picture: pic as never, crop, placement, backgroundColour: size?.background ?? null, targetAspect: aspect, size: out, makeCanvas: browserCanvas, flatMax: 900 });
           };
           pics.forEach((img, i) => img && draw(live.current[i], img, img.naturalWidth, img.naturalHeight, 640));

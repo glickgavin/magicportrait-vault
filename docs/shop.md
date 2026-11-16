@@ -142,6 +142,7 @@ A template has:
 How it's drawn:
 
 - The image is cropped to the variant's print area by the rules (Product rules), then warped into the print zone. The cropping and warping live in one shared module, as the card layout does today.
+- **Cropped, never stretched, and kept to the top** (16 Nov). The default crop keeps the top of the picture and trims the sides evenly (`defaultCrop` in `lib/shop/fit.ts`). If the print zone on the photo isn't exactly the print area's shape, the flat picture is cropped again to the zone's own shape (top kept) before warping, so it's never squashed to fill the zone. Sizes without Adjust also accept the old centred crop, so carts made before still check out.
 - The browser draws previews with that module, so changing the image or the crop redraws the 4 or 5 previews without a round trip.
 - The server draws the same thing with `@napi-rs/canvas` for cart thumbnails and for a preview image on the order line.
 

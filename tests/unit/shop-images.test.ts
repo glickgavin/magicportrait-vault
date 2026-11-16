@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 import { evaluateCatalog, forPage } from "@/lib/shop/catalog";
-import { centredCrop, cropAllowed, cropPercent, fitVariant, ideasFor, topIdeas } from "@/lib/shop/fit";
+import { defaultCrop, cropAllowed, cropPercent, fitVariant, ideasFor, topIdeas } from "@/lib/shop/fit";
 import { buildImageList, externalImageId, isAllowedUrl, looksLikeImageId, orderedPhotoTiles } from "@/lib/shop/images";
 import type { VariantRules } from "@/lib/shop/rules";
 import { FX_COLLECTION_ID, ShopCatalogFixtures } from "@/lib/shop/sources/fixtures";
@@ -37,7 +37,7 @@ describe("fit rules", () => {
   it("3:4 on a 4:5 print: a little cropped", () => {
     const f = fitVariant(THREE_FOUR, rules());
     expect(f.ok && f.cropPct).toBe(6.3);
-    expect(f.ok && f.crop).toEqual({ x: 0, y: 64, w: 1536, h: 1920 });
+    expect(f.ok && f.crop).toEqual({ x: 0, y: 0, w: 1536, h: 1920 }); // top kept
   });
   it("landscape on a portrait print loses too much and is hidden", () => {
     expect(fitVariant(LANDSCAPE, rules())).toEqual({ ok: false, reason: "too_much_crop", cropPct: 46.7 });
@@ -68,7 +68,8 @@ describe("fit rules", () => {
   it("crop maths", () => {
     expect(cropPercent(100, 100, 100, 100)).toBe(0);
     expect(cropPercent(200, 100, 100, 100)).toBe(50);
-    expect(centredCrop(200, 100, 1, 1)).toEqual({ x: 50, y: 0, w: 100, h: 100 });
+    expect(defaultCrop(200, 100, 1, 1)).toEqual({ x: 50, y: 0, w: 100, h: 100 });
+    expect(defaultCrop(100, 200, 1, 1)).toEqual({ x: 0, y: 0, w: 100, h: 100 }); // tall: the top is kept
   });
 });
 

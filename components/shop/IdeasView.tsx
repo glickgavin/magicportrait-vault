@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import { Crop, X } from "lucide-react";
 import type { IdeaView, Pricing, ShopPage, VariantView } from "@/lib/shop/pages";
-import { centredCrop, type Rect } from "@/lib/shop/fit";
+import { defaultCrop, type Rect } from "@/lib/shop/fit";
 import { formatMoney } from "@/lib/shop/money";
 import { t, tn } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
@@ -26,7 +26,7 @@ function OtherPictures({ others, showChange, base, page }: { others: Promise<{ i
       {list.map((o, n) => (
         <li key={o.id}>
           <Link href={`${base}/i/${o.id}`} aria-label={t("shop.usePicture", { n: n + 1 })} onClick={() => trackClient("shop_image_selected", { changed: true, page })} className="block aspect-square overflow-hidden rounded-[10px] bg-black/5">
-            {o.url && <img src={o.url} alt="" className="ph-no-capture h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />}
+            {o.url && <img src={o.url} alt="" className="ph-no-capture h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />}
           </Link>
         </li>
       ))}
@@ -74,7 +74,7 @@ export function IdeasView({ page, picture, top, rest, others, pricing, sizeKnown
       <div className="flex flex-wrap items-start gap-6">
         <aside aria-labelledby="pic-title" className="flex w-full flex-col gap-3 rounded-[20px] bg-white p-3 shadow-[0_1px_4px_rgba(0,0,0,0.04)] lg:sticky lg:top-20 lg:w-[320px]">
           <div className="flex items-center gap-3 lg:flex-col lg:items-stretch">
-            {picture.url && <img src={picture.url} alt={t("shop.yourPicture")} className="ph-no-capture h-20 w-20 flex-none rounded-[12px] object-cover lg:h-auto lg:w-full lg:rounded-[16px]" referrerPolicy="no-referrer" />}
+            {picture.url && <img src={picture.url} alt={t("shop.yourPicture")} className="ph-no-capture h-20 w-20 flex-none rounded-[12px] object-cover object-top lg:h-auto lg:w-full lg:rounded-[16px]" referrerPolicy="no-referrer" />}
             <div className="min-w-0 flex-1">
               <h2 id="pic-title" className="text-[16px] font-extrabold">
                 {t("shop.yourPicture")}
@@ -270,7 +270,7 @@ function ProductSheet({ page, idea, picture, pricing, maxQty, onClose }: { page:
 
 /** Adjust: zoom and move the picture inside the print shape, never past the size's smallest-picture rule. */
 function AdjustDialog({ picture, variant, crop, onDone, onCancel }: { picture: Picture & { url: string; width: number; height: number }; variant: VariantView; crop: Rect; onDone: (c: Rect) => void; onCancel: () => void }) {
-  const base = useMemo(() => centredCrop(picture.width, picture.height, variant.aspect, 1), [picture.width, picture.height, variant.aspect]);
+  const base = useMemo(() => defaultCrop(picture.width, picture.height, variant.aspect, 1), [picture.width, picture.height, variant.aspect]);
   const maxZoom = Math.max(1, Math.min(3, Math.min(base.w, base.h) / Math.max(1, variant.minShortSidePx)));
   const [zoom, setZoom] = useState(() => Math.min(maxZoom, Math.max(1, base.w / crop.w)));
   const [c, setC] = useState<Rect>(crop);

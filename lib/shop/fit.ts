@@ -18,15 +18,24 @@ export function target(rules: Pick<VariantRules, "placement" | "printPx" | "zone
   return rules.placement === "wrap_zone" && rules.zonePx ? rules.zonePx : rules.printPx;
 }
 
-/** The largest centred rectangle of the target shape inside the picture. */
-export function centredCrop(w: number, h: number, targetW: number, targetH: number): Rect {
+/**
+ * The default crop: the largest rectangle of the target shape inside the picture, kept to the top
+ * (so heads are never cut off) and centred side to side. The picture is cropped, never stretched.
+ */
+export function defaultCrop(w: number, h: number, targetW: number, targetH: number): Rect {
   const ta = targetW / targetH;
   if (w / h > ta) {
     const cw = Math.round(h * ta);
     return { x: Math.round((w - cw) / 2), y: 0, w: cw, h };
   }
   const ch = Math.round(w / ta);
-  return { x: 0, y: Math.round((h - ch) / 2), w, h: ch };
+  return { x: 0, y: 0, w, h: ch };
+}
+
+/** The old centred default, still accepted for sizes without Adjust so carts made before stay valid. */
+function centredCrop(w: number, h: number, targetW: number, targetH: number): Rect {
+  const c = defaultCrop(w, h, targetW, targetH);
+  return c.h < h ? { ...c, y: Math.round((h - c.h) / 2) } : c;
 }
 
 /** Share of the picture lost to fill the print area, 0–100, rounded to one decimal. */
@@ -46,7 +55,7 @@ export function fitVariant(img: FitInput, rules: Pick<VariantRules, "imageKinds"
   const t = target(rules);
   const pct = cropPercent(img.width, img.height, t.w, t.h);
   if (pct > rules.maxCropPct) return { ok: false, reason: "too_much_crop", cropPct: pct };
-  return { ok: true, cropPct: pct, crop: centredCrop(img.width, img.height, t.w, t.h) };
+  return { ok: true, cropPct: pct, crop: defaultCrop(img.width, img.height, t.w, t.h) };
 }
 
 /** A crop the customer chose with Adjust is accepted only inside the picture, in the print shape (±1%). */
@@ -58,8 +67,8 @@ export function cropAllowed(crop: Rect, img: { width: number; height: number }, 
   const ta = t.w / t.h;
   if (Math.abs(crop.w / crop.h - ta) / ta > 0.01) return false;
   if (!rules.adjustable) {
-    const c = centredCrop(img.width, img.height, t.w, t.h);
-    return Math.abs(c.x - crop.x) <= 1 && Math.abs(c.y - crop.y) <= 1 && Math.abs(c.w - crop.w) <= 1 && Math.abs(c.h - crop.h) <= 1;
+    const near = (c: Rect) => Math.abs(c.x - crop.x) <= 1 && Math.abs(c.y - crop.y) <= 1 && Math.abs(c.w - crop.w) <= 1 && Math.abs(c.h - crop.h) <= 1;
+    return near(defaultCrop(img.width, img.height, t.w, t.h)) || near(centredCrop(img.width, img.height, t.w, t.h));
   }
   return true;
 }

@@ -15,7 +15,7 @@ async function RecentTiles({ recent, base }: { recent: Promise<RecentPicture[]>;
   return list.map((p, i) =>
     p.url ? (
       <Link key={p.id} href={`${base}/i/${p.id}`} aria-label={t("shop.usePicture", { n: i + 1 })} className="aspect-square overflow-hidden rounded-[12px] bg-black/5">
-        <img src={p.url} alt="" className="ph-no-capture h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+        <img src={p.url} alt="" className="ph-no-capture h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
       </Link>
     ) : null,
   );
@@ -90,7 +90,7 @@ export function ShopLanding({ page, data, recent }: { page: ShopPage; data: Data
             {sec.products.map((p) => (
               <li key={p.handle}>
                 <Link href={choose(p.handle)} className="flex h-full flex-col gap-2 rounded-[20px] bg-white p-2.5 text-ink shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-                  {p.image ? <img src={p.image} alt="" className="aspect-square w-full rounded-[14px] object-cover" loading="lazy" /> : <span className="aspect-square w-full rounded-[14px] bg-black/5" aria-hidden="true" />}
+                  {p.image ? <img src={p.image} alt="" className="aspect-square w-full rounded-[14px] object-cover object-top" loading="lazy" /> : <span className="aspect-square w-full rounded-[14px] bg-black/5" aria-hidden="true" />}
                   <span className="px-1 text-[15px] font-bold leading-5">{p.title}</span>
                   <Price price={p.from} discounted={p.fromDiscounted} currency={data.pricing.currency} from={p.many} className="px-1 pb-1" />
                 </Link>
