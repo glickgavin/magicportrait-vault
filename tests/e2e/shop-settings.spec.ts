@@ -24,16 +24,16 @@ test.describe("Settings › Shop", () => {
     await signInWithLink(page, "super@example.com", "/");
     await page.goto("/settings/shop");
     const poster = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
-    await poster.getByLabel("Page").selectOption("all");
+    await poster.getByLabel("Page", { exact: true }).selectOption("all");
     await poster.getByText("Birthday", { exact: true }).click();
     await poster.getByRole("button", { name: "Save page and occasions for Magic Poster" }).click();
     await expect(poster.getByRole("status")).toHaveText("Saved to Shopify.");
     await page.reload();
     const again = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
-    await expect(again.getByLabel("Page")).toHaveValue("all");
+    await expect(again.getByLabel("Page", { exact: true })).toHaveValue("all");
     await expect(again.getByText("GIFTS + PRODUCTS")).toBeVisible();
     // Put it back.
-    await again.getByLabel("Page").selectOption("products");
+    await again.getByLabel("Page", { exact: true }).selectOption("products");
     await again.getByText("Birthday", { exact: true }).click();
     await again.getByRole("button", { name: "Save page and occasions for Magic Poster" }).click();
     await expect(again.getByRole("status")).toHaveText("Saved to Shopify.");
@@ -59,7 +59,7 @@ test.describe("Settings › Shop", () => {
     await signInWithLink(page, "super@example.com", "/");
     await page.goto("/settings/shop");
     const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
-    await tile.getByRole("link", { name: "Make the preview template" }).click();
+    await tile.getByRole("link", { name: /^(Make|Edit) the preview template$/ }).click();
     await expect(page.getByRole("heading", { name: /Preview template: Magic Portrait Tile/ })).toBeVisible();
     const handle = page.getByRole("button", { name: "Top left: move with the arrow keys" });
     await handle.focus();

@@ -47,7 +47,7 @@ async function occasionOrder(entries: CatalogEntry[]): Promise<string[]> {
 
 /** The Gifts page (by occasion) or the Products page (by product type). */
 export async function landingData(user: SessionUser, page: ShopPage, filter: string | null) {
-  // Pricing, the catalog and the setting side by side; the person's pictures stream in separately (recentPictures).
+  // Pricing, the catalog and the setting side by side; the person's pictures stream in separately (landingPictures).
   const [pricing, catalog, s] = await Promise.all([pricingFor(user.email), getCatalog(), getSettings(["shop.top_picks_count"] as const)]);
   const entries = forPage(catalog, page);
   const groups = page === "gifts" ? (await occasionOrder(entries)).filter((o) => entries.some((e) => e.product.occasions.includes(o))) : [...new Set(entries.map((e) => e.product.productType.trim()).filter(Boolean))];
@@ -61,13 +61,52 @@ export async function landingData(user: SessionUser, page: ShopPage, filter: str
 
 export type RecentPicture = { id: string; url: string | null };
 
-/** The person's three newest pictures for the "Start with a picture" box. Never throws: none on failure. */
-export async function recentPictures(email: string): Promise<RecentPicture[]> {
+/** One product drawn with the person's picture (what ShopPreview needs). */
+export type LandingPreview = { template: Template; crop: { x: number; y: number; w: number; h: number }; placement: "cover" | "contain" | "wrap_zone"; aspect: number; background: string | null };
+export type LandingPictures = {
+  /** The picture shown on the products: the one asked for (when it's theirs), else their newest. */
+  selected: { id: string; url: string; width: number | null; height: number | null } | null;
+  /** Their other pictures, for one-tap switching. */
+  others: RecentPicture[];
+  /** By product handle; a product the picture doesn't suit has none and keeps its own photo. */
+  previews: Record<string, LandingPreview>;
+};
+
+/**
+ * The landing pages show the person's own picture on every product (docs/shop.md › Gifts and Products).
+ * Streamed after the products; never throws (no previews on failure, so the product photos stay).
+ */
+export async function landingPictures(user: SessionUser, page: ShopPage, pictureId: string | null): Promise<LandingPictures> {
+  const none: LandingPictures = { selected: null, others: [], previews: {} };
   try {
-    const pictures = await listPictures(email);
-    return await Promise.all([...pictures.portraits, ...pictures.photos].slice(0, 3).map(async (p) => ({ id: p.id, url: await pictureLink(p) })));
+    const [list, s, catalog] = await Promise.all([listPictures(user.email), getSettings(["shop.change_strip_count"] as const), getCatalog()]);
+    const all = [...list.portraits, ...list.photos];
+    const asked = pictureId ? await pictureFor(user.email, pictureId) : null;
+    const pic = asked ?? all[0];
+    if (!pic) return none;
+    const img = await ensureSize(user.email, pic);
+    const url = await pictureLink(img);
+    if (!url) return none;
+    const previews: Record<string, LandingPreview> = {};
+    if (img.width && img.height) {
+      for (const idea of ideasFor(forPage(catalog, page), { kind: img.kind, width: img.width, height: img.height })) {
+        const template = parseTemplate(idea.entry.product.template?.value);
+        // The cheapest size that suits the picture stands for the product.
+        const v = [...idea.variants].sort((a, b) => Number(a.variant.price) - Number(b.variant.price))[0];
+        if (!template || !v) continue;
+        const t = target(v.rules);
+        previews[idea.entry.product.handle] = { template, crop: v.fit.crop, placement: v.rules.placement, aspect: t.w / t.h, background: v.rules.background };
+      }
+    }
+    const others = await Promise.all(
+      all
+        .filter((p) => p.id !== img.id)
+        .slice(0, s["shop.change_strip_count"])
+        .map(async (p) => ({ id: p.id, url: await pictureLink(p) })),
+    );
+    return { selected: { id: img.id, url, width: img.width, height: img.height }, others, previews };
   } catch {
-    return [];
+    return none;
   }
 }
 

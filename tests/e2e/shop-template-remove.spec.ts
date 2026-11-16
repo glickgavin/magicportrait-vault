@@ -27,3 +27,33 @@ test("an uploaded template photo can be removed with its ×", async ({ page }, i
   await page.reload();
   await expect(page.getByRole("button", { name: "Remove this uploaded photo" })).toHaveCount(start);
 });
+
+test("a photo the live template uses is removed at once and deleted when you publish", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one viewport is enough");
+  await signInWithLink(page, "super@example.com", "/");
+  await page.goto("/settings/shop");
+  const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
+  const href = await tile.getByRole("link", { name: /preview template/i }).getAttribute("href");
+  await page.goto(href!);
+  const x = page.getByRole("button", { name: "Remove this uploaded photo" });
+  await expect(page.getByRole("button", { name: "Publish to Shopify" })).toBeVisible();
+  const start = await x.count();
+  const png = await sharp({ create: { width: 600, height: 600, channels: 3, background: "#3366ff" } }).png().toBuffer();
+  await page.getByLabel("Upload a photo of the blank product").first().setInputFiles({ name: "blue.png", mimeType: "image/png", buffer: png });
+  await expect(x).toHaveCount(start + 1);
+  // Publish with the new photo, so the live template uses it.
+  await page.getByRole("button", { name: "Publish to Shopify" }).click();
+  await expect(page.getByText("Published to Shopify.")).toBeVisible();
+  await page.reload();
+  const deletes: string[] = [];
+  page.on("request", (r) => r.method() === "DELETE" && r.url().includes("/template/upload") && deletes.push(r.url()));
+  await page.getByRole("button", { name: "Remove this uploaded photo" }).first().click();
+  await expect(page.getByText("Removed. The live template still uses it, so it's deleted when you publish.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove this uploaded photo" })).toHaveCount(start);
+  expect(deletes).toHaveLength(0);
+  await page.getByRole("button", { name: "Publish to Shopify" }).click();
+  await expect(page.getByText("Published to Shopify.")).toBeVisible();
+  await expect.poll(() => deletes.length).toBe(1);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Remove this uploaded photo" })).toHaveCount(start);
+});
