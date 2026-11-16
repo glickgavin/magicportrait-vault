@@ -13,15 +13,16 @@ const SIZES = [
 
 async function emptyCart(page: Page) {
   await page.goto("/cart");
-  await page.waitForLoadState("networkidle");
-  for (let i = 0; i < 10; i++) {
-    const remove = page.getByRole("button", { name: "Remove" }).first();
-    if (!(await remove.isVisible().catch(() => false))) break;
-    await remove.click();
-    await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("heading", { name: "Your cart" })).toBeVisible();
+  const remove = page.getByRole("button", { name: "Remove" });
+  for (let i = 0; i < 10 && (await remove.count()) > 0; i++) {
+    const before = await remove.count();
+    await remove.first().click();
+    await expect(remove).toHaveCount(before - 1);
   }
-  // Let the cart's own refresh finish before the test moves on.
-  await page.waitForLoadState("networkidle");
+  // A fresh load, so no refresh from the removals is still in flight when the test moves on.
+  await page.goto("/cart");
+  await expect(remove).toHaveCount(0);
 }
 
 test.describe("shop", () => {
