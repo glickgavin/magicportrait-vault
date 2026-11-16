@@ -154,6 +154,7 @@ export const EVENTS = {
   admin_shop_occasions_updated: biz,
   admin_shop_fields_created: biz,
   admin_shop_template_published: biz,
+  admin_shop_rules_updated: biz,
   admin_shop_template_uploaded: biz,
   admin_shop_scene_made: biz,
 

@@ -132,6 +132,10 @@ export default async function ShopSettings() {
                                 <Link href={`/settings/shop/template/${p.legacyId}`} className="link">
                                   {e.hidden.includes("no_template") ? "Make the preview template" : "Edit the preview template"}
                                 </Link>
+                                {" · "}
+                                <Link href={`/settings/shop/rules/${p.legacyId}`} className="link">
+                                  {e.hidden.includes("no_rules") ? "Add the print rules" : "Edit the print rules"}
+                                </Link>
                                 {link && (
                                   <>
                                     {" · "}

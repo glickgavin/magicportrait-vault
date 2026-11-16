@@ -109,6 +109,8 @@ To start with, the existing Shopify products that could go in the shop include t
 
 Each Shopify variant carries its rules as metafields in the namespace mmp_shop. They decide whether the product suits an image, how the image sits on it, and what we tell the maker on the order line.
 
+**Editing them (16 Nov):** Settings › Shop › a product › **Add/Edit the print rules** (`/settings/shop/rules/[id]`) shows one card per size with maker, maker's product code, print area, placement, picture zone (wrap only), smallest picture, most crop, adjustable and which pictures, and a READY or "missing …" badge. **Save to Shopify** writes only the rules that changed (`metafieldsSet`, or `metafieldsDelete` for a cleared one) on that product's sizes, in mmp_shop only (allowed write 5); `background` and `extra` are left as they are. Prodigi products use Prodigi's own SKU as the maker's code (e.g. `JIGSAW-PUZZLE-252`), and the print area is Prodigi's `printAreaSizes` for the main print area. Event: `admin_shop_rules_updated`.
+
 | Rule | Example | Used for |
 |---|---|---|
 | Maker | Gelato, Prodigi or in-house | The order line, so the fulfilment system routes it |

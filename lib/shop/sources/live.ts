@@ -2,7 +2,7 @@ import "server-only";
 import { opName, timed } from "@/lib/perf";
 import type { ShopifyTokenProvider } from "@/lib/sources/shopify-auth";
 import { parseList } from "../fields";
-import type { DiscountInfo, FieldDefinitionSpec, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopProduct, WriteResult } from "./types";
+import type { DiscountInfo, FieldDefinitionSpec, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopProduct, VariantRuleChange, WriteResult } from "./types";
 
 /**
  * The shop's Shopify Admin reads and its two kinds of write (CLAUDE.md, allowed writes 4–5).
@@ -247,6 +247,23 @@ export class ShopCatalogLive implements ShopCatalogSource {
     }
     if (clear.length) {
       const d = await this.gql<{ metafieldsDelete: { userErrors: { message: string }[] } }>(M_DELETE, { metafields: clear });
+      if (d.metafieldsDelete.userErrors.length) return { ok: false, reason: d.metafieldsDelete.userErrors.map((e) => e.message).join(",").slice(0, 200) };
+    }
+    return { ok: true };
+  }
+
+  async setVariantRules(productId: string, namespace: string, changes: VariantRuleChange[]): Promise<WriteResult> {
+    if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId)) return { ok: false, reason: "bad_product_id" };
+    if (changes.some((c) => !/^gid:\/\/shopify\/ProductVariant\/\d+$/.test(c.variantId))) return { ok: false, reason: "bad_variant_id" };
+    const set = changes.flatMap((c) => c.set.map((f) => ({ ownerId: c.variantId, namespace, key: f.key, type: f.type, value: f.value })));
+    const clear = changes.flatMap((c) => c.clear.map((key) => ({ ownerId: c.variantId, namespace, key })));
+    // metafieldsSet takes at most 25 at a time.
+    for (let i = 0; i < set.length; i += 25) {
+      const d = await this.gql<{ metafieldsSet: { userErrors: { message: string; code?: string }[] } }>(M_SET, { metafields: set.slice(i, i + 25) });
+      if (d.metafieldsSet.userErrors.length) return { ok: false, reason: d.metafieldsSet.userErrors.map((e) => e.code || e.message).join(",").slice(0, 200) };
+    }
+    for (let i = 0; i < clear.length; i += 25) {
+      const d = await this.gql<{ metafieldsDelete: { userErrors: { message: string }[] } }>(M_DELETE, { metafields: clear.slice(i, i + 25) });
       if (d.metafieldsDelete.userErrors.length) return { ok: false, reason: d.metafieldsDelete.userErrors.map((e) => e.message).join(",").slice(0, 200) };
     }
     return { ok: true };

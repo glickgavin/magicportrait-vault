@@ -1,5 +1,5 @@
 import { FIXTURE_SCENES, fixtureTemplate } from "../fixture-scenes";
-import type { DiscountInfo, FieldDefinitionSpec, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopProduct, ShopVariant, WriteResult } from "./types";
+import type { DiscountInfo, FieldDefinitionSpec, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopProduct, ShopVariant, VariantRuleChange, WriteResult } from "./types";
 
 /**
  * In-memory Store collection for tests and local dev. Made-up products only (no customer images);
@@ -122,6 +122,21 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
     this.writes.push({ type: "metafieldsSet", target: productId, payload: { namespace, ...fields } });
     if (fields.page !== undefined) p.page = fields.page;
     if (fields.occasions !== undefined) p.occasions = [...fields.occasions];
+    return { ok: true };
+  }
+
+  async setVariantRules(productId: string, namespace: string, changes: VariantRuleChange[]): Promise<WriteResult> {
+    const fail = this.takeFailure();
+    if (fail) return fail;
+    const p = this.products.find((x) => x.id === productId);
+    if (!p) return { ok: false, reason: "not_found" };
+    for (const c of changes) {
+      const v = p.variants.find((x) => x.id === c.variantId);
+      if (!v) return { ok: false, reason: "variant_not_found" };
+      this.writes.push({ type: "metafieldsSet", target: c.variantId, payload: { namespace, set: c.set, clear: c.clear } });
+      const drop = new Set([...c.clear, ...c.set.map((f) => f.key)]);
+      v.metafields = [...v.metafields.filter((m) => !drop.has(m.key)), ...c.set.map((f) => ({ key: f.key, value: f.value, type: f.type, updatedAt: new Date().toISOString() }))];
+    }
     return { ok: true };
   }
 

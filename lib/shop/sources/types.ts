@@ -67,6 +67,9 @@ export type DiscountInfo = {
   summary?: string | null;
 };
 
+/** One size's rule changes: values to set (with their Shopify type) and keys to clear. */
+export type VariantRuleChange = { variantId: string; set: { key: string; type: string; value: string }[]; clear: string[] };
+
 export type WriteResult = { ok: true } | { ok: false; reason: string };
 
 export interface ShopCatalogSource {
@@ -79,6 +82,11 @@ export interface ShopCatalogSource {
   setProductFields(productId: string, namespace: string, fields: { page?: string | null; occasions?: string[] }): Promise<WriteResult>;
   /** Allowed write 5: `mmp_shop.template` on one product (the template editor's Publish). */
   setProductTemplate(productId: string, namespace: string, templateJson: string): Promise<WriteResult>;
+  /**
+   * Allowed write 5: the `mmp_shop` print rules on sizes (variants) of one Store product, from Settings ›
+   * Shop › Print rules. Only the keys given; never any other variant field.
+   */
+  setVariantRules(productId: string, namespace: string, changes: VariantRuleChange[]): Promise<WriteResult>;
   /** Allowed write 5: the occasions definition's choices. */
   setOccasionChoices(namespace: string, choices: string[]): Promise<WriteResult>;
   /** Allowed write 5: creates whichever `mmp_shop` definitions are missing. */

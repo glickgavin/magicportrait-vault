@@ -3,10 +3,10 @@ import { z } from "zod";
 import { getSettings } from "@/lib/settings";
 import { track } from "@/lib/track";
 import type { CatalogEntry } from "./catalog";
-import { fieldSpecs, normalisePage, pageLabel } from "./fields";
+import { fieldSpecs, IMAGE_KINDS, MAKERS, normalisePage, pageLabel, PLACEMENTS } from "./fields";
 import { discountInfo, discountSettingFor, getCatalog, invalidateCatalog } from "./index";
 import { getShopCatalogSource } from "./sources";
-import type { DiscountInfo, ShopFieldDefinition } from "./sources/types";
+import type { DiscountInfo, ShopFieldDefinition, VariantRuleChange } from "./sources/types";
 import { parseTemplate, templateSchema, type Template } from "./template";
 
 /** Settings › Shop (docs/shop.md). Every write here is CLAUDE.md allowed write 5: `mmp_shop` only. */
@@ -219,5 +219,74 @@ export async function publishTemplate(actor: { email: string }, input: { product
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the template (${r.reason}).` };
   invalidateCatalog();
   await track("admin_shop_template_published", { product_id: entry.product.legacyId, zone: t.zone.kind }, { email: actor.email, actor: `super_user:${actor.email}` });
+  return { ok: true };
+}
+
+/** The print rules Settings › Shop › Print rules edits; `background` and `extra` are left as they are. */
+export const RULE_KEYS = ["maker", "maker_sku", "print_px", "placement", "zone_px", "min_short_side_px", "max_crop_pct", "adjustable", "image_kinds"] as const;
+export type RuleKey = (typeof RULE_KEYS)[number];
+
+const px = z.string().trim().regex(/^(\d{2,5}x\d{2,5})?$/i, "Width x height in pixels, e.g. 2400x3000");
+const intIn = (min: number, max: number) => z.string().trim().regex(/^(\d{1,6})?$/, "A whole number").refine((v) => v === "" || (Number(v) >= min && Number(v) <= max), `Between ${min} and ${max}`);
+
+/** "" clears a rule (optional ones fall back to their defaults; a size without the required three is hidden). */
+export const variantRulesSchema = z.object({
+  maker: z.enum(["", ...MAKERS]),
+  maker_sku: z.string().trim().max(200).regex(/^[^\s<>"'`]*$/, "No spaces or quotes"),
+  print_px: px,
+  placement: z.enum(["", ...PLACEMENTS]),
+  zone_px: px,
+  min_short_side_px: intIn(100, 20000),
+  max_crop_pct: intIn(0, 90),
+  adjustable: z.enum(["", "true", "false"]),
+  image_kinds: z.enum(["", ...IMAGE_KINDS]),
+});
+export type VariantRulesInput = z.infer<typeof variantRulesSchema>;
+
+export const rulesUpdateSchema = z.object({
+  productId: z.string().regex(/^gid:\/\/shopify\/Product\/\d{1,20}$/),
+  variants: z.array(z.object({ variantId: z.string().regex(/^gid:\/\/shopify\/ProductVariant\/\d{1,20}$/), rules: variantRulesSchema })).min(1).max(100),
+});
+
+/** A size's rules as the editor shows them ("" when unset). */
+export function rulesFor(metafields: { key: string; value: string }[]): VariantRulesInput {
+  const m = new Map(metafields.map((f) => [f.key, f.value.trim()]));
+  return Object.fromEntries(RULE_KEYS.map((k) => [k, k === "maker" || k === "placement" || k === "image_kinds" ? (m.get(k) ?? "").toLowerCase() : (m.get(k) ?? "")])) as VariantRulesInput;
+}
+
+/** Saves the print rules of a Store product's sizes: only what changed, set or cleared, in mmp_shop. */
+export async function updateVariantRules(actor: { email: string }, input: z.infer<typeof rulesUpdateSchema>): Promise<AdminResult> {
+  const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
+  let entries: CatalogEntry[];
+  try {
+    entries = await getCatalog({ fresh: true });
+  } catch (e) {
+    return { ok: false, status: 502, error: errorText(e) };
+  }
+  const entry = entries.find((e) => e.product.id === input.productId);
+  if (!entry) return { ok: false, status: 404, error: "That product isn't in the Store collection." };
+  const types = new Map(fieldSpecs([]).filter((f) => f.ownerType === "PRODUCTVARIANT").map((f) => [f.key, f.type]));
+  const changes: VariantRuleChange[] = [];
+  const changedKeys = new Set<string>();
+  for (const v of input.variants) {
+    const variant = entry.product.variants.find((x) => x.id === v.variantId);
+    if (!variant) return { ok: false, status: 400, error: "A size isn't on this product." };
+    const now = rulesFor(variant.metafields);
+    const next = { ...v.rules, print_px: v.rules.print_px.toLowerCase(), zone_px: v.rules.zone_px.toLowerCase() };
+    const set: VariantRuleChange["set"] = [];
+    const clear: string[] = [];
+    for (const k of RULE_KEYS) {
+      if (next[k] === now[k]) continue;
+      changedKeys.add(k);
+      if (next[k] === "") clear.push(k);
+      else set.push({ key: k, type: types.get(k) ?? "single_line_text_field", value: next[k] });
+    }
+    if (set.length || clear.length) changes.push({ variantId: v.variantId, set, clear });
+  }
+  if (!changes.length) return { ok: true };
+  const r = await (await getShopCatalogSource()).setVariantRules(input.productId, ns, changes);
+  if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };
+  invalidateCatalog();
+  await track("admin_shop_rules_updated", { product_id: entry.product.legacyId, sizes: changes.length, fields: [...changedKeys] }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }
