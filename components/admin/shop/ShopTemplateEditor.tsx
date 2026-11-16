@@ -330,38 +330,50 @@ function Editor({
     };
   }, [t, size, samples]);
 
-  const [fieldMsg, setFieldMsg] = useState<{ which: "background" | "overlay"; text: string } | null>(null);
+  const [fieldMsg, setFieldMsg] = useState<{ which: "background" | "overlay"; text: string; ok?: boolean } | null>(null);
   const isOverlayFile = (m: Media) => m.id.startsWith("upload:") && m.id.endsWith(".webp");
   const isPhotoFile = (m: Media) => m.id.startsWith("upload:") && !m.id.endsWith(".webp");
 
+  // Photos the live template uses: out of the draft and the lists now, deleted once Publish has replaced them.
+  const [pendingRemoval, setPendingRemoval] = useState<string[]>([]);
+
+  async function deleteUpload(id: string): Promise<string | null> {
+    const r = await fetch("/api/admin/shop/template/upload", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId, mediaId: id }) }).catch(() => null);
+    if (r?.ok) return null;
+    const b = (await r?.json().catch(() => ({}))) as { error?: string } | undefined;
+    return b?.error ?? "Couldn't remove that photo.";
+  }
+
   /**
    * Removes an uploaded photo. If this draft uses it, it is taken out of the draft first (the overlay
-   * goes back to None; the blank photo moves to another one). The published template's photos can't
-   * go until a template without them is published, or the live previews would break.
+   * goes back to None; the blank photo moves to another one). A photo the live template uses goes from
+   * the lists at once and is deleted when Publish has replaced it, so live previews never lose it.
    */
   async function remove(m: Media, which: "background" | "overlay") {
     setMsg(null);
     setFieldMsg(null);
-    if (published?.background.media_id === m.id || published?.overlay?.media_id === m.id) {
-      setFieldMsg({ which, text: "The published template uses this photo. Pick another one (or None), publish, then remove it." });
-      return;
-    }
     let next = t;
     if (t.overlay?.media_id === m.id) next = { ...next, overlay: null };
     if (t.background.media_id === m.id) {
-      const other = media.find((x) => x.id !== m.id && !isOverlayFile(x));
+      const other = media.find((x) => x.id !== m.id && !isOverlayFile(x) && !pendingRemoval.includes(x.id));
       if (!other) {
         setFieldMsg({ which, text: "Upload or pick another photo of the blank product first; a template always needs one." });
         return;
       }
       next = { ...next, background: { media_id: other.id, url: other.url, w: other.width, h: other.height } };
     }
-    const r = await fetch("/api/admin/shop/template/upload", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId, mediaId: m.id }) }).catch(() => null);
-    const b = (await r?.json().catch(() => ({}))) as { error?: string } | undefined;
-    if (r?.ok) {
+    if (published?.background.media_id === m.id || published?.overlay?.media_id === m.id) {
+      setT(next);
+      setPendingRemoval((l) => [...l, m.id]);
+      setFieldMsg({ which, text: "Removed. The live template still uses it, so it's deleted when you publish.", ok: true });
+      return;
+    }
+    const err = await deleteUpload(m.id);
+    if (err) setFieldMsg({ which, text: err });
+    else {
       setT(next);
       setMedia((list) => list.filter((x) => x.id !== m.id));
-    } else setFieldMsg({ which, text: b?.error ?? "Couldn't remove that photo." });
+    }
   }
 
   const added = (m: Media, which: "background" | "overlay") => {
@@ -468,7 +480,12 @@ function Editor({
         /* ignore */
       }
       setRestored(false);
-      setMsg({ ok: true, text: "Published to Shopify." });
+      // The live template no longer uses these: delete them now.
+      const gone = pendingRemoval;
+      const failed = (await Promise.all(gone.map(deleteUpload))).filter(Boolean).length;
+      setMedia((list) => list.filter((x) => !gone.includes(x.id)));
+      setPendingRemoval([]);
+      setMsg(failed ? { ok: false, text: `Published to Shopify, but ${failed} removed photo${failed === 1 ? "" : "s"} couldn't be deleted. Try its × again.` } : { ok: true, text: "Published to Shopify." });
       router.refresh();
     } else setMsg({ ok: false, text: b.error ?? "Couldn't publish" });
   }
@@ -483,7 +500,7 @@ function Editor({
             None
           </label>
         )}
-        {media.filter((m) => (which === "background" ? !isOverlayFile(m) : !isPhotoFile(m))).map((m) => {
+        {media.filter((m) => !pendingRemoval.includes(m.id) && (which === "background" ? !isOverlayFile(m) : !isPhotoFile(m))).map((m) => {
           const on = which === "background" ? t.background.media_id === m.id : t.overlay?.media_id === m.id;
           // Every uploaded photo has a ×; Shopify's own product photos are never changed from here.
           const removable = m.id.startsWith("upload:");
@@ -513,7 +530,7 @@ function Editor({
         <UploadTile productId={productId} kind={which} upload={upload} onUploaded={(m) => added(m, which)} />
       </div>
       {fieldMsg?.which === which && (
-        <p role="alert" className="text-[13px] font-bold text-[#a1251b]">
+        <p role={fieldMsg.ok ? "status" : "alert"} className={cn("text-[13px] font-bold", fieldMsg.ok ? "text-ink-2" : "text-[#a1251b]")}>
           {fieldMsg.text}
         </p>
       )}
@@ -527,7 +544,7 @@ function Editor({
         {restored && (
           <p role="status" className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[14px] text-[#7a4a00]">
             Your unpublished draft was restored.
-            <button type="button" className="font-bold underline" onClick={() => { setT(startFrom); setRestored(false); }}>
+            <button type="button" className="font-bold underline" onClick={() => { setT(startFrom); setRestored(false); setPendingRemoval([]); }}>
               Discard draft
             </button>
           </p>
