@@ -148,7 +148,7 @@ How it's drawn:
 
 The template is one JSON value (`lib/shop/template.ts`): `background` and `overlay` (a product photo's media id, URL and size), `zone` (`corners` with four points, or `wrap` with left, right, top, bottom, curve and spread), `mask` (none, rounded with a radius, circle) and `blend` (normal, or multiply to let the product's shading show through). Coordinates are fractions of the background photo.
 
-The template editor in Settings works like the card template editor. A draft stays in the browser until Publish writes it to Shopify; Publish refuses any background or overlay that isn't one of the product's own Shopify photos or one its saved template already uses (the studio photos below). It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
+The template editor in Settings works like the card template editor. A draft stays in the browser until Publish writes it to Shopify; Publish refuses any background or overlay that isn't one of the product's own Shopify photos or one its saved template already uses (the studio photos below). Every uploaded photo has a × (16 Nov): one the draft uses is taken out of the draft first (the overlay goes back to None; the blank photo moves to another photo), while one the published template uses stays until a template without it is published, and the message says so beside the photos. Uploaded photos show only in their own list (blank photos under the photo, see-through overlays under the overlay); Shopify's own product photos show in both and have no ×. It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
 
 ### Studio templates
 

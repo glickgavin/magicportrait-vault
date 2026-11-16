@@ -330,12 +330,38 @@ function Editor({
     };
   }, [t, size, samples]);
 
-  async function remove(m: Media) {
+  const [fieldMsg, setFieldMsg] = useState<{ which: "background" | "overlay"; text: string } | null>(null);
+  const isOverlayFile = (m: Media) => m.id.startsWith("upload:") && m.id.endsWith(".webp");
+  const isPhotoFile = (m: Media) => m.id.startsWith("upload:") && !m.id.endsWith(".webp");
+
+  /**
+   * Removes an uploaded photo. If this draft uses it, it is taken out of the draft first (the overlay
+   * goes back to None; the blank photo moves to another one). The published template's photos can't
+   * go until a template without them is published, or the live previews would break.
+   */
+  async function remove(m: Media, which: "background" | "overlay") {
     setMsg(null);
+    setFieldMsg(null);
+    if (published?.background.media_id === m.id || published?.overlay?.media_id === m.id) {
+      setFieldMsg({ which, text: "The published template uses this photo. Pick another one (or None), publish, then remove it." });
+      return;
+    }
+    let next = t;
+    if (t.overlay?.media_id === m.id) next = { ...next, overlay: null };
+    if (t.background.media_id === m.id) {
+      const other = media.find((x) => x.id !== m.id && !isOverlayFile(x));
+      if (!other) {
+        setFieldMsg({ which, text: "Upload or pick another photo of the blank product first; a template always needs one." });
+        return;
+      }
+      next = { ...next, background: { media_id: other.id, url: other.url, w: other.width, h: other.height } };
+    }
     const r = await fetch("/api/admin/shop/template/upload", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId, mediaId: m.id }) }).catch(() => null);
     const b = (await r?.json().catch(() => ({}))) as { error?: string } | undefined;
-    if (r?.ok) setMedia((list) => list.filter((x) => x.id !== m.id));
-    else setMsg({ ok: false, text: b?.error ?? "Couldn't remove that photo." });
+    if (r?.ok) {
+      setT(next);
+      setMedia((list) => list.filter((x) => x.id !== m.id));
+    } else setFieldMsg({ which, text: b?.error ?? "Couldn't remove that photo." });
   }
 
   const added = (m: Media, which: "background" | "overlay") => {
@@ -457,10 +483,10 @@ function Editor({
             None
           </label>
         )}
-        {media.map((m) => {
+        {media.filter((m) => (which === "background" ? !isOverlayFile(m) : !isPhotoFile(m))).map((m) => {
           const on = which === "background" ? t.background.media_id === m.id : t.overlay?.media_id === m.id;
-          // Uploaded photos can be removed while nothing uses them (this draft or the published template).
-          const removable = m.id.startsWith("upload:") && t.background.media_id !== m.id && t.overlay?.media_id !== m.id && published?.background.media_id !== m.id && published?.overlay?.media_id !== m.id;
+          // Every uploaded photo has a ×; Shopify's own product photos are never changed from here.
+          const removable = m.id.startsWith("upload:");
           return (
             <span key={m.id} className="relative">
             <label className={cn("block cursor-pointer rounded-[10px] border-2 p-0.5 focus-within:ring-2 focus-within:ring-[#DD07C4]", on ? "border-[#DD07C4]" : "border-transparent")}>
@@ -477,7 +503,7 @@ function Editor({
               <img src={m.url} alt={m.alt ?? "Product photo"} className="h-14 w-14 rounded-[8px] object-cover" />
             </label>
             {removable && (
-              <button type="button" aria-label="Remove this uploaded photo" onClick={() => void remove(m)} className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-ink text-[13px] font-bold leading-none text-white shadow">
+              <button type="button" aria-label="Remove this uploaded photo" onClick={() => void remove(m, which)} className="absolute -right-1.5 -top-1.5 z-10 grid h-6 w-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DD07C4] place-items-center rounded-full bg-ink text-[13px] font-bold leading-none text-white shadow">
                 ×
               </button>
             )}
@@ -486,6 +512,11 @@ function Editor({
         })}
         <UploadTile productId={productId} kind={which} upload={upload} onUploaded={(m) => added(m, which)} />
       </div>
+      {fieldMsg?.which === which && (
+        <p role="alert" className="text-[13px] font-bold text-[#a1251b]">
+          {fieldMsg.text}
+        </p>
+      )}
     </fieldset>
   );
 
