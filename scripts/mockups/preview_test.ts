@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { readFileSync, writeFileSync } from "node:fs";
 import { drawPreview, previewSize } from "../../lib/shop/preview.ts";
 import { parseTemplate } from "../../lib/shop/template.ts";
-import { centredCrop } from "../../lib/shop/fit.ts";
+import { defaultCrop } from "../../lib/shop/fit.ts";
 
 const require = createRequire(new URL("../../package.json", import.meta.url));
 const { createCanvas, loadImage } = require("@napi-rs/canvas");
@@ -20,7 +20,7 @@ for (const item of items) {
   const t = parseTemplate(JSON.stringify(raw));
   if (!t) throw new Error(`bad template ${name}`);
   const [aw, ah] = aspect.split("x").map(Number);
-  const crop = centredCrop(pic.width, pic.height, aw, ah);
+  const crop = defaultCrop(pic.width, pic.height, aw, ah);
   const background = await loadImage(readFileSync(`${dir}/${name}-base.jpg`));
   const overlay = await loadImage(readFileSync(`${dir}/${name}-overlay.png`));
   const size = previewSize(t, Number(width));
