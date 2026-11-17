@@ -126,6 +126,7 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('shop.metafield_namespace', '"mmp_shop"'::jsonb, 'text', 'shop', 'Shop metafield namespace', 'The only product fields the app may write (CLAUDE.md).', null, 'seed', now()),
   ('shop.top_picks_count', '5'::jsonb, 'number', 'shop', 'Product ideas per picture', null, null, 'seed', now()),
   ('shop.product_cache_minutes', '5'::jsonb, 'number', 'shop', 'Product cache (minutes)', null, null, 'seed', now()),
+  ('shop.catalog_changed_at', '0'::jsonb, 'number', 'shop', 'Shop products last changed in Settings', 'Set automatically whenever Settings › Shop saves to Shopify, so every server reloads the products at once instead of waiting for the product cache.', null, 'seed', now()),
   ('shop.discount_code_normal', '"SITEWIDE OFF"'::jsonb, 'text', 'shop', 'Discount code: normal customers', 'A Shopify discount code limited to the Store collection. Empty: no discount.', null, 'seed', now()),
   ('shop.discount_code_vip', '""'::jsonb, 'text', 'shop', 'Discount code: VIP customers', 'Empty: VIPs get the normal code.', null, 'seed', now()),
   ('shop.vip_customer_tag', '"VIP"'::jsonb, 'text', 'shop', 'VIP customer tags', 'The Shopify customer tags that mark a VIP, separated by commas, e.g. VIP, member-active. A customer with any one of them is a VIP (any case).', null, 'seed', now()),

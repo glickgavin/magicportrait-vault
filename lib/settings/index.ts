@@ -112,11 +112,12 @@ export async function setSetting(
   key: string,
   value: unknown,
   by: string,
-  meta?: { type?: SettingType; section?: Section; label?: string; description?: string },
+  meta?: { type?: SettingType; section?: Section; label?: string; description?: string; system?: boolean },
 ): Promise<SetResult> {
   const v = validateSetting(key, value);
   if (!v.ok) return v;
-  if (isSettingKey(key) && getDef(key).readOnly) return { ok: false, error: "This setting is read-only" };
+  // Read-only settings are written only by the app itself (`system`), never from the Settings screen.
+  if (isSettingKey(key) && getDef(key).readOnly && !meta?.system) return { ok: false, error: "This setting is read-only" };
   const current = (await db().from("settings").select("value").eq("key", key).maybeSingle()).data as { value: unknown } | null;
   if (current && JSON.stringify(current.value) === JSON.stringify(v.value)) return { ok: true, changed: false };
   const def = isSettingKey(key) ? getDef(key) : null;

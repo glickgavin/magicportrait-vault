@@ -154,7 +154,7 @@ export async function updateProductFields(actor: { email: string }, input: z.inf
   if (!changed.length) return { ok: true };
   const r = await src.setProductFields(input.productId, ns, fields);
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };
-  invalidateCatalog();
+  await invalidateCatalog();
   await track("admin_shop_product_updated", { product_id: entry.product.legacyId, fields: changed }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }
@@ -189,7 +189,7 @@ export async function updateList(actor: { email: string }, key: ShopListKey, lis
   if (inUse.length) return { ok: false, status: 409, error: `Still used by a product: ${inUse.join(", ")}. Take it off those products first.`, inUse };
   const r = await src.setListChoices(ns, key, list);
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };
-  invalidateCatalog();
+  await invalidateCatalog();
   await track(LIST_WORDS[key].event, { count: list.length, added: list.filter((o) => !before.includes(o)).length, removed: removed.length }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }
@@ -216,7 +216,7 @@ export async function createMissingFields(actor: { email: string }): Promise<Adm
   const missing = fieldSpecs(inUse, categories).filter((f) => !have.has(`${f.ownerType}:${f.key}`));
   if (!missing.length) return { ok: true, created: [], failed: [] };
   const r = await src.createFieldDefinitions(ns, missing);
-  invalidateCatalog();
+  await invalidateCatalog();
   await track("admin_shop_fields_created", { created: r.created.length, failed: r.failed.length }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true, created: r.created, failed: r.failed };
 }
@@ -255,7 +255,7 @@ export async function publishTemplate(actor: { email: string }, input: { product
   const t: Template = { ...input.template, updated_at: new Date().toISOString() };
   const r = await (await getShopCatalogSource()).setProductTemplate(input.productId, ns, JSON.stringify(t));
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the template (${r.reason}).` };
-  invalidateCatalog();
+  await invalidateCatalog();
   await track("admin_shop_template_published", { product_id: entry.product.legacyId, zone: t.zone.kind }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }
@@ -324,7 +324,7 @@ export async function updateVariantRules(actor: { email: string }, input: z.infe
   if (!changes.length) return { ok: true };
   const r = await (await getShopCatalogSource()).setVariantRules(input.productId, ns, changes);
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };
-  invalidateCatalog();
+  await invalidateCatalog();
   await track("admin_shop_rules_updated", { product_id: entry.product.legacyId, sizes: changes.length, fields: [...changedKeys] }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }

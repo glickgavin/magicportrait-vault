@@ -46,3 +46,18 @@ describe("Products page categories work like Gifts occasions", () => {
     expect(await updateList(actor, "categories", before)).toEqual({ ok: true });
   });
 });
+
+describe("a Settings › Shop save reaches every server at once", () => {
+  it("stamps shop.catalog_changed_at, and a cached product list older than it is read again", async () => {
+    const { getSetting } = await import("@/lib/settings");
+    const before = Date.now();
+    const poster = await entry("fx-poster");
+    expect(await updateProductFields(actor, { productId: poster.product.id, categories: ["Wall art", "Acrylic"] })).toEqual({ ok: true });
+    expect(await getSetting("shop.catalog_changed_at")).toBeGreaterThanOrEqual(before);
+    // Another server's copy (simulated: an old cached list) is ignored once the stamp is newer.
+    const g = globalThis as unknown as { __shopCatalog?: { at: number; entries: unknown[] } | null };
+    g.__shopCatalog = { at: before - 1, entries: [] };
+    expect((await getCatalog()).length).toBeGreaterThan(0);
+    expect(await updateProductFields(actor, { productId: poster.product.id, categories: ["Wall art"] })).toEqual({ ok: true });
+  });
+});

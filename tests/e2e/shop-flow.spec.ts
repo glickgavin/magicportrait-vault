@@ -12,18 +12,19 @@ const SIZES = [
 ] as const;
 
 async function emptyCart(page: Page) {
-  await page.goto("/cart");
-  await expect(page.getByRole("heading", { name: "Your cart" })).toBeVisible();
   const remove = page.getByRole("button", { name: "Remove" });
-  // Wait until the cart has loaded: either its lines or the empty message.
-  await expect(remove.first().or(page.getByText("Your cart is empty.").first())).toBeVisible();
-  for (let i = 0; i < 10 && (await remove.count()) > 0; i++) {
-    const before = await remove.count();
-    await remove.first().click();
-    await expect(remove).toHaveCount(before - 1);
+  // A removal can still be settling when the page reloads, so repeat until a fresh load shows none.
+  for (let round = 0; round < 5; round++) {
+    await page.goto("/cart");
+    await expect(page.getByRole("heading", { name: "Your cart" })).toBeVisible();
+    await expect(remove.first().or(page.getByText("Your cart is empty.").first())).toBeVisible();
+    if ((await remove.count()) === 0) return;
+    for (let i = 0; i < 10 && (await remove.count()) > 0; i++) {
+      const before = await remove.count();
+      await remove.first().click();
+      await expect(remove).toHaveCount(before - 1);
+    }
   }
-  // A fresh load, so no refresh from the removals is still in flight when the test moves on.
-  await page.goto("/cart");
   await expect(remove).toHaveCount(0);
 }
 
@@ -98,6 +99,9 @@ test.describe("shop", () => {
     await page.goto("/products");
     const yours = page.locator('[data-testid="shop-card"][data-preview="yours"]');
     await expect(yours.first()).toBeVisible();
+    // Only their own picture on the products: never the plain product photo (all of these suit it).
+    await expect(page.locator('[data-testid="shop-card"][data-preview="product"]')).toHaveCount(0);
+    await expect(page.getByTestId("card-loading")).toHaveCount(0);
     const first = await page.getByTestId("picture-bar").getByRole("img", { name: "Picture on the products now" }).getAttribute("src");
     await page.getByRole("link", { name: "Show picture 2 on the products" }).click();
     await expect(page).toHaveURL(/\/products\?pic=/);
