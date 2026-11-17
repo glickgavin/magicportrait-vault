@@ -22,7 +22,7 @@ const withParams = (base: string, filter: string | null, pic: string | null) => 
 };
 
 /** One product: drawn with the person's picture when it suits it, else the product's own photo. */
-function ProductCard({ p, preview, pic, base, choose, currency }: { p: CardView; preview: LandingPreview | undefined; pic: Pic | null; base: string; choose: string; currency: string }) {
+function ProductCard({ p, preview, pic, base, choose, currency, loading = false }: { p: CardView; preview: LandingPreview | undefined; pic: Pic | null; base: string; choose: string; currency: string; loading?: boolean }) {
   const href = preview && pic ? `${base}/i/${pic.id}?product=${encodeURIComponent(p.handle)}` : choose;
   return (
     <li>
@@ -41,6 +41,9 @@ function ProductCard({ p, preview, pic, base, choose, currency }: { p: CardView;
               alt={t("shop.previewOn", { product: p.title })}
               className="h-full w-full rounded-none object-cover object-top"
             />
+          ) : loading ? (
+            // Their own picture is on its way: a placeholder, never the plain product photo first.
+            <span aria-hidden="true" className="block h-full w-full animate-pulse bg-black/[0.06]" data-testid="card-loading" />
           ) : p.image ? (
             <img src={p.image} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
           ) : null}
@@ -88,7 +91,26 @@ function PictureBar({ gifts, pictures, base, filter, choose }: { gifts: boolean;
   );
 }
 
-/** Before they have any picture (or while it loads): the old "Start with a picture" box. */
+/** While their pictures load: the Choose your picture box with placeholders, so nothing jumps. */
+function PictureBarLoading({ gifts }: { gifts: boolean }) {
+  return (
+    <aside aria-labelledby="start-title" aria-busy="true" className="flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] md:flex-row md:items-center md:gap-6 md:p-5" data-testid="picture-bar-loading">
+      <div className="md:min-w-0 md:flex-1">
+        <h2 id="start-title" className="text-[20px] font-extrabold">
+          {t("shop.choosePicture")}
+        </h2>
+        <p className="text-[14px] text-ink-2">{t(gifts ? "shop.shownSubGifts" : "shop.shownSub")}</p>
+      </div>
+      <div className="grid grid-cols-5 gap-2 md:w-[480px] md:flex-none md:gap-3" aria-hidden="true">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="aspect-square animate-pulse rounded-[14px] bg-black/[0.06]" />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+/** Before they have any picture: the old "Start with a picture" box. */
 function StartBox({ gifts, topPicks, choose, loading }: { gifts: boolean; topPicks: number; choose: string; loading: boolean }) {
   return (
     <aside aria-labelledby="start-title" className="flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] md:flex-row md:items-center md:gap-5 md:p-5">
@@ -174,7 +196,13 @@ function Body({ page, data, pictures }: { page: ShopPage; data: Data; pictures: 
   const pic = pictures?.selected ?? null;
   return (
     <>
-      {pic ? <PictureBar gifts={gifts} pictures={pictures!} base={base} filter={data.chosen} choose={choose()} /> : <StartBox gifts={gifts} topPicks={data.topPicks} choose={choose()} loading={pictures === null} />}
+      {pic ? (
+        <PictureBar gifts={gifts} pictures={pictures!} base={base} filter={data.chosen} choose={choose()} />
+      ) : pictures === null ? (
+        <PictureBarLoading gifts={gifts} />
+      ) : (
+        <StartBox gifts={gifts} topPicks={data.topPicks} choose={choose()} loading={false} />
+      )}
       {data.sections.length === 0 && <p className="text-[15px] text-ink-2">{t("shop.noProducts")}</p>}
       {data.sections.map((sec, i) => (
         <section key={sec.title || `more-${i}`} aria-labelledby={`sec-${i}`} className="flex flex-col gap-3">
@@ -186,7 +214,7 @@ function Body({ page, data, pictures }: { page: ShopPage; data: Data; pictures: 
           </div>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
             {sec.products.map((p) => (
-              <ProductCard key={p.handle} p={p} preview={pictures?.previews[p.handle]} pic={pic} base={base} choose={choose(p.handle)} currency={data.pricing.currency} />
+              <ProductCard key={p.handle} p={p} preview={pictures?.previews[p.handle]} pic={pic} base={base} choose={choose(p.handle)} currency={data.pricing.currency} loading={pictures === null} />
             ))}
           </ul>
         </section>

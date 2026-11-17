@@ -1,7 +1,7 @@
 import "server-only";
 import { getSessionUser } from "@/lib/auth/session";
 import type { SessionUser } from "@/lib/auth/types";
-import { getSettings } from "@/lib/settings";
+import { getSettings, setSetting } from "@/lib/settings";
 import { canSeeShop } from "./access";
 import { evaluateCatalog, type CatalogEntry } from "./catalog";
 import { getShopCatalogSource } from "./sources";
@@ -32,15 +32,25 @@ function shared<T>(key: string, work: () => Promise<T>): Promise<T> {
 type Cached = { at: number; entries: CatalogEntry[] };
 const g = globalThis as unknown as { __shopCatalog?: Cached | null };
 
-export function invalidateCatalog() {
+/**
+ * After Settings › Shop changes something in Shopify: drops this server's copy now and stamps
+ * shop.catalog_changed_at, so every other server drops its copy too (settings are re-read within seconds).
+ */
+export async function invalidateCatalog(): Promise<void> {
   g.__shopCatalog = null;
+  try {
+    await setSetting("shop.catalog_changed_at", Date.now(), "system", { system: true });
+  } catch {
+    /* the product cache still expires on its own */
+  }
 }
 
 /** The Store collection, evaluated, cached for shop.product_cache_minutes. `fresh` for Settings. */
 export async function getCatalog(opts: { fresh?: boolean } = {}): Promise<CatalogEntry[]> {
-  const s = await getSettings(["shop.collection_id", "shop.metafield_namespace", "shop.product_cache_minutes", "shop.default_min_short_side_px", "shop.default_max_crop_pct"] as const);
+  const s = await getSettings(["shop.collection_id", "shop.metafield_namespace", "shop.product_cache_minutes", "shop.default_min_short_side_px", "shop.default_max_crop_pct", "shop.catalog_changed_at"] as const);
   const hit = g.__shopCatalog;
-  if (!opts.fresh && hit && Date.now() - hit.at < s["shop.product_cache_minutes"] * 60_000) return hit.entries;
+  // Older than a change saved in Settings › Shop (on any server): read Shopify again.
+  if (!opts.fresh && hit && hit.at > s["shop.catalog_changed_at"] && Date.now() - hit.at < s["shop.product_cache_minutes"] * 60_000) return hit.entries;
   return shared(`catalog:${opts.fresh ? "fresh" : "cached"}`, async () => {
     const src = await getShopCatalogSource();
     const products = await src.storeProducts(s["shop.collection_id"], s["shop.metafield_namespace"]);

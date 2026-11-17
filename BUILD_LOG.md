@@ -509,3 +509,8 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 - **Print rules entered in Shopify** (17 Nov, at Gavin's request): Magic Puzzle (`JIGSAW-PUZZLE-30/252/500`) and Acrylic Glass Art (`GLOBAL-MOU-ACRY-4X6 … 20X30`), maker prodigi, print areas from the Prodigi API.
 - **Open:** Next.js 16.4.4 reports a known security vulnerability (`next dev`/`next build` stop once on an upgrade notice; a retry continues, and this was why the e2e web server sometimes "failed to start"). Upgrade as its own change.
 - **Tests:** the shop e2e cart helper waits for the cart to load; the print-rules test presses Save with the keyboard (a dev-only Next.js badge can cover it at 390 px).
+
+## 17 Nov: Settings › Shop changes show at once; landing shows only their own picture
+- **Fixed: categories didn't show on Products after saving.** Each server kept its own copy of the Shopify products for `shop.product_cache_minutes` (5), and a save only cleared the copy on the server that handled it. Now every Settings › Shop save to Shopify also stamps the new read-only setting `shop.catalog_changed_at`; every server re-reads Shopify when its copy is older than the stamp (settings are re-read within seconds). The live row is created on the first save (upsert); `seed.sql` has it too.
+- **Gifts and Products load without flashing the plain product photos.** While their pictures load, the "Choose your picture" box shows placeholder tiles and each product card shows a pulsing placeholder; then every card shows their own picture. Product photos only appear for products the picture doesn't suit, or for someone with no pictures yet.
+- Shop e2e: the cart helper repeats (reload, remove) until a fresh load shows an empty cart.
