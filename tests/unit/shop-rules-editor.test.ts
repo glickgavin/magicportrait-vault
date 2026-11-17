@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { getCatalog } from "@/lib/shop";
-import { rulesFor, rulesUpdateSchema, updateVariantRules, variantRulesSchema } from "@/lib/shop/admin";
+import { rulesFor, rulesUpdateSchema, updateVariantRules, variantRulesSchema, type VariantRulesInput } from "@/lib/shop/admin";
 import { shopFixtures } from "@/lib/shop/sources";
 
 const actor = { email: "test@example.com" };
-const blank = { maker: "", maker_sku: "", print_px: "", placement: "", zone_px: "", min_short_side_px: "", max_crop_pct: "", adjustable: "", image_kinds: "" };
+const blank: VariantRulesInput = { maker: "", maker_sku: "", print_px: "", placement: "", zone_px: "", min_short_side_px: "", max_crop_pct: "", adjustable: "", image_kinds: "" };
 
 async function puzzle() {
   const e = (await getCatalog({ fresh: true })).find((x) => x.product.handle === "fx-puzzle")!;
