@@ -55,7 +55,7 @@ export function evaluateProduct(p: ShopProduct, defaults?: RuleDefaults): Catalo
   }
   if (available.length && !sellable.length) hidden.push("no_rules");
   if (!templateUsable(p.template)) hidden.push("no_template");
-  if (!p.productType.trim() && (page === "products" || page === "all")) warnings.push("No product type, so the Products page can't group it");
+  if (!p.categories.length && !p.productType.trim() && (page === "products" || page === "all")) warnings.push("No category, so the Products page shows it under More products");
   return { product: p, page, sellable, hidden, warnings };
 }
 

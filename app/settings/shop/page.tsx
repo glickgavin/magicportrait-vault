@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 import { shopAccess, shopOverview } from "@/lib/shop/admin";
 import { HIDDEN_REASON_TEXT } from "@/lib/shop/catalog";
 import { SettingField } from "@/components/admin/SettingField";
-import { CreateFieldsButton, OccasionsEditor, ProductFieldsEditor } from "@/components/admin/shop/ShopEditors";
+import { CategoriesEditor, CreateFieldsButton, OccasionsEditor, ProductFieldsEditor } from "@/components/admin/shop/ShopEditors";
 import { TrackPageView } from "@/components/TrackPageView";
 import { Badge } from "@/components/ui/Badge";
 import type { DiscountInfo } from "@/lib/shop/sources/types";
@@ -42,7 +42,7 @@ export default async function ShopSettings() {
       <TrackPageView event="settings_viewed" props={{ section: "shop" }} />
       <h1 className="text-[30px] font-extrabold tracking-tight">Shop: products &amp; discounts</h1>
       <p className="text-[15px] text-ink-2">
-        The Gifts and Products pages. Products, sizes and prices come from the Store collection in Shopify; the page and occasions you set here are saved on each product in Shopify.
+        The Gifts and Products pages. Products, sizes and prices come from the Store collection in Shopify; the page, occasions and categories you set here are saved on each product in Shopify.
       </p>
 
       <div className="mt-5 grid gap-5 2xl:grid-cols-[1fr_420px]">
@@ -162,7 +162,7 @@ export default async function ShopSettings() {
                             </div>
                           </div>
                           <div className="w-full sm:w-[360px]">
-                            <ProductFieldsEditor productId={p.id} title={p.title} page={e.page} occasions={p.occasions} choices={overview.occasions} canSave={!overview.missingDefinitions.some((d) => d === "PRODUCT:page" || d === "PRODUCT:occasions")} />
+                            <ProductFieldsEditor productId={p.id} title={p.title} page={e.page} occasions={p.occasions} choices={overview.occasions} categories={p.categories} categoryChoices={overview.categories} canSave={!overview.missingDefinitions.some((d) => d === "PRODUCT:page" || d === "PRODUCT:occasions")} />
                           </div>
                         </div>
                       </li>
@@ -185,6 +185,22 @@ export default async function ShopSettings() {
               {!overview.occasionsFromDefinition && overview.occasions.length > 0 && <p className="mt-2 text-[13px] text-[#7a4a00]">Not saved as a list in Shopify yet; showing the occasions products use.</p>}
               <div className="mt-3">
                 <OccasionsEditor initial={overview.occasions} enabled={!overview.missingDefinitions.includes("PRODUCT:occasions")} />
+              </div>
+            </section>
+          )}
+          {overview.ok && (
+            <section className={CARD} aria-labelledby="shop-categories">
+              <h2 id="shop-categories" className="text-[19px] font-extrabold">
+                Categories
+              </h2>
+              <p className="mt-1 text-[14px] text-ink-2">The Products page&apos;s chips and sections, in this order, just like occasions on Gifts. Saved in Shopify as the choices of the <code>mmp_shop.categories</code> field. A product with no category is grouped by its Shopify product type.</p>
+              {overview.missingDefinitions.includes("PRODUCT:categories") ? (
+                <p className="mt-2 text-[13px] text-[#7a4a00]">Create the shop fields in Shopify first (above): the new categories field starts with the product types products use now.</p>
+              ) : (
+                !overview.categoriesFromDefinition && overview.categories.length > 0 && <p className="mt-2 text-[13px] text-[#7a4a00]">Not saved as a list in Shopify yet; showing the categories and product types products use.</p>
+              )}
+              <div className="mt-3">
+                <CategoriesEditor initial={overview.categories} enabled={!overview.missingDefinitions.includes("PRODUCT:categories")} />
               </div>
             </section>
           )}

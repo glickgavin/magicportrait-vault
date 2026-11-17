@@ -39,8 +39,8 @@ Two pages, Gifts and Products, lead into the same four screens. Both are for sig
 |  | Gifts page | Products page |
 |---|---|---|
 | Menu item and address | Gifts, `/gifts` | Products, `/products` |
-| Browsed by | Occasion and person, e.g. Christmas, Birthday, For Mom | Product type, e.g. Mugs, Wall art, Apparel |
-| Products it shows | Products set to Gifts or All, by occasion | Products set to Products or All, by product type |
+| Browsed by | Occasion and person, e.g. Christmas, Birthday, For Mom | Category, e.g. Mugs, Wall art, Apparel |
+| Products it shows | Products set to Gifts or All, by occasion | Products set to Products or All, by category |
 | "Who's it for?" | Asked before checkout: their name and an optional gift message | Not asked |
 | Copy | Written for giving | Written for owning |
 
@@ -90,12 +90,12 @@ Everything about a product lives in Shopify, including its sizes and the rules f
 | Which page: Gifts, Products or All | Product metafield `mmp_shop.page` | All shows it on both pages |
 | Occasions, e.g. Christmas, Birthday, For Mom | Product metafield `mmp_shop.occasions`, a list | The Gifts page's chips and sections |
 | Short description for the product sheet | Product metafield `mmp_shop.short_description` (multi-line text: a sentence or two, then `- ` lines for bullets; about 4 to 5 lines on a phone) | The product sheet. Empty: the product's own Shopify description, shown with its paragraphs and lists. Kept separate so the full description on other sales channels never changes |
-| Product type, e.g. Mugs, Wall art | Shopify's own Product type field | The Products page's chips and sections |
+| Categories, e.g. Mugs, Wall art | `mmp_shop.categories`, a list like occasions (17 Nov). A product with none falls back to Shopify's own Product type | The Products page's chips and sections, in the order set in Settings |
 | Maker, maker's code, print size and fit rules | Variant metafields, namespace `mmp_shop` | See Product rules |
 | Where the picture sits on the blank photo | Product metafield `mmp_shop.template` | Saved by the template editor in Settings |
 | Discounts | Two discounts limited to the Store collection | See Discounts |
 
-**Settings › Shop › Products** lists every product in the Store collection with its page, occasions and product type, and lets super users change them there. Settings writes each change straight to the product in Shopify, so Shopify admin and Settings always show the same thing.
+**Settings › Shop › Products** lists every product in the Store collection with its page, occasions and categories, and lets super users change them there. **Occasions** and **Categories** are two lists managed the same way (add, rename, reorder, remove; one still on a product can't be removed), saved as the choices of `mmp_shop.occasions` and `mmp_shop.categories`. When the categories field is first created it starts with the product types products use, so the Products page doesn't regroup. Settings writes each change straight to the product in Shopify, so Shopify admin and Settings always show the same thing.
 
 **Occasions** are one list, kept in Shopify as the allowed values of the `mmp_shop.occasions` metafield definition. Settings › Shop › Occasions adds, renames, orders and retires them, and the Gifts page shows them in that order.
 
@@ -357,7 +357,7 @@ The first three need answers before the build starts; the rest can be settled du
 
 | Address | Screen |
 |---|---|
-| `/gifts`, `/products` (`?filter=` an occasion or product type) | The Gifts or Products page |
+| `/gifts`, `/products` (`?filter=` an occasion or category) | The Gifts or Products page |
 | `/gifts/choose`, `/products/choose` (`?tab=photos\|upload`, `?product=<handle>`) | Choose a picture |
 | `/gifts/i/<picture id>`, `/products/i/<picture id>` (`?product=<handle>` opens its sheet) | Product ideas, with the product sheet and Adjust as dialogs |
 | `/cart` | The cart, "Who's it for?" when it holds a gift, Checkout |
