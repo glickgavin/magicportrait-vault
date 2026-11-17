@@ -45,8 +45,23 @@ export function CreateFieldsButton({ missing }: { missing: number }) {
   );
 }
 
+const LIST_TEXT = {
+  occasions: { label: "Occasions, in the order the Gifts page shows them", one: "occasion", One: "Occasion", example: "Anniversary", save: "Save occasions", endpoint: "/api/admin/shop/occasions" },
+  categories: { label: "Categories, in the order the Products page shows them", one: "category", One: "Category", example: "Wall art", save: "Save categories", endpoint: "/api/admin/shop/categories" },
+} as const;
+
 /** The occasion list: add, rename, reorder, remove; saved to Shopify as one list. */
-export function OccasionsEditor({ initial, enabled }: { initial: string[]; enabled: boolean }) {
+export function OccasionsEditor(props: { initial: string[]; enabled: boolean }) {
+  return <ListEditor kind="occasions" {...props} />;
+}
+
+/** The Products page category list, managed exactly like occasions. */
+export function CategoriesEditor(props: { initial: string[]; enabled: boolean }) {
+  return <ListEditor kind="categories" {...props} />;
+}
+
+function ListEditor({ kind, initial, enabled }: { kind: keyof typeof LIST_TEXT; initial: string[]; enabled: boolean }) {
+  const words = LIST_TEXT[kind];
   const router = useRouter();
   const [list, setList] = useState(initial);
   const [draft, setDraft] = useState("");
@@ -63,11 +78,11 @@ export function OccasionsEditor({ initial, enabled }: { initial: string[]; enabl
   });
   return (
     <div className="flex flex-col gap-3">
-      <ol className="flex flex-col gap-2" aria-label="Occasions, in the order the Gifts page shows them">
+      <ol className="flex flex-col gap-2" aria-label={words.label}>
         {list.map((o, i) => (
           <li key={`${i}-${o}`} className="flex items-center gap-2">
             <label className="sr-only" htmlFor={`${inputId}-${i}`}>
-              Occasion {i + 1}
+              {words.One} {i + 1}
             </label>
             <input
               id={`${inputId}-${i}`}
@@ -98,9 +113,9 @@ export function OccasionsEditor({ initial, enabled }: { initial: string[]; enabl
         }}
       >
         <label className="sr-only" htmlFor={`${inputId}-new`}>
-          New occasion
+          New {words.one}
         </label>
-        <input id={`${inputId}-new`} value={draft} disabled={!enabled} onChange={(e) => setDraft(e.target.value)} placeholder="Add an occasion, e.g. Anniversary" maxLength={40} className="h-10 min-w-0 flex-1 rounded-[10px] border border-line bg-white px-3 text-[15px]" />
+        <input id={`${inputId}-new`} value={draft} disabled={!enabled} onChange={(e) => setDraft(e.target.value)} placeholder={`Add ${kind === "occasions" ? "an" : "a"} ${words.one}, e.g. ${words.example}`} maxLength={40} className="h-10 min-w-0 flex-1 rounded-[10px] border border-line bg-white px-3 text-[15px]" />
         <Button type="submit" variant="secondary" size="sm" disabled={!enabled || !draft.trim()}>
           <Plus className="h-4 w-4" aria-hidden="true" /> Add
         </Button>
@@ -111,13 +126,13 @@ export function OccasionsEditor({ initial, enabled }: { initial: string[]; enabl
           onClick={async () => {
             setBusy(true);
             setMsg(null);
-            const r = await post("/api/admin/shop/occasions", { occasions: list.map((x) => x.trim()) });
+            const r = await post(words.endpoint, { [kind]: list.map((x) => x.trim()) });
             setBusy(false);
             setMsg(r.ok ? { ok: true, text: "Saved to Shopify." } : { ok: false, text: String(r.data.error ?? "Couldn't save") });
             if (r.ok) router.refresh();
           }}
         >
-          {busy ? "Saving…" : "Save occasions"}
+          {busy ? "Saving…" : words.save}
         </Button>
         {dirty && (
           <button type="button" className="text-[14px] font-bold text-pink-link" onClick={() => setList(initial)}>
@@ -141,16 +156,46 @@ const PAGES = [
   ["all", "All (both pages)"],
 ] as const;
 
-/** One product's page and occasions, saved straight to its mmp_shop metafields in Shopify. */
-export function ProductFieldsEditor({ productId, title, page, occasions, choices, canSave }: { productId: string; title: string; page: "gifts" | "products" | "all" | null; occasions: string[]; choices: string[]; canSave: boolean }) {
+/** Chips for one list (occasions or categories): tick the ones that apply. */
+function ChipField({ legend, all, choices, value, onChange, disabled, empty }: { legend: string; all: string[]; choices: string[]; value: string[]; onChange: (v: string[]) => void; disabled: boolean; empty: string }) {
+  return (
+    <fieldset className="flex flex-col gap-1">
+      <legend className="mb-1 text-[13px] font-bold">{legend}</legend>
+      {all.length ? (
+        <div className="flex flex-wrap gap-2">
+          {all.map((o) => {
+            const on = value.includes(o);
+            const unknown = !choices.includes(o);
+            return (
+              <label key={o} className={cn("inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border px-3 text-[14px] focus-within:ring-2 focus-within:ring-[#DD07C4] focus-within:ring-offset-1", on ? "border-[#DD07C4] bg-pink-tint font-bold text-pink-dark" : "border-line bg-white", unknown && "border-dashed")}>
+                <input type="checkbox" className="sr-only" checked={on} disabled={disabled} onChange={() => onChange(on ? value.filter((x) => x !== o) : [...value, o])} />
+                {o}
+                {unknown && <span className="text-[11px] font-normal text-ink-2">(not in list)</span>}
+              </label>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[14px] text-ink-2">{empty}</p>
+      )}
+    </fieldset>
+  );
+}
+
+/** One product's page, occasions (Gifts) and categories (Products), saved straight to its mmp_shop metafields in Shopify. */
+export function ProductFieldsEditor({ productId, title, page, occasions, choices, categories, categoryChoices, canSave }: { productId: string; title: string; page: "gifts" | "products" | "all" | null; occasions: string[]; choices: string[]; categories: string[]; categoryChoices: string[]; canSave: boolean }) {
   const router = useRouter();
   const [p, setP] = useState<string>(page ?? "none");
   const [occ, setOcc] = useState<string[]>(occasions);
+  const [cat, setCat] = useState<string[]>(categories);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const id = useId();
-  const dirty = p !== (page ?? "none") || JSON.stringify(occ) !== JSON.stringify(occasions);
+  const dirty = p !== (page ?? "none") || JSON.stringify(occ) !== JSON.stringify(occasions) || JSON.stringify(cat) !== JSON.stringify(categories);
   const all = [...choices, ...occasions.filter((o) => !choices.includes(o))];
+  const allCats = [...categoryChoices, ...categories.filter((o) => !categoryChoices.includes(o))];
+  const onGifts = p === "gifts" || p === "all";
+  const onProducts = p === "products" || p === "all";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
@@ -165,35 +210,18 @@ export function ProductFieldsEditor({ productId, title, page, occasions, choices
           ))}
         </select>
       </div>
-      <fieldset className="flex flex-col gap-1">
-        <legend className="mb-1 text-[13px] font-bold">Occasions</legend>
-        {all.length ? (
-          <div className="flex flex-wrap gap-2">
-            {all.map((o) => {
-              const on = occ.includes(o);
-              const unknown = !choices.includes(o);
-              return (
-                <label key={o} className={cn("inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border px-3 text-[14px] focus-within:ring-2 focus-within:ring-[#DD07C4] focus-within:ring-offset-1", on ? "border-[#DD07C4] bg-pink-tint font-bold text-pink-dark" : "border-line bg-white", unknown && "border-dashed")}>
-                  <input type="checkbox" className="sr-only" checked={on} disabled={!canSave} onChange={() => setOcc((l) => (on ? l.filter((x) => x !== o) : [...l, o]))} />
-                  {o}
-                  {unknown && <span className="text-[11px] font-normal text-ink-2">(not in list)</span>}
-                </label>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-[14px] text-ink-2">Add occasions above first.</p>
-        )}
-      </fieldset>
+      {/* Occasions group it on the Gifts page; categories group it on the Products page. */}
+      {(onGifts || occ.length > 0) && <ChipField legend="Occasions (Gifts page)" all={all} choices={choices} value={occ} onChange={setOcc} disabled={!canSave} empty="Add occasions first." />}
+      {(onProducts || cat.length > 0) && <ChipField legend="Categories (Products page)" all={allCats} choices={categoryChoices} value={cat} onChange={setCat} disabled={!canSave} empty="Add categories first." />}
       <div className="flex flex-wrap items-center gap-3">
         <Button
           size="sm"
           disabled={!canSave || !dirty || busy}
-          aria-label={`Save page and occasions for ${title}`}
+          aria-label={`Save page, occasions and categories for ${title}`}
           onClick={async () => {
             setBusy(true);
             setMsg(null);
-            const r = await post("/api/admin/shop/products", { productId, page: p, occasions: occ });
+            const r = await post("/api/admin/shop/products", { productId, page: p, occasions: occ, categories: cat });
             setBusy(false);
             setMsg(r.ok ? { ok: true, text: "Saved to Shopify." } : { ok: false, text: String(r.data.error ?? "Couldn't save") });
             if (r.ok) router.refresh();

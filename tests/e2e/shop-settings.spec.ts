@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { signInWithLink } from "./auth";
+import { setSetting } from "./db";
 import { expectNoAxeViolations } from "./helpers";
 
 // Settings › Shop against the fixtures Store collection (lib/shop/sources/fixtures.ts). Writes go to the
@@ -26,7 +27,7 @@ test.describe("Settings › Shop", () => {
     const poster = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
     await poster.getByLabel("Page", { exact: true }).selectOption("all");
     await poster.getByText("Birthday", { exact: true }).click();
-    await poster.getByRole("button", { name: "Save page and occasions for Magic Poster" }).click();
+    await poster.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
     await expect(poster.getByRole("status")).toHaveText("Saved to Shopify.");
     await page.reload();
     const again = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
@@ -35,7 +36,7 @@ test.describe("Settings › Shop", () => {
     // Put it back.
     await again.getByLabel("Page", { exact: true }).selectOption("products");
     await again.getByText("Birthday", { exact: true }).click();
-    await again.getByRole("button", { name: "Save page and occasions for Magic Poster" }).click();
+    await again.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
     await expect(again.getByRole("status")).toHaveText("Saved to Shopify.");
   });
 
@@ -93,7 +94,7 @@ test.describe("Settings › Shop", () => {
     await expect(page.getByText("print area must be width x height")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save to Shopify" })).toBeDisabled();
     await size.getByLabel("Print area (px)").fill("2400x2400");
-    await page.getByRole("button", { name: "Save to Shopify" }).click();
+    await page.getByRole("button", { name: "Save to Shopify" }).press("Enter"); // keyboard: the dev-only Next.js badge can sit over it at 390 px
     await expect(page.getByText("Saved to Shopify.")).toBeVisible();
     await page.reload();
     await expect(page.getByTestId("rules-size").first().getByText("READY")).toBeVisible();
@@ -103,11 +104,44 @@ test.describe("Settings › Shop", () => {
     await again.getByLabel("Maker", { exact: true }).selectOption("");
     await again.getByLabel("Maker's product code").fill("");
     await again.getByLabel("Print area (px)").fill("");
-    await page.getByRole("button", { name: "Save to Shopify" }).click();
+    await page.getByRole("button", { name: "Save to Shopify" }).press("Enter"); // keyboard: the dev-only Next.js badge can sit over it at 390 px
     await expect(page.getByText("Saved to Shopify.")).toBeVisible();
     // The API refuses anything outside the rules.
     const bad = await page.request.post("/api/admin/shop/rules", { data: { productId: "gid://shopify/Product/1", variants: [{ variantId: "gid://shopify/ProductVariant/1", rules: { maker: "x" } }] } });
     expect(bad.status()).toBe(400);
+  });
+
+  test("categories: managed like occasions, ticked on a product, and the Products page groups by them", async ({ page }) => {
+    await signInWithLink(page, "super@example.com", "/");
+    await page.goto("/settings/shop");
+    // A category still on a product can't be removed.
+    await page.getByRole("button", { name: "Remove Mugs" }).click();
+    await page.getByRole("button", { name: "Save categories" }).click();
+    await expect(page.getByText(/Still used by a product: Mugs/)).toBeVisible();
+    await page.reload();
+
+    // Put the Poster in Acrylic as well as Wall art.
+    const poster = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
+    await poster.getByRole("group", { name: "Categories (Products page)" }).getByText("Acrylic", { exact: true }).click();
+    await poster.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
+    await expect(poster.getByRole("status")).toHaveText("Saved to Shopify.");
+
+    await setSetting("shop.enabled", true);
+    try {
+      await page.goto("/products");
+      await expect(page.getByRole("region", { name: "Acrylic" }).getByText("Magic Poster")).toBeVisible();
+      await expect(page.getByRole("region", { name: "Wall art" }).getByText("Magic Poster")).toBeVisible();
+      await expect(page.getByRole("link", { name: "Acrylic", exact: true })).toBeVisible();
+    } finally {
+      await setSetting("shop.enabled", false);
+    }
+
+    // Put it back.
+    await page.goto("/settings/shop");
+    const again = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
+    await again.getByRole("group", { name: "Categories (Products page)" }).getByText("Acrylic", { exact: true }).click();
+    await again.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
+    await expect(again.getByRole("status")).toHaveText("Saved to Shopify.");
   });
 });
 

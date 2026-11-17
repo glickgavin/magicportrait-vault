@@ -1,5 +1,5 @@
 import { FIXTURE_SCENES, fixtureTemplate } from "../fixture-scenes";
-import type { DiscountInfo, FieldDefinitionSpec, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopProduct, ShopVariant, VariantRuleChange, WriteResult } from "./types";
+import type { DiscountInfo, FieldDefinitionSpec, ProductFieldChanges, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopListKey, ShopProduct, ShopVariant, VariantRuleChange, WriteResult } from "./types";
 
 /**
  * In-memory Store collection for tests and local dev. Made-up products only (no customer images);
@@ -7,6 +7,7 @@ import type { DiscountInfo, FieldDefinitionSpec, RawMetafield, ShopCatalogSource
  */
 export const FX_COLLECTION_ID = "328021508292";
 export const FX_OCCASIONS = ["Christmas", "Birthday", "New Year", "For Mom", "For Dad", "Pet lovers"];
+export const FX_CATEGORIES = ["Mugs", "Puzzles", "Acrylic", "Wall art", "Pillows", "Ornaments", "Apparel"];
 export const FX_VIP_EMAIL = "vip.tester@example.com";
 
 const T = "2026-11-01T10:00:00Z";
@@ -33,9 +34,10 @@ const variant = (title: string, price: string, rules: Record<string, string> | n
 const TEMPLATE = (scene: keyof typeof FIXTURE_SCENES) => JSON.stringify(fixtureTemplate(scene));
 
 let pid = 700;
-const product = (p: Omit<ShopProduct, "id" | "legacyId" | "position" | "media" | "description"> & { description?: string }): ShopProduct => {
+const product = (p: Omit<ShopProduct, "id" | "legacyId" | "position" | "media" | "description" | "categories"> & { description?: string; categories?: string[] }): ShopProduct => {
   pid++;
-  return { id: `gid://shopify/Product/8${pid}000000`, legacyId: `8${pid}000000`, position: 0, media: [], description: p.description ?? "", ...p };
+  // A product's category starts as its product type, as the Products page grouped before categories.
+  return { id: `gid://shopify/Product/8${pid}000000`, legacyId: `8${pid}000000`, position: 0, media: [], description: p.description ?? "", ...p, categories: p.categories ?? (p.productType.trim() ? [p.productType.trim()] : []) };
 };
 
 function buildProducts(): ShopProduct[] {
@@ -80,6 +82,7 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
   readonly kind = "fixtures" as const;
   private products = buildProducts();
   private occasionChoices = [...FX_OCCASIONS];
+  private categoryChoices = [...FX_CATEGORIES];
   private definitionsCreated = true;
   readonly writes: { type: "metafieldsSet" | "metafieldDefinitionUpdate" | "metafieldDefinitionCreate"; target: string; payload: unknown }[] = [];
   failNextWrite: string | null = null;
@@ -87,6 +90,7 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
   reset() {
     this.products = buildProducts();
     this.occasionChoices = [...FX_OCCASIONS];
+    this.categoryChoices = [...FX_CATEGORIES];
     this.definitionsCreated = true;
     this.writes.length = 0;
     this.failNextWrite = null;
@@ -103,7 +107,7 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
   async fieldDefinitions(): Promise<ShopFieldDefinition[]> {
     if (!this.definitionsCreated) return [];
     const { fieldSpecs } = await import("../fields");
-    return fieldSpecs(this.occasionChoices).map((s, i) => ({ id: `gid://shopify/MetafieldDefinition/${100 + i}`, key: s.key, name: s.name, type: s.type, ownerType: s.ownerType, choices: s.choices ?? null }));
+    return fieldSpecs(this.occasionChoices, this.categoryChoices).map((s, i) => ({ id: `gid://shopify/MetafieldDefinition/${100 + i}`, key: s.key, name: s.name, type: s.type, ownerType: s.ownerType, choices: s.choices ?? null }));
   }
 
   private takeFailure(): WriteResult | null {
@@ -113,15 +117,17 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
     return { ok: false, reason };
   }
 
-  async setProductFields(productId: string, namespace: string, fields: { page?: string | null; occasions?: string[] }): Promise<WriteResult> {
+  async setProductFields(productId: string, namespace: string, fields: ProductFieldChanges): Promise<WriteResult> {
     const fail = this.takeFailure();
     if (fail) return fail;
     const p = this.products.find((x) => x.id === productId);
     if (!p) return { ok: false, reason: "not_found" };
     if (fields.occasions?.some((o) => !this.occasionChoices.includes(o))) return { ok: false, reason: "INCLUSION" };
+    if (fields.categories?.some((o) => !this.categoryChoices.includes(o))) return { ok: false, reason: "INCLUSION" };
     this.writes.push({ type: "metafieldsSet", target: productId, payload: { namespace, ...fields } });
     if (fields.page !== undefined) p.page = fields.page;
     if (fields.occasions !== undefined) p.occasions = [...fields.occasions];
+    if (fields.categories !== undefined) p.categories = [...fields.categories];
     return { ok: true };
   }
 
@@ -150,11 +156,12 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
     return { ok: true };
   }
 
-  async setOccasionChoices(namespace: string, choices: string[]): Promise<WriteResult> {
+  async setListChoices(namespace: string, key: ShopListKey, choices: string[]): Promise<WriteResult> {
     const fail = this.takeFailure();
     if (fail) return fail;
-    this.writes.push({ type: "metafieldDefinitionUpdate", target: `${namespace}.occasions`, payload: { choices } });
-    this.occasionChoices = [...choices];
+    this.writes.push({ type: "metafieldDefinitionUpdate", target: `${namespace}.${key}`, payload: { choices } });
+    if (key === "occasions") this.occasionChoices = [...choices];
+    else this.categoryChoices = [...choices];
     return { ok: true };
   }
 

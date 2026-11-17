@@ -11,6 +11,7 @@ import { getCatalog, pricingFor, type CustomerType } from "./index";
 import { discounted, lowest } from "./money";
 import { ensureSize, listPictures, pictureFor, pictureLink } from "./pictures";
 import { getShopCatalogSource } from "./sources";
+import type { ShopListKey } from "./sources/types";
 import { parseTemplate, type Template } from "./template";
 
 export type ShopPage = "gifts" | "products";
@@ -33,16 +34,25 @@ function card(e: CatalogEntry, pct: number | null): CardView {
   return { handle: e.product.handle, title: e.product.title, productType: e.product.productType, occasions: e.product.occasions, image: e.product.media[0]?.url ?? null, from, fromDiscounted: discounted(from, pct), many: e.sellable.length > 1 };
 }
 
-async function occasionOrder(entries: CatalogEntry[]): Promise<string[]> {
+/** A product's Products page categories; until it has any, its Shopify product type (how the page grouped before). */
+export function categoriesOf(e: CatalogEntry): string[] {
+  if (e.product.categories.length) return e.product.categories;
+  const t = e.product.productType.trim();
+  return t ? [t] : [];
+}
+
+/** The occasion or category list in the order set in Settings › Shop, then any others products use. */
+async function listOrder(entries: CatalogEntry[], key: ShopListKey): Promise<string[]> {
+  const used = [...new Set(entries.flatMap((e) => (key === "occasions" ? e.product.occasions : categoriesOf(e))))];
   const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
   try {
     const defs = await (await getShopCatalogSource()).fieldDefinitions(ns);
-    const choices = defs.find((d) => d.ownerType === "PRODUCT" && d.key === "occasions")?.choices;
-    if (choices?.length) return choices;
+    const choices = defs.find((d) => d.ownerType === "PRODUCT" && d.key === key)?.choices;
+    if (choices?.length) return [...choices, ...used.filter((u) => !choices.includes(u))];
   } catch {
-    /* fall back to the occasions products use */
+    /* fall back to the ones products use */
   }
-  return [...new Set(entries.flatMap((e) => e.product.occasions))];
+  return used;
 }
 
 /** The Gifts page (by occasion) or the Products page (by product type). */
@@ -50,8 +60,9 @@ export async function landingData(user: SessionUser, page: ShopPage, filter: str
   // Pricing, the catalog and the setting side by side; the person's pictures stream in separately (landingPictures).
   const [pricing, catalog, s] = await Promise.all([pricingFor(user.email), getCatalog(), getSettings(["shop.top_picks_count"] as const)]);
   const entries = forPage(catalog, page);
-  const groups = page === "gifts" ? (await occasionOrder(entries)).filter((o) => entries.some((e) => e.product.occasions.includes(o))) : [...new Set(entries.map((e) => e.product.productType.trim()).filter(Boolean))];
-  const inGroup = (e: CatalogEntry, g: string) => (page === "gifts" ? e.product.occasions.includes(g) : e.product.productType.trim() === g);
+  // Gifts by occasion, Products by category: both lists are set and ordered in Settings › Shop.
+  const inGroup = (e: CatalogEntry, g: string) => (page === "gifts" ? e.product.occasions.includes(g) : categoriesOf(e).includes(g));
+  const groups = (await listOrder(entries, page === "gifts" ? "occasions" : "categories")).filter((g) => entries.some((e) => inGroup(e, g)));
   const chosen = filter && groups.includes(filter) ? filter : null;
   const sections = (chosen ? [chosen] : groups).map((g) => ({ title: g, products: entries.filter((e) => inGroup(e, g)).map((e) => card(e, pricing.pct)) })).filter((s) => s.products.length);
   const ungrouped = entries.filter((e) => !groups.some((g) => inGroup(e, g)));

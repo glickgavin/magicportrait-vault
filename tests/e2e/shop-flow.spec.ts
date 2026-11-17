@@ -15,6 +15,8 @@ async function emptyCart(page: Page) {
   await page.goto("/cart");
   await expect(page.getByRole("heading", { name: "Your cart" })).toBeVisible();
   const remove = page.getByRole("button", { name: "Remove" });
+  // Wait until the cart has loaded: either its lines or the empty message.
+  await expect(remove.first().or(page.getByText("Your cart is empty.").first())).toBeVisible();
   for (let i = 0; i < 10 && (await remove.count()) > 0; i++) {
     const before = await remove.count();
     await remove.first().click();

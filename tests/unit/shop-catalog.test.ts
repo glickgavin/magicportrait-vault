@@ -73,7 +73,7 @@ describe("the Store collection", () => {
     expect(by["fx-ornaments"].hidden).toEqual([]);
     expect(by["fx-tile"].hidden).toEqual(["no_rules", "no_template"]);
     expect(by["fx-tee"].hidden).toEqual(["not_active", "no_page", "sold_out", "no_template"]);
-    expect(by["fx-tile"].warnings).toContain("No product type, so the Products page can't group it");
+    expect(by["fx-tile"].warnings).toContain("No category, so the Products page shows it under More products");
   });
   it("drops a size with no rules but keeps the product", async () => {
     const poster = evaluateProduct((await fx.storeProducts(FX_COLLECTION_ID)).find((p) => p.handle === "fx-poster")!);
@@ -109,7 +109,7 @@ describe("writes stay inside mmp_shop", () => {
   });
   it("defines every field in the namespace, products and variants", () => {
     const specs = fieldSpecs(["Christmas"]);
-    expect(specs.filter((s) => s.ownerType === "PRODUCT").map((s) => s.key)).toEqual(["page", "occasions", "short_description", "template"]);
+    expect(specs.filter((s) => s.ownerType === "PRODUCT").map((s) => s.key)).toEqual(["page", "occasions", "categories", "short_description", "template"]);
     expect(specs.find((s) => s.key === "occasions")?.choices).toEqual(["Christmas"]);
     expect(fieldSpecs([]).find((s) => s.key === "occasions")?.choices).toBeUndefined();
   });
