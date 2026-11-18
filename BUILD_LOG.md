@@ -514,3 +514,7 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 - **Fixed: categories didn't show on Products after saving.** Each server kept its own copy of the Shopify products for `shop.product_cache_minutes` (5), and a save only cleared the copy on the server that handled it. Now every Settings › Shop save to Shopify also stamps the new read-only setting `shop.catalog_changed_at`; every server re-reads Shopify when its copy is older than the stamp (settings are re-read within seconds). The live row is created on the first save (upsert); `seed.sql` has it too.
 - **Gifts and Products load without flashing the plain product photos.** While their pictures load, the "Choose your picture" box shows placeholder tiles and each product card shows a pulsing placeholder; then every card shows their own picture. Product photos only appear for products the picture doesn't suit, or for someone with no pictures yet.
 - Shop e2e: the cart helper repeats (reload, remove) until a fresh load shows an empty cart.
+
+## 18 Nov: Next.js security upgrade
+- **Done.** `next` and `eslint-config-next` 16.4.4 → 16.4.6. Fixes GHSA-mfr8-8qww-v76h and GHSA-vc7v-qv4w-wrv8 (moderate; both are cache leaks in `'use cache'` / `unstable_cache`, which this app doesn't use). `next dev` and `next build` no longer stop on the upgrade notice.
+- **Still open:** `pnpm audit` reports two moderate advisories in `glob` / `minimatch`, pulled in by `archiver` (hi-res download zips). They need an `archiver` upgrade; separate change.
