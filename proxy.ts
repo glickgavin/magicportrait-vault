@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /** Shop pages; their loading placeholders stream, so a page's own notFound() can't set the 404 status. */
 const SHOP_PAGE = /^\/(gifts|products|cart)(\/|$)/;
+/** The open store's pages and API (docs/open-store.md): 404 while hidden, the same way. */
+const STORE_PATH = /^\/(store|api\/store)(\/|$)/;
 
 /**
  * Keeps the Supabase auth cookies fresh. Authorisation itself happens in each page and route, except that
@@ -29,6 +31,14 @@ export async function proxy(request: NextRequest) {
     if (!(await shopVisibleTo(data.user?.email ?? null))) {
       // Any unknown path renders the app's not-found page with a real 404.
       const hidden = NextResponse.rewrite(new URL("/_shop-hidden", request.url), { status: 404 });
+      for (const c of response.cookies.getAll()) hidden.cookies.set(c);
+      return hidden;
+    }
+  }
+  if (STORE_PATH.test(request.nextUrl.pathname)) {
+    const { openStoreVisibleTo } = await import("@/lib/open-store/visible");
+    if (!(await openStoreVisibleTo(data.user?.email ?? null))) {
+      const hidden = request.nextUrl.pathname.startsWith("/api/") ? NextResponse.json({ error: "not_found" }, { status: 404 }) : NextResponse.rewrite(new URL("/_store-hidden", request.url), { status: 404 });
       for (const c of response.cookies.getAll()) hidden.cookies.set(c);
       return hidden;
     }

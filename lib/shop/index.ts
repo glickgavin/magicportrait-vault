@@ -40,6 +40,7 @@ export async function invalidateCatalog(): Promise<void> {
   g.__shopCatalog = null;
   // The open store caches the same products (lib/open-store/index.ts): drop its copy too.
   (globalThis as { __openStoreCatalog?: unknown }).__openStoreCatalog = null;
+  (globalThis as { __openStoreReads?: Map<string, unknown> }).__openStoreReads?.clear();
   try {
     await setSetting("shop.catalog_changed_at", Date.now(), "system", { system: true });
   } catch {

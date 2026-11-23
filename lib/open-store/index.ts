@@ -43,7 +43,24 @@ export async function getStoreCatalog(opts: { fresh?: boolean } = {}): Promise<{
   return out;
 }
 
+const reads = globalThis as unknown as { __openStoreReads?: Map<string, { at: number; value: unknown }> };
+
+/**
+ * A cached Shopify read for the store pages (a category collection, the menu, policies): kept for
+ * shop.product_cache_minutes and dropped when Settings › Shop saves (shop.catalog_changed_at).
+ */
+export async function cachedRead<T>(key: string, read: () => Promise<T>): Promise<T> {
+  const s = await getSettings(["shop.product_cache_minutes", "shop.catalog_changed_at"] as const);
+  const map = (reads.__openStoreReads ??= new Map());
+  const hit = map.get(key);
+  if (hit && hit.at > s["shop.catalog_changed_at"] && Date.now() - hit.at < s["shop.product_cache_minutes"] * 60_000) return hit.value as T;
+  const value = await read();
+  map.set(key, { at: Date.now(), value });
+  return value;
+}
+
 /** Drop this server's copy (lib/shop's invalidateCatalog() also stamps the change for every server). */
 export function forgetStoreCatalog() {
   g.__openStoreCatalog = null;
+  reads.__openStoreReads?.clear();
 }
