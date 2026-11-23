@@ -59,7 +59,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
   2. Klaviyo events, profile properties and deletion jobs, and a marketing subscription that an open-store visitor ticked for, through the outbox only.
   3. The webhook-registration script, which a human runs.
   4. Shop carts: Storefront `cartCreate` and the cart update mutations, for a signed-in customer's own cart (`docs/shop.md`) or an open-store visitor's own cart, held against their visitor id (`docs/open-store.md`).
-  5. Shop product fields: `metafieldsSet` on the `mmp_shop` namespace of products in the Store collection, and the `mmp_shop` metafield definitions, from Settings › Shop by a super user. Never any other product field.
+  5. Shop product fields: `metafieldsSet` on the `mmp_shop` namespace of products in the Store or Magic Store collection, and the `mmp_shop` metafield definitions, from Settings › Shop or Settings › Open store by a super user. Never any other product field.
   6. Open-store pictures: new Imagen sessions through Imagen's public API with this app's own key (`docs/open-store.md`).
   
   Never write to Imagen's database, the events mirror or the live site's databases.
