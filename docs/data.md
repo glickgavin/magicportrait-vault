@@ -1226,3 +1226,19 @@ All behind `lib/shop/sources/` (fixtures + live), separate from `lib/sources/`, 
 **Fulfilment's fresh links:** `POST /api/shop/fulfilment/image` with `{ "line_id": "<_vault_line_id>" }` and header `x-shop-signature: hex(HMAC-SHA256(SHOP_FULFILMENT_SECRET, line_id))` returns `{ image_url, preview_url, valid_days }` (signed links for new uploads and previews; public pictures as they are). 404 when `SHOP_FULFILMENT_SECRET` isn't set.
 
 **Events mirror** (read-only, `vault_reader`): past portrait uploads (`shop.mirror_upload_event` / `shop.mirror_upload_property`, default `funnel_portrait_generated` / `original_image_url`) and dropped photo tiles (`shop.mirror_tile_event`, default `tile_dropped` with `tile_type` = `photo`), by `email = any($1)` as in §2.4.
+
+## 12. Source 7: the open store (`docs/open-store.md`)
+
+All behind `lib/open-store/sources/` (Shopify reads) and `lib/sources/imagen-api.ts` (Imagen), each with fixtures; the open store's own rows are in `lib/db/store.ts`.
+
+**Admin GraphQL** (read-only, the shop's authenticated client): the Magic Store collection by handle (`collectionByIdentifier(identifier: { handle })`, products in `COLLECTION_DEFAULT` order with the `mmp_shop` product and variant metafields, `resourcePublications` for the sales-channel check, `reviews.rating` / `reviews.rating_count`), any collection by handle (the category pages), `menus` by handle (the category circles, with each collection's image), and `shopPolicies` (shipping and refund). The writes from Settings (`setProductMetafields`, `setThemeChoices`) go through the shop's source (allowed write 5).
+
+**Storefront GraphQL** (allowed write 4, as §11): `cartCreate` without `buyerIdentity` for a visitor who isn't signed in (with it when they are), the store's `open_store.discount_code`, cart attributes `_source` = `open_store` and `_open_store_visitor`; `cart(id)`, `cartLinesAdd`, `cartLinesUpdate`, `cartLinesRemove`. The cart id lives on `store_visitors.shopify_cart_id` only; there are no open-store cart tables. Line keys: `lib/open-store/order-lines.ts` (the shop's keys with `_image_kind` = `generated`, `_shop_page` = `open_store`, `_shop_image_id`, `_shop_session_id`, `_shop_theme`, Imagen's public `_image_url`).
+
+**Imagen's public API** (allowed write 6), server only, `IMAGEN_API_URL` with `Authorization: Bearer IMAGEN_API_KEY`: `GET /api-themes` (cached 10 minutes; Settings › Shop › Magic Store refreshes it), `POST /api-generate` (multipart `theme_id`, `name`, `source_image`, header `X-Client-User-Id: open-store:<visitor id>`; extra photos as `source_image_2…` until Imagen confirms the field), `GET /api-sessions/<id>` (asked at most every 2 s while a visitor's page is open), and the finished pictures, fetched only from Imagen's own host and copied to `store-uploads`. Fixtures: the pet's name picks the case (`Oops` fails, `Slowpoke` is slow, `Forever` never finishes, `Faces` asks for faces).
+
+**orders/paid** (§5.6): after the gift offer and the shop, `_source` = `open_store` with `_open_store_visitor` marks that visitor's pictures ordered (by `_shop_session_id`, only on that visitor's rows), links the visitor to the order email if it has none (`linked_via` = `order`), creates the member (`created_via` = `store_order`), clears the cart id, and records `store_order_paid`. A failure never changes the reply.
+
+**AgentMail:** the one "Your picture is ready" email per picture (`emails/store-picture.tsx`), with a `store_picture` sign-in link that opens `/store/product/<id>?g=<picture>&from=email_link`.
+
+**Klaviyo** (allowed write 2, outbox only): when the visitor ticked "Send me offers", a `subscription` row (`profile-subscription-bulk-create-jobs`, consent `SUBSCRIBED`, source `open_store.klaviyo_source`, list `open_store.klaviyo_list_id` when set) and the `Store Picture Ready` event (product, theme, product page link). Nothing goes to Klaviyo without the tick.

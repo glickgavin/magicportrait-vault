@@ -185,3 +185,29 @@ export async function picturesEmailedTo(email: string, since: Date): Promise<num
   const r = await db().from("store_generations").select("id", { count: "exact", head: true }).eq("email_to", email.trim().toLowerCase()).gte("emailed_at", since.toISOString());
   return r.count ?? 0;
 }
+
+// ---------------------------------------------------------------- Open store 5: numbers for Settings › Shop › Magic Store
+
+export type NumbersGeneration = Pick<StoreGenerationRow, "visitor_id" | "product_id" | "theme" | "status" | "created_at" | "finished_at" | "cost_usd" | "order_id"> & { email_to: string | null; email_consent: boolean };
+export type NumbersVisitor = { id: string; created_at: string; first_touch: Record<string, unknown> | null };
+export type NumbersActivity = { event: string; created_at: string; props: Record<string, unknown> };
+
+/** Everything the numbers need since `since` (our own tables only, so they never depend on PostHog). */
+export async function storeNumbersData(since: Date): Promise<{ generations: NumbersGeneration[]; visitors: NumbersVisitor[]; activity: NumbersActivity[] }> {
+  const iso = since.toISOString();
+  const [g, v, a] = await Promise.all([
+    db().from("store_generations").select("visitor_id, product_id, theme, status, created_at, finished_at, cost_usd, order_id, email_to, email_consent").gte("created_at", iso).limit(50000),
+    db().from("store_visitors").select("id, created_at, first_touch").gte("created_at", iso).limit(50000),
+    db().from("activity_log").select("event, created_at, props").in("event", ["store_added_to_cart", "store_order_paid"]).gte("created_at", iso).limit(50000),
+  ]);
+  return { generations: (g.data ?? []) as NumbersGeneration[], visitors: (v.data ?? []) as NumbersVisitor[], activity: (a.data ?? []) as NumbersActivity[] };
+}
+
+/** First touch for visitors made before it was recorded on them, by id (for orders whose visitor is older than the window). */
+export async function visitorFirstTouches(ids: string[]): Promise<Map<string, Record<string, unknown> | null>> {
+  const out = new Map<string, Record<string, unknown> | null>();
+  if (!ids.length) return out;
+  const r = await db().from("store_visitors").select("id, first_touch").in("id", ids.slice(0, 1000));
+  for (const row of (r.data ?? []) as { id: string; first_touch: Record<string, unknown> | null }[]) out.set(row.id, row.first_touch);
+  return out;
+}
