@@ -267,7 +267,7 @@ PostHog dashboard: a funnel Store page → Product page → Photo chosen → Pic
 
 Product pages sit under `/store/` rather than at `/product/<id>` so that one switch hides the whole store, and so they don't sit next to the signed-in shop's `/products`.
 
-## Changes needed in `CLAUDE.md` (to approve)
+## Changes to `CLAUDE.md` (approved and made 23 Nov)
 
 1. **Imagen:** "Never write to Imagen" becomes "Never write to Imagen's database; the open store creates sessions only through Imagen's public API with its own key".
 2. **Shop carts:** the fourth allowed write adds "or an anonymous visitor's cart, held by a cookie".
@@ -283,7 +283,7 @@ Product pages sit under `/store/` rather than at `/product/<id>` so that one swi
 | Open store 2: store and product pages | Store page, product page before a picture (gallery, variants, delivery estimate, details, related with placeholders), cart icon | e2e at 390 × 844 and 1280 × 800, axe clean |
 | Open store 3: pictures | `lib/sources/imagen-api.ts` (live and fixtures), the visitor cookie and `store_visitors`, `store_photos`, `store_generations`, the `store-uploads` bucket and its file route, upload checks, bot check, limits, the creating and ready states, several photo slots, drawing on the template, result strip, related products with the picture, restore on return | Fixtures cover ready, slow, failed, timed out, limited and a two-photo theme; golden images of the pillow with a square and a 3:4 result; another visitor's cookie gets 404 on every file |
 | Open store 4: cart, checkout, sign-in and email | Guest Shopify cart on the visitor row, drawer, order-line keys, discount code, `orders/paid` linking the visitor, linking on sign-in, pictures on another device, the email ask while painting, the "Your picture is ready" email, the Klaviyo subscription through the outbox | A fixture checkout produces exactly the order-line keys; signing in on a second browser shows the first browser's pictures; the email's link opens the picture in a fresh browser |
-| Open store 5: tracking and docs | Events, the PostHog funnel, `docs/analytics.md`, `docs/schema.md`, `docs/data.md`, the `CLAUDE.md` changes above | Docs match the build |
+| Open store 5: tracking and docs | Events, the PostHog funnel, `docs/analytics.md`, `docs/schema.md`, `docs/data.md` | Docs match the build |
 
 Needed from people: the Imagen API key for this app and Imagen's API docs; the Shopify navigation menu and collections; the first products with `imagen_theme`, templates and rules; the Storefront token's sales channel publishing them.
 

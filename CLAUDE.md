@@ -12,6 +12,7 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 | `docs/analytics.md` | PostHog events and the `activity_log` |
 | `docs/design.md` | Brand tokens, header, menu, footer, components |
 | `docs/shop.md` | The shop (Gifts and Products pages, cart, Shopify checkout): its spec, switches and build parts |
+| `docs/open-store.md` | The open store ("Magic Store", `/store`): shopping without signing in, pictures made with Imagen's API, visitors and their saved data |
 | `designs/README.md` | Screen mockups → routes |
 | `reference/live-site/` | The live site's header, menu, footer and tokens, copied from its code |
 
@@ -20,9 +21,10 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 - **Tailwind + shadcn/ui**, matching the live site (`reference/live-site/`).
 - **Supabase** (the app's own project, `magic-vault`, ref `koudexolfdvzmrglzhaz`; the only one, live): Postgres, Auth (email OTP), Storage. Use `@supabase/ssr` for auth cookies; the browser key is the publishable key.
 - **External reads:** Imagen and the events mirror through the read-only `vault_reader` Postgres role (`IMAGEGEN_DATABASE_URL`, `MIRROR_DATABASE_URL`; `postgres` driver via the Supabase pooler); Shopify Admin GraphQL with the r_orders app token.
+- **Imagen API** (open store only): Imagen's public API with this app's own key (`IMAGEN_API_URL`, `IMAGEN_API_KEY`), server-side, behind `lib/sources/imagen-api.ts`.
 - **Card render:** `@napi-rs/canvas` (fonts registered from `assets/fonts/`). Use `sharp` for upload checks and thumbnails.
 - **Email:** React Email + **AgentMail** (API, `agentmail` SDK) for everything that must arrive at once or goes to non-customers, sent from the inbox `cards@magicportraitspartners.com`. Supabase Auth sends its codes through AgentMail's SMTP relay (`smtp.agentmail.to`).
-- **Klaviyo:** events and profile properties only, server-side through the `outbound_events` outbox (`docs/data.md` §10). This app sends no offer, reminder or mug-photo emails; they'll be written later as Klaviyo flows (`SPEC.md` §14a).
+- **Klaviyo:** events and profile properties, plus a marketing subscription when an open-store visitor ticks for one, server-side through the `outbound_events` outbox (`docs/data.md` §10). This app sends no offer, reminder or mug-photo emails; they'll be written later as Klaviyo flows (`SPEC.md` §14a).
 - **Analytics:** `posthog-js` + `posthog-node`, proxied at `/ingest`.
 - **Validation:** Zod on every input. **Tests:** Vitest (unit) and Playwright (e2e at 390 × 844 and 1280 × 800).
 - **Scheduled work:** Vercel Cron → `/api/cron/*`, protected by `CRON_SECRET`.
@@ -51,16 +53,18 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 ## Rules
 
 **Data**
-- Shopify and Imagen are the sources of truth. Read them live; never copy orders, products or portraits into our database, except the cached session-id list, the copy of a portrait used on a card, and the shop's carts and new uploads (`docs/shop.md`).
-- Writes outside our database are allowed in exactly five places:
+- Shopify and Imagen are the sources of truth. Read them live; never copy orders, products or portraits into our database, except the cached session-id list, the copy of a portrait used on a card, the shop's carts and new uploads (`docs/shop.md`), and the open store's visitors, photos and pictures (`docs/open-store.md`).
+- Writes outside our database are allowed in exactly six places:
   1. The mug choice on a Shopify order: `metafieldsSet` + `tagsAdd`, as in `docs/data.md`.
-  2. Klaviyo events, profile properties and deletion jobs, through the outbox only.
+  2. Klaviyo events, profile properties and deletion jobs, and a marketing subscription that an open-store visitor ticked for, through the outbox only.
   3. The webhook-registration script, which a human runs.
-  4. Shop carts: Storefront `cartCreate` and the cart update mutations, for a signed-in customer's own cart (`docs/shop.md`).
+  4. Shop carts: Storefront `cartCreate` and the cart update mutations, for a signed-in customer's own cart (`docs/shop.md`) or an open-store visitor's own cart, held against their visitor id (`docs/open-store.md`).
   5. Shop product fields: `metafieldsSet` on the `mmp_shop` namespace of products in the Store collection, and the `mmp_shop` metafield definitions, from Settings › Shop by a super user. Never any other product field.
+  6. Open-store pictures: new Imagen sessions through Imagen's public API with this app's own key (`docs/open-store.md`).
   
-  Never write to Imagen, the events mirror or the live site's databases.
+  Never write to Imagen's database, the events mirror or the live site's databases.
 - The shop is hidden unless `shop.enabled` (customers) or `shop.super_user_preview` (super users) is on; hidden shop routes return 404 and shop UI doesn't render. Shop changes must leave every existing screen and test unchanged with both off.
+- The open store is hidden the same way unless `open_store.enabled` or `open_store.super_user_preview` is on; `/store/*` and `/api/store/*` return 404 while hidden.
 - Every external source sits behind an interface in `lib/sources/` with a `fixtures` implementation. Tests and local dev use fixtures (`DATA_SOURCE=fixtures`); fixtures contain made-up people only.
 - Our own database: there is one Supabase project, `magic-vault`, and it is live. Tests and e2e use the **local Supabase stack** (`supabase start`, Docker) in the build session. `magic-vault` gets migrations and `supabase/seed.sql` only, through `scripts/db-apply-remote.ts` and the Management API; never test data. Vercel previews also use `magic-vault`, with every switch off.
 
@@ -69,7 +73,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 - Code calls `getSetting('cards.message_max_chars')`. Secrets live only in Vercel env vars.
 
 **Security** (lessons from the live /redeem)
-- Every customer action re-checks on the server that the signed-in email owns the thing (card, order) and that the action is allowed: mug present and not locked; downloads enabled.
+- Every customer action re-checks on the server that the signed-in email owns the thing (card, order) and that the action is allowed: mug present and not locked; downloads enabled. In the open store, it checks that the visitor cookie (or a signed-in email linked to that visitor) owns it.
 - No debug fields in responses. Never return another person's email or data. Error messages don't reveal whether an email or order exists.
 - Downloads and card images use short-lived signed URLs or app routes that check access. Never hand out permanent public links to private files.
 - Only `NEXT_PUBLIC_*` values reach the browser, and those are the Supabase URL and anon key, the PostHog key and host, and the Intercom app id. No other keys in client code.
