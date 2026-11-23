@@ -34,7 +34,7 @@ Shopify stays the source of truth for products, variants, prices and stock. That
 
 ## The customer flow
 
-Two pages, Gifts and Products, lead into the same four screens. Both are for signed-in customers only, because they need their images. Ways in: **Gifts and Products** in the menu, a "Give it as a gift" and "Put it on a product" on Home and on each portrait in My portraits, and a link from each order.
+Two pages, Gifts and Products, lead into the same four screens. Both are for signed-in customers only, because they need their images. For people who aren't signed in, see the open store (`docs/open-store.md`). Ways in: **Gifts and Products** in the menu, a "Give it as a gift" and "Put it on a product" on Home and on each portrait in My portraits, and a link from each order.
 
 |  | Gifts page | Products page |
 |---|---|---|

@@ -574,3 +574,7 @@ These came up while reading the live code and databases. They affect customers t
 
 Added 10 Nov 2026 and specified in `docs/shop.md`: Gifts and Products pages, Choose a picture, Product ideas with live previews, the product sheet with Adjust, a cart kept in step with a Shopify cart, "Who's it for?" for gifts, Shopify checkout, the promotion bar and Settings › Shop. Hidden behind `shop.enabled` and `shop.super_user_preview` (both off); with both off every existing screen is unchanged.
 
+## 23. The open store (Magic Store, no sign-in)
+
+Drafted 23 Nov 2026 and specified in `docs/open-store.md`: a store page and product pages anyone can use without signing in. The visitor uploads a photo on a product page, Imagen paints it in that product's style (set in the product's `mmp_shop` metafields), and the result replaces the placeholder on the product, with three more products shown with the same picture. Guest cart in Shopify, Shopify checkout. Hidden behind `open_store.enabled` and `open_store.super_user_preview` (both off). Needs three `CLAUDE.md` rule changes and answers to its open questions before the build starts.
+
