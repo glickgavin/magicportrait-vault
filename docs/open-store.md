@@ -94,6 +94,18 @@ Mockups: the "Open store mockups" design canvas (store page, product page before
 
 Changing the variant redraws the picture at once (same picture, new template and crop); it never calls Imagen again. Changing the name or photo needs a new picture. A visitor's earlier photos are offered again ("Use a photo you've added before") so they don't have to upload twice on the next product.
 
+### Asking for their email while we paint
+
+While the picture is being made, a box under the picture area asks for their email. It's optional and on by default (`open_store.ask_email_while_painting`). The mockup is in the "Creating the picture" board.
+
+- **The box:** "While we paint: want Teddy's picture by email?", "We'll send it the moment it's ready, so you can come back to it on any device.", an email field, **Email it to me**, and an unticked box "Send me offers and new designs too. Unsubscribe any time." A close button hides it for this visitor. It never blocks or delays the picture.
+- **Saving:** `POST /api/store/email` (Zod, rate-limited per visitor and IP) saves it as `email_given` on the visitor. It isn't proven, since anyone can type anyone's address, so it doesn't link the visitor to that email's account.
+- **The email:** when the picture is ready, the app sends one "Your picture is ready" email through AgentMail (React Email). It shows the picture (Imagen's public URL, as on order lines), the product, and **See it on your pillow**.
+- **The link in it** works like gift links (`/g/<token>`): random, stored hashed, expires after `open_store.email_link_days` (default 30), and stripped from the address after use. Opening it proves the email, signs them in, links the visitor (`linked_via` = `email_link`), and opens the product with their picture, on any device.
+- **Email limits:** one email per generation, and at most `open_store.emails_per_address_per_day` (default 3) to one address. If the picture is already ready when they give the email, it goes at once.
+- **Offers box ticked:** an outbox job subscribes the address in Klaviyo with consent (source "Magic Store: while painting") and sends the event `Store Picture Ready` with the product, theme and product page link, for the store's future flows. Without the tick, nothing goes to Klaviyo.
+- **Ready state:** under the "Teddy is ready" note: "We've emailed it to you too." The address isn't shown.
+
 ### Generation settings in Shopify
 
 Each product's generation is set in product metafields, namespace `mmp_shop`, edited in Shopify admin or in Settings › Open store:
@@ -150,7 +162,7 @@ The server, never the browser, calls Imagen's public API, the same one the main 
 
 | Table | Columns |
 |---|---|
-| `store_visitors` | `id uuid pk`, `token_hash text unique`, `email text null` (lower-cased; set when they sign in or buy), `linked_via` (`sign_in` · `order`, null until linked), `shopify_cart_id`, `shopify_checkout_url`, `first_seen_at`, `last_seen_at`, `created_at`, `updated_at` |
+| `store_visitors` | `id uuid pk`, `token_hash text unique`, `email text null` (lower-cased; set when they sign in or buy, so it's proven), `linked_via` (`sign_in` · `order` · `email_link`, null until linked), `email_given text null` (typed while painting, not proven), `email_given_at`, `marketing_consent_at`, `shopify_cart_id`, `shopify_checkout_url`, `first_seen_at`, `last_seen_at`, `created_at`, `updated_at` |
 | `store_photos` | `id uuid pk`, `visitor_id` → `store_visitors` (cascade), `storage_path`, `width`, `height`, `created_at` |
 | `store_generations` | `id uuid pk`, `visitor_id` → `store_visitors` (cascade), `product_id` (Shopify gid), `theme`, `photo_ids uuid[]`, `names text[]` (private: never in analytics or logs), `imagen_session_id`, `status`, `images jsonb` (per result: Imagen image id, width, height, our `storage_path`), `chosen_index`, `cost_usd`, `order_id`, `ordered_at`, `created_at`, `finished_at` |
 
@@ -165,10 +177,10 @@ The pages load them through an app route that checks the cookie (or a signed-in 
 
 ### Keeping and deleting
 
-- **Bought:** the photos, pictures and previews behind an order are kept, like the shop's new uploads.
-- **Not bought:** deleted after `open_store.keep_unbought_days` (default 30) by `/api/cron/store-cleanup`. Visitor rows with no email and nothing left are deleted too.
-- **Data-deletion requests** for an email delete its linked visitors, their rows and their files.
-- **Imagen's copy:** Imagen keeps its own copy (open question).
+- **Everything is kept, bought or not** (Gavin, 23 Nov), for future marketing. There is no clean-up job.
+- **What "marketing" may use:** a visitor's own photo and pictures may be shown back to that visitor, on the site and in emails to an address they gave us. Using them anywhere public (ads, social, the site's examples) needs that person's separate permission. The privacy policy has to say we keep photos and pictures and why, before launch.
+- **Data-deletion requests** for an email delete its linked visitors (and those that only gave that email), their rows and their files.
+- **Imagen's copy:** Imagen keeps its own copy, in public storage (open question for deletion requests).
 
 ### Visitors and sign-in
 
@@ -208,14 +220,14 @@ Each card shows the product drawn with their picture, its title and "From" price
 - **Bot check** on `POST /api/store/generations` (Vercel BotID). Bots get a polite refusal and nothing reaches Imagen.
 - **Limits:** `open_store.generations_per_visitor_per_day` (default 5), `open_store.generations_per_ip_per_day` (default 15), and a daily total across everyone, `open_store.generations_daily_cap` (default 1,500), after which the page says the studio is busy and shows placeholders. Settings › Open store shows today's count and Imagen's cost.
 - **Uploads:** checked by content; HEIC converted on the server (or refused with "save it as JPEG" if conversion fails); saved as JPEG in `store-uploads` with location and camera data removed.
-- **Consent** under the upload: "Use a photo you have the right to use. We use it only to make your picture, and delete it after 30 days unless you order. Privacy policy". Photos of children are likely, so the copy says what happens to the photo; the day count comes from `open_store.keep_unbought_days`.
-- **What Imagen keeps:** today Imagen stores uploads under `user-uploads/` and results in the public `images` bucket, permanently. Our clean-up deletes our copies; Imagen's need a delete call or retention rule on its side (open question). Until then, Settings shows the number of unpaid open-store sessions older than `open_store.keep_unbought_days`.
+- **Consent** under the upload: "Use a photo you have the right to use. We keep your photo and picture so you can come back to them. Privacy policy". Photos of children are likely, so the copy says plainly that the photo is kept.
+- **What Imagen keeps:** Imagen stores uploads under `user-uploads/` and results in the public `images` bucket, permanently. A data-deletion request needs a delete call on Imagen's side too (open question).
 - **No personal data in tracking:** no photo, picture URL or name in PostHog, Klaviyo or logs; only the product, theme, status and our ids. Session replay masks the picture area and the upload.
 - **Not indexed while hidden;** when on, product pages carry the product's SEO title and description and an Open Graph image of the placeholder (never a visitor's picture).
 
 ## Settings › Open store
 
-Switches, the menu handle, the home collection, the discount code and label, the reassurance rows, the limits, `shipping_days`, `upload_max_px`, `min_photo_px`, `slow_after_s`, `timeout_s`, `visitor_cookie_days`, `keep_unbought_days`; a product table (theme, photos the theme takes, related products, status and why hidden); today's visitors, generations, failures, median time and cost from `store_generations`, and the storage `store-uploads` uses.
+Switches, the menu handle, the home collection, the discount code and label, the reassurance rows, the limits, `shipping_days`, `upload_max_px`, `min_photo_px`, `slow_after_s`, `timeout_s`, `visitor_cookie_days`, the email ask (`ask_email_while_painting`, its copy, `email_link_days`); a product table (theme, photos the theme takes, related products, status and why hidden); today's visitors, generations, failures, median time and cost from `store_generations`, and the storage `store-uploads` uses.
 
 ## Tracking
 
@@ -231,6 +243,8 @@ New events (`docs/analytics.md`). PostHog's distinct id is the visitor id; when 
 | `store_generation_started` (server) | Imagen called | `product_handle`, `theme`, `has_name` |
 | `store_generation_ready` (server) | Imagen done | `product_handle`, `theme`, `seconds`, `images`, `cost_usd` |
 | `store_generation_failed` (server) | Failed, timed out, limited or refused | `product_handle`, `reason` |
+| `store_email_given` | Email given while painting | `marketing_consent` (true or false; never the address) |
+| `store_picture_emailed` (server) | "Your picture is ready" sent | `product_id` |
 | `store_result_picked` | Another result chosen | `product_handle`, `index` |
 | `store_related_tapped` | A product under "On more gifts" | `from_handle`, `to_handle`, `position` |
 | `store_added_to_cart` | Add to cart | `product_handle`, `variant_id`, `price` |
@@ -248,7 +262,7 @@ PostHog dashboard: a funnel Store page → Product page → Photo chosen → Pic
 | `POST /api/store/generations`, `GET /api/store/generations/<id>` | Create a picture, ask how it's going |
 | `GET /api/store/files/<photo or picture id>` | A visitor's photo, picture or preview, after the ownership check |
 | `POST /api/store/cart/lines`, `PATCH`/`DELETE /api/store/cart/lines/<id>`, `GET /api/store/cart` | The guest cart |
-| `/api/cron/store-cleanup` | Daily: deletes what wasn't bought after `keep_unbought_days` |
+| `POST /api/store/email` | The optional email given while painting |
 | `/settings/open-store` | Settings › Open store |
 
 Product pages sit under `/store/` rather than at `/product/<id>` so that one switch hides the whole store, and so they don't sit next to the signed-in shop's `/products`.
@@ -259,6 +273,7 @@ Product pages sit under `/store/` rather than at `/product/<id>` so that one swi
 2. **Shop carts:** the fourth allowed write adds "or an anonymous visitor's cart, held by a cookie".
 3. **Security:** "Every customer action re-checks that the signed-in email owns the thing" gains "or, in the open store, that the visitor cookie owns it".
 4. **Data:** the exceptions to "never copy orders, products or portraits into our database" gain "and the open store's visitors, photos and pictures (`docs/open-store.md`)".
+5. **Klaviyo:** the second allowed write ("Klaviyo events, profile properties and deletion jobs") gains "and a marketing subscription that a store visitor ticked for". The "This app sends no offer emails" rule stays: the "Your picture is ready" email is the one the visitor asked for, sent at once through AgentMail.
 
 ## Build parts
 
@@ -266,8 +281,8 @@ Product pages sit under `/store/` rather than at `/product/<id>` so that one swi
 |---|---|---|
 | Open store 1: catalogue | Storefront API reads (menu, collections, products, variants, metafields, policies) behind `lib/open-store/sources/` with fixtures; the open-store check; Settings › Open store with switches and the product table | A super user sees the menu's collections and why each product is or isn't in the store |
 | Open store 2: store and product pages | Store page, product page before a picture (gallery, variants, delivery estimate, details, related with placeholders), cart icon | e2e at 390 × 844 and 1280 × 800, axe clean |
-| Open store 3: pictures | `lib/sources/imagen-api.ts` (live and fixtures), the visitor cookie and `store_visitors`, `store_photos`, `store_generations`, the `store-uploads` bucket and its file route, upload checks, bot check, limits, the creating and ready states, several photo slots, drawing on the template, result strip, related products with the picture, restore on return, the clean-up cron | Fixtures cover ready, slow, failed, timed out, limited and a two-photo theme; golden images of the pillow with a square and a 3:4 result; another visitor's cookie gets 404 on every file |
-| Open store 4: cart, checkout and sign-in | Guest Shopify cart on the visitor row, drawer, order-line keys, discount code, `orders/paid` linking the visitor, linking on sign-in, pictures on another device | A fixture checkout produces exactly the order-line keys; signing in on a second browser shows the first browser's pictures |
+| Open store 3: pictures | `lib/sources/imagen-api.ts` (live and fixtures), the visitor cookie and `store_visitors`, `store_photos`, `store_generations`, the `store-uploads` bucket and its file route, upload checks, bot check, limits, the creating and ready states, several photo slots, drawing on the template, result strip, related products with the picture, restore on return | Fixtures cover ready, slow, failed, timed out, limited and a two-photo theme; golden images of the pillow with a square and a 3:4 result; another visitor's cookie gets 404 on every file |
+| Open store 4: cart, checkout, sign-in and email | Guest Shopify cart on the visitor row, drawer, order-line keys, discount code, `orders/paid` linking the visitor, linking on sign-in, pictures on another device, the email ask while painting, the "Your picture is ready" email, the Klaviyo subscription through the outbox | A fixture checkout produces exactly the order-line keys; signing in on a second browser shows the first browser's pictures; the email's link opens the picture in a fresh browser |
 | Open store 5: tracking and docs | Events, the PostHog funnel, `docs/analytics.md`, `docs/schema.md`, `docs/data.md`, the `CLAUDE.md` changes above | Docs match the build |
 
 Needed from people: the Imagen API key for this app and Imagen's API docs; the Shopify navigation menu and collections; the first products with `imagen_theme`, templates and rules; the Storefront token's sales channel publishing them.
@@ -283,9 +298,11 @@ Answered 23 Nov:
 
 Still open (none blocks the build):
 
-- [ ] **Imagen's copy of guest photos.** Imagen keeps uploads and results in public, permanent storage. Can our clean-up ask Imagen to delete a session that wasn't bought?
-- [ ] **Links in.** Should the main site's home and the Magic Store emails (Store 1–3 link to `/products`, which needs sign-in) point to `/store`?
-- [ ] **Email me my picture.** Offer visitors who don't buy a way to get their picture by email? It would capture emails before checkout but needs consent wording and a Klaviyo flow.
+- [x] **Keeping unbought pictures.** Kept, for future marketing (Keeping and deleting).
+- [x] **Asking for the email.** An optional email box while painting (Asking for their email while we paint). A Klaviyo sign-up form can come later.
+- [ ] **Main site and emails.** The store needs its own set of emails (written later in Klaviyo). Still to decide: how the main site links to `/store`, and whether Store 1–3 move from `/products` to `/store`.
+- [ ] **Klaviyo sign-up form (later).** Klaviyo's own form on store pages needs Klaviyo's public key in the browser, which `CLAUDE.md` doesn't allow today.
+- [ ] **Imagen's copy on deletion requests.** Can Imagen delete a session when someone asks us to delete their data?
 - [ ] **Discount.** A code on every open-store cart (`open_store.discount_code`), or Shopify automatic discounts only?
 - [ ] **Reviews.** Which app writes the `reviews.rating` metafields? Without one, no stars show.
 - [ ] **Signed-in customers.** Should the product page also offer the photos behind their existing portraits, so they don't upload again?
