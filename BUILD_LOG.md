@@ -524,3 +524,33 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 ## 18 Nov: Next.js security upgrade
 - **Done.** `next` and `eslint-config-next` 16.4.4 → 16.4.6. Fixes GHSA-mfr8-8qww-v76h and GHSA-vc7v-qv4w-wrv8 (moderate; both are cache leaks in `'use cache'` / `unstable_cache`, which this app doesn't use). `next dev` and `next build` no longer stop on the upgrade notice.
 - **Still open:** `pnpm audit` reports two moderate advisories in `glob` / `minimatch`, pulled in by `archiver` (hi-res download zips). They need an `archiver` upgrade; separate change.
+
+## Open store
+
+Built on `claude/open-store` (from `claude/shop`) through `docs/open-store.md` › Build parts. Draft PR into `claude/shop`. `open_store.enabled` and `open_store.super_user_preview` stay off; with them off every existing screen and test is unchanged.
+
+### Decisions
+- **`main` merged in first.** `claude/shop` was 19 commits behind `main` (print rules editor, Products page categories, the landing pages, the cross-server product refresh, Next.js 16.4.6), and the spec's one product page needs print rules and categories. Conflicts: `lib/shop/preview.ts` (kept the curved-zone mesh from `claude/shop` and the no-stretch crop from `main`), `docs/shop.md`, `docs/analytics.md`, this file (kept both sides).
+- **One set of products for both stores.** The fixtures hold each product once, marked Store, Magic Store or both (`fx-canvas` is Magic Store only, `fx-tee` Store only), so a Settings save shows in both stores, as in Shopify. Magic Store fields ride on `ShopProduct.store` (optional), read only by the open store's own query.
+- **Writes go through the shop's source.** `setProductMetafields` (shared and Magic Store fields) and `setThemeChoices` (the `imagen_theme` dropdown) were added to `ShopCatalogSource`, so both stores save one way (CLAUDE.md allowed write 5). The open store's reads use the shop's authenticated client (`adminQuery`, read-only).
+- **Sales channel check:** the open-store check needs "published to the Storefront token's channel", but which publication that is can't be read from the token. New setting `open_store.storefront_publication_id` (empty: not checked). The live store has several "Storyboards Headless" channels; fill it in once you know which one the token uses.
+- **Theme check:** an unknown or inactive theme hides the product ("Its Imagen theme isn't in Imagen's list"), since it couldn't make a picture. When Imagen's list can't be read, themes aren't checked.
+- **"Every size has rules"** is taken literally for the Magic Store (sold-out sizes too, since they still show as chips), unlike the shop, which needs one.
+- **Imagen's theme list:** `parseThemes` accepts several likely field names for the slug and for how many photos a theme takes (`required_images`, `image_count`, `photos`, …), since Imagen hasn't confirmed them. Theme field names to confirm are in Blocked.
+- **Settings keys with an underscore:** the settings table only allowed `[a-z]+` before the dot, so `open_store.*` couldn't be stored. Migration `20261123000001_open_store_settings.sql` relaxes the key and section checks (additive).
+- **Print rules and the template editor** now find a product in either collection (`adminProducts()`), since both stores share them; they said "not in the Store collection" for a Magic Store-only product before.
+- **The Settings menu's SHOP group:** Products, Gifts & Products pages, Magic Store, Photo library, AI room photos.
+
+### Blocked
+- **Live migration not applied.** `pnpm db:apply-remote --no-seed` got `Management API 401: Invalid access token` (the Supabase token attached to the environment seems expired). Until `20261123000001_open_store_settings.sql` is applied, `open_store.*` settings can be read (defaults) but not saved on `magic-vault`, including the Magic Store preview switch. Renew the token, then run `pnpm db:apply-remote --no-seed`.
+- **No `magic-store` navigation menu in Shopify yet** (checked live, read-only): the store will show no category circles until it's made (Online Store › Navigation, one item per collection).
+- **Imagen theme list fields to confirm:** which field holds the slug, whether a theme is active, and how many photos it takes.
+
+### Open store 1: catalogue (done)
+- `lib/open-store/sources/` (types, live, fixtures): the Magic Store collection with its fields, a collection by handle, the navigation menu with collection images, Shopify's shipping and refund policies. Live queries checked read-only against the real store (`collectionByIdentifier`, `menus`, `shopPolicies`, `reviews.rating`).
+- `lib/sources/imagen-api.ts`: Imagen's theme list (live and fixtures, including a two-photo theme and an inactive one). Picture sessions come in Open store 3.
+- `lib/open-store/catalog.ts`: the open-store check (`evaluateStoreProduct`) with reasons, and `gridProducts` (no related-only products). `lib/open-store/index.ts`: the catalogue, cached like the shop's and refreshed with it everywhere on a Settings save.
+- Product fields in `lib/settings/registry.ts` (`PRODUCT_FIELDS`: scope, metafield, type, validation, label, store fallback) with `getProductSetting()` / `getVariantSetting()` (`lib/settings/product.ts`); a bad value set in Shopify is flagged and the store default used. New `open_store.*` settings (switches, collection, menu, limits, timings, email ask, store defaults for every product field).
+- Settings › Shop as one area: **Products** (every product in either collection once; chips for where it's sold and whether each store shows it, with reasons; filters All · Gifts & Products · Magic Store · Hidden), **one product page** (where it's sold, both stores' shared fields, Gifts & Products fields, Magic Store fields with the theme dropdown and photo slots from the theme, status), **Gifts & Products pages** (today's shop settings, moved), **Magic Store** (its settings, what's in Shopify now, Imagen's themes with **Refresh themes from Imagen**, numbers placeholder and the dashboard link).
+- All open-store event names from `docs/analytics.md` declared in `lib/events.ts` (properties wired as each part uses them; checked in Open store 5).
+- Tests: `tests/unit/open-store-catalogue.test.ts` (16); `shop-settings.spec.ts` reworked for the new layout plus 3 new tests (Magic Store fields, folded sections and photo slots, the Magic Store page). The template-editor test expected the old handle name ("Top left: …"); the editor on `claude/shop` calls it "Top left corner: …", so it was already failing there; fixed.

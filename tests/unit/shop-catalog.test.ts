@@ -109,7 +109,11 @@ describe("writes stay inside mmp_shop", () => {
   });
   it("defines every field in the namespace, products and variants", () => {
     const specs = fieldSpecs(["Christmas"]);
-    expect(specs.filter((s) => s.ownerType === "PRODUCT").map((s) => s.key)).toEqual(["page", "occasions", "categories", "short_description", "template"]);
+    expect(specs.filter((s) => s.ownerType === "PRODUCT").map((s) => s.key)).toEqual(["page", "occasions", "categories", "short_description", "template", "imagen_theme", "generation", "related", "open_store_related", "details"]);
+    expect(specs.filter((s) => s.ownerType === "PRODUCTVARIANT").map((s) => s.key)).toContain("lead_days");
+    // The Magic Store fields say they're only for that collection (Shopify can't limit a field to one).
+    for (const k of ["imagen_theme", "generation", "related", "open_store_related", "details", "badge", "lead_days"]) expect(specs.find((s) => s.key === k)?.description).toMatch(/^Only for products in the Magic Store collection/);
+    expect(fieldSpecs([], [], ["admiral-01"]).find((s) => s.key === "imagen_theme")?.choices).toEqual(["admiral-01"]);
     expect(specs.find((s) => s.key === "occasions")?.choices).toEqual(["Christmas"]);
     expect(fieldSpecs([]).find((s) => s.key === "occasions")?.choices).toBeUndefined();
   });

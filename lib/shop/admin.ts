@@ -4,9 +4,9 @@ import { getSettings } from "@/lib/settings";
 import { track } from "@/lib/track";
 import type { CatalogEntry } from "./catalog";
 import { fieldSpecs, IMAGE_KINDS, MAKERS, normalisePage, pageLabel, PLACEMENTS } from "./fields";
-import { discountInfo, discountSettingFor, getCatalog, invalidateCatalog } from "./index";
+import { adminProducts, discountInfo, discountSettingFor, getCatalog, invalidateCatalog } from "./index";
 import { getShopCatalogSource } from "./sources";
-import type { DiscountInfo, ProductFieldChanges, ShopFieldDefinition, ShopListKey, VariantRuleChange } from "./sources/types";
+import type { DiscountInfo, ProductFieldChanges, ShopFieldDefinition, ShopListKey, ShopProduct, VariantRuleChange } from "./sources/types";
 import { parseTemplate, templateSchema, type Template } from "./template";
 
 /** Settings › Shop (docs/shop.md). Every write here is CLAUDE.md allowed write 5: `mmp_shop` only. */
@@ -229,14 +229,15 @@ export const templatePublishSchema = z.object({ productId: z.string().regex(/^gi
  */
 export async function publishTemplate(actor: { email: string }, input: { productId: string; template: Template }): Promise<AdminResult> {
   const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
-  let entries: CatalogEntry[];
+  let products: ShopProduct[];
   try {
-    entries = await getCatalog({ fresh: true });
+    products = await adminProducts();
   } catch (e) {
     return { ok: false, status: 502, error: errorText(e) };
   }
-  const entry = entries.find((e) => e.product.id === input.productId);
-  if (!entry) return { ok: false, status: 404, error: "That product isn't in the Store collection." };
+  const found = products.find((p) => p.id === input.productId);
+  if (!found) return { ok: false, status: 404, error: "That product isn't in the Store or Magic Store collection." };
+  const entry = { product: found };
   if (input.template.overlay && input.template.overlay.media_id === input.template.background.media_id) {
     return { ok: false, status: 422, error: "The overlay is the same photo as the background, so it would cover the customer's picture. Choose no overlay." };
   }
@@ -295,14 +296,15 @@ export function rulesFor(metafields: { key: string; value: string }[]): VariantR
 /** Saves the print rules of a Store product's sizes: only what changed, set or cleared, in mmp_shop. */
 export async function updateVariantRules(actor: { email: string }, input: z.infer<typeof rulesUpdateSchema>): Promise<AdminResult> {
   const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
-  let entries: CatalogEntry[];
+  let products: ShopProduct[];
   try {
-    entries = await getCatalog({ fresh: true });
+    products = await adminProducts();
   } catch (e) {
     return { ok: false, status: 502, error: errorText(e) };
   }
-  const entry = entries.find((e) => e.product.id === input.productId);
-  if (!entry) return { ok: false, status: 404, error: "That product isn't in the Store collection." };
+  const found = products.find((p) => p.id === input.productId);
+  if (!found) return { ok: false, status: 404, error: "That product isn't in the Store or Magic Store collection." };
+  const entry = { product: found };
   const types = new Map(fieldSpecs([]).filter((f) => f.ownerType === "PRODUCTVARIANT").map((f) => [f.key, f.type]));
   const changes: VariantRuleChange[] = [];
   const changedKeys = new Set<string>();

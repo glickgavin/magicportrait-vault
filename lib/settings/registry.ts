@@ -16,7 +16,7 @@ const isTimeZone = (tz: string) => {
  * `supabase/seed.sql` is generated from this file (scripts/gen-seed.ts); a test keeps them in sync.
  * Secrets never go here (CLAUDE.md).
  */
-export const SECTIONS = ["cards", "gift", "redeem", "auth", "vault", "themes", "brand", "email", "links", "tracking", "klaviyo", "shop", "site"] as const;
+export const SECTIONS = ["cards", "gift", "redeem", "auth", "vault", "themes", "brand", "email", "links", "tracking", "klaviyo", "shop", "open_store", "site"] as const;
 export type Section = (typeof SECTIONS)[number];
 export const SETTING_TYPES = ["text", "number", "boolean", "choice", "list", "json", "shopify_id", "date"] as const;
 export type SettingType = (typeof SETTING_TYPES)[number];
@@ -69,6 +69,15 @@ const list = (section: Section, d: string[], m: Meta & { item?: z.ZodString; max
 const shopifyId = (section: Section, d: string, m: Meta): SettingDef<string> => ({ type: "shopify_id", section, default: d, schema: z.string().regex(/^\d{6,20}$/), ...m });
 const date = (section: Section, d: string, m: Meta): SettingDef<string> => ({ type: "date", section, default: d, schema: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ...m });
 const json = <T>(section: Section, d: T, schema: z.ZodType<T>, m: Meta): SettingDef<T> => ({ type: "json", section, default: d, schema, ...m });
+
+/** A photo slot's words on the open store's product page (docs/open-store.md › Photos and names). */
+export type PhotoSlotWords = { label: string; name_label?: string; name_placeholder?: string };
+export const photoSlotsSchema = z
+  .array(z.object({ label: z.string().min(1).max(60), name_label: z.string().max(80).optional(), name_placeholder: z.string().max(30).optional() }).strict())
+  .min(1)
+  .max(4);
+export type ReassuranceRow = { icon: "truck" | "heart" | "lock" | "gift" | "star" | "clock"; text: string };
+const dayRange = /^\d{1,2}(-\d{1,2})?$/;
 
 export type PromoBarSetting = { id: string; on: boolean; text: string; link_label: string; link_url: string; audience: "everyone" | "normal" | "vip"; starts: string; ends: string; style: "tint" | "gradient"; closable: boolean };
 
@@ -335,6 +344,51 @@ export const REGISTRY = {
   "shop.change_strip_count": num("shop", 12, { label: "Pictures in the Change picture strip", min: 3, max: 48 }),
   "shop.storefront_api_version": text("shop", "2025-07", { label: "Shopify Storefront API version", pattern: /^\d{4}-\d{2}$/ }),
 
+  // ---------- open_store: the Magic Store at /store (docs/open-store.md) ----------
+  "open_store.enabled": bool("open_store", false, { label: "Magic Store on for everyone", description: "Off: /store and /api/store are 404 for everyone (except super users with the preview on). Turning it on is the store's launch." }),
+  "open_store.super_user_preview": bool("open_store", false, { label: "Magic Store preview for super users", description: "On: super users see /store on the live site while it is still off for everyone else." }),
+  "open_store.collection": text("open_store", "magic-store", { label: "Magic Store collection (handle)", description: "Only products in this Shopify collection appear anywhere in the store, and only they use the Magic Store fields. A product joins or leaves the store by being added to or removed from it in Shopify.", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),
+  "open_store.menu_handle": text("open_store", "magic-store", { label: "Category menu (Shopify navigation handle)", description: "The category circles: each item of this menu links to a collection. Edited in Shopify admin › Online Store › Navigation.", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),
+  "open_store.home_collection": text("open_store", "magic-store", { label: "Collection shown at /store (handle)", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),
+  "open_store.storefront_publication_id": text("open_store", "", { label: "Storefront sales channel (publication id)", description: "The Shopify publication the Storefront token sells through (gid://shopify/Publication/…). Products not published to it are hidden, since carts can't add them. Empty: not checked.", pattern: /^(gid:\/\/shopify\/Publication\/\d{1,20})?$/, max: 60 }),
+  "open_store.products_per_page": num("open_store", 24, { label: "Products per page (then Show more)", min: 4, max: 96 }),
+  "open_store.discount_code": text("open_store", "", { label: "Discount code on every Magic Store cart", description: "A Shopify discount code. Empty: no code (an automatic Shopify discount still applies at checkout).", max: 60 }),
+  "open_store.discount_label": text("open_store", "Sale price", { label: "Discount label", allowEmpty: false, max: 40 }),
+  "open_store.shipping_days": text("open_store", "2-3", { label: "Shipping time (working days)", description: "Added to a size's making time for the delivery estimate, e.g. 2-3. Empty: no estimate.", pattern: /^(\d{1,2}(-\d{1,2})?)?$/, max: 5 }),
+  "open_store.reassurance": json(
+    "open_store",
+    [
+      { icon: "truck", text: "Delivery estimate shown before you pay" },
+      { icon: "heart", text: "Printed to order, just for you" },
+      { icon: "lock", text: "Secure checkout with Shopify" },
+    ] as ReassuranceRow[],
+    z.array(z.object({ icon: z.enum(["truck", "heart", "lock", "gift", "star", "clock"]), text: z.string().min(1).max(80) }).strict()).max(4) as unknown as z.ZodType<ReassuranceRow[]>,
+    { label: "Shopping info rows", description: "Up to 4 short rows under the product, each with an icon (truck, heart, lock, gift, star or clock)." },
+  ),
+  "open_store.how_it_works": list("open_store", ["Add a clear photo of your pet", "We paint them in about a minute", "We print it and send it to you"], { label: "How it works (steps)", max: 4, item: z.string().min(1).max(120) }),
+  "open_store.upload_max_px": num("open_store", 2048, { label: "Photos: shrunk to this longest side in the browser (px)", min: 512, max: 6000 }),
+  "open_store.min_photo_px": num("open_store", 600, { label: "Photos: smallest short side (px)", min: 200, max: 4000 }),
+  "open_store.slow_after_s": num("open_store", 90, { label: "“Still painting” after (s)", min: 10, max: 600 }),
+  "open_store.timeout_s": num("open_store", 240, { label: "Give up on a picture after (s)", min: 30, max: 1800 }),
+  "open_store.generations_per_visitor_per_day": num("open_store", 5, { label: "Pictures per visitor per day", min: 1, max: 1000000 }),
+  "open_store.generations_per_ip_per_day": num("open_store", 15, { label: "Pictures per IP per day", min: 1, max: 1000000 }),
+  "open_store.generations_daily_cap": num("open_store", 1500, { label: "Pictures per day, everyone together", description: "After this, product pages say the studio is busy and show the sample pictures.", min: 0, max: 1000000 }),
+  "open_store.visitor_cookie_days": num("open_store", 365, { label: "Visitor cookie lasts (days)", min: 1, max: 730 }),
+  "open_store.ask_email_while_painting": bool("open_store", true, { label: "Ask for an email while painting", description: "An optional box under the picture while it's made: we email the picture when it's ready." }),
+  "open_store.email_link_days": num("open_store", 30, { label: "The email's link works for (days)", min: 1, max: 90 }),
+  "open_store.emails_per_address_per_day": num("open_store", 3, { label: "“Your picture is ready” emails per address per day", min: 1, max: 1000000 }),
+  "open_store.posthog_dashboard_url": text("open_store", "", { label: "PostHog dashboard link", description: "The “Magic Store” dashboard, linked from this page.", pattern: /^(https:\/\/[^\s]+)?$/, max: 300 }),
+  // Store defaults for the product fields (PRODUCT_FIELDS below): a product's own value wins.
+  "open_store.photos": json("open_store", [{ label: "Add their photo", name_label: "Their name (optional, shown on the picture)", name_placeholder: "Teddy" }] as PhotoSlotWords[], photoSlotsSchema as unknown as z.ZodType<PhotoSlotWords[]>, {
+    label: "Default photo slots' words",
+    description: "Slot 1 uses the first entry's label and name label, slot 2 the second, and so on. How many photos a product takes comes from its Imagen theme.",
+  }),
+  "open_store.name_max": num("open_store", 14, { label: "Default name length (characters)", min: 1, max: 40 }),
+  "open_store.photo_tips": text("open_store", "Best results: one pet, facing the camera, in good light, with the whole head in the picture.", { label: "Default photo tips", max: 300 }),
+  "open_store.subject": choice("open_store", ["pet", "person", "any"] as const, "pet", { label: "Default subject (changes the copy only)" }),
+  "open_store.images_to_show": num("open_store", 4, { label: "Default results to show (Pick your favourite)", min: 1, max: 8 }),
+  "open_store.step_labels": list("open_store", ["Uploading your photo", "Painting {name}", "Putting it on your {product}"], { label: "Default progress steps", description: "{name} becomes the name typed (or “your pet”), {product} the product.", max: 3, item: z.string().min(1).max(80) }),
+
   // ---------- site: the whole of My Magic Portraits ----------
   "site.promo_bars": json(
     "site",
@@ -375,7 +429,7 @@ export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: s
 /** Validates a value for a registered key. Unregistered keys (“Add variable”) take any JSON up to 10 kB. */
 export function validateSetting(key: string, value: unknown): ValidationResult<unknown> {
   if (!isSettingKey(key)) {
-    if (!/^[a-z]+\.[a-z0-9_.]+$/.test(key)) return { ok: false, error: "Keys look like section.name" };
+    if (!/^[a-z][a-z_]*\.[a-z0-9_.]+$/.test(key)) return { ok: false, error: "Keys look like section.name" };
     const size = JSON.stringify(value ?? null).length;
     return size <= 10_000 ? { ok: true, value } : { ok: false, error: "Too large" };
   }
@@ -385,4 +439,50 @@ export function validateSetting(key: string, value: unknown): ValidationResult<u
 }
 
 /** Keys that must stay off on the live project until launch (BUILD.md). */
-export const LAUNCH_SWITCHES: SettingKey[] = ["cards.enabled", "gift.offer_email_enabled", "gift.popup_enabled", "gift.popup_email_later_enabled", "gift.reminder_email_enabled", "klaviyo.enabled", "redeem.mug_reminder_enabled", "shop.enabled", "shop.super_user_preview"];
+export const LAUNCH_SWITCHES: SettingKey[] = ["cards.enabled", "gift.offer_email_enabled", "gift.popup_enabled", "gift.popup_email_later_enabled", "gift.reminder_email_enabled", "klaviyo.enabled", "redeem.mug_reminder_enabled", "shop.enabled", "shop.super_user_preview", "open_store.enabled", "open_store.super_user_preview"];
+
+/*
+ * ---------- Product fields (docs/open-store.md › Product settings use the store's settings framework) ----------
+ * Declared like settings: type, default, validation, label and help text. They differ only in scope (a product
+ * or a variant) and where the value lives: a `mmp_shop` metafield in Shopify (inside the `generation` JSON for
+ * the picture settings) instead of the `settings` table. Each falls back to a store setting or its own default.
+ * Read them with getProductSetting() / getVariantSetting() (lib/settings/product.ts).
+ */
+export type ProductFieldDef<T> = {
+  scope: "product" | "variant";
+  /** The mmp_shop metafield; `jsonKey` when the value is one key of a JSON metafield. */
+  metafield: string;
+  jsonKey?: string;
+  /** The Shopify metafield type (for writes). */
+  metafieldType: string;
+  type: SettingType;
+  /** Which store uses it: both stores (shared), or only the Magic Store. */
+  store: "both" | "open_store";
+  label: string;
+  description?: string;
+  schema: z.ZodType<T>;
+  /** The store setting used when the product has no value (or a bad one). */
+  fallback?: SettingKey;
+  default?: T;
+  options?: readonly string[];
+};
+const pf = <T>(d: ProductFieldDef<T>) => d;
+
+export const PRODUCT_FIELDS = {
+  short_description: pf<string>({ scope: "product", metafield: "short_description", metafieldType: "multi_line_text_field", type: "text", store: "both", label: "Short description", description: "A sentence or two, then lines starting with “- ” for bullets. Empty: the product's own Shopify description.", schema: z.string().max(1500), default: "" }),
+  imagen_theme: pf<string>({ scope: "product", metafield: "imagen_theme", metafieldType: "single_line_text_field", type: "text", store: "open_store", label: "Imagen theme", description: "The art style a visitor's picture is made in. Required for a product people make pictures on.", schema: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,80}$/, "An Imagen theme slug, e.g. bathroom-01"), default: "" }),
+  photos: pf<PhotoSlotWords[]>({ scope: "product", metafield: "generation", jsonKey: "photos", metafieldType: "json", type: "json", store: "open_store", label: "Photo slots' words", schema: photoSlotsSchema as unknown as z.ZodType<PhotoSlotWords[]>, fallback: "open_store.photos" }),
+  name_max: pf<number>({ scope: "product", metafield: "generation", jsonKey: "name_max", metafieldType: "json", type: "number", store: "open_store", label: "Name length (characters)", schema: z.number().int().min(1).max(40), fallback: "open_store.name_max" }),
+  photo_tips: pf<string>({ scope: "product", metafield: "generation", jsonKey: "photo_tips", metafieldType: "json", type: "text", store: "open_store", label: "Photo tips", schema: z.string().min(1).max(300), fallback: "open_store.photo_tips" }),
+  subject: pf<"pet" | "person" | "any">({ scope: "product", metafield: "generation", jsonKey: "subject", metafieldType: "json", type: "choice", options: ["pet", "person", "any"], store: "open_store", label: "Subject (changes the copy only)", schema: z.enum(["pet", "person", "any"]), fallback: "open_store.subject" }),
+  images_to_show: pf<number>({ scope: "product", metafield: "generation", jsonKey: "images_to_show", metafieldType: "json", type: "number", store: "open_store", label: "Results to show", schema: z.number().int().min(1).max(8), fallback: "open_store.images_to_show" }),
+  step_labels: pf<string[]>({ scope: "product", metafield: "generation", jsonKey: "step_labels", metafieldType: "json", type: "list", store: "open_store", label: "Progress steps", description: "{name} and {product} are filled in.", schema: z.array(z.string().min(1).max(80)).length(3), fallback: "open_store.step_labels" }),
+  related: pf<string[]>({ scope: "product", metafield: "related", metafieldType: "list.product_reference", type: "list", store: "open_store", label: "More gifts", description: "The products under “On more gifts”, in order. Empty: chosen from the same collection.", schema: z.array(z.string().regex(/^gid:\/\/shopify\/Product\/\d{1,20}$/)).max(12), default: [] }),
+  open_store_related: pf<boolean>({ scope: "product", metafield: "open_store_related", metafieldType: "boolean", type: "boolean", store: "open_store", label: "Related only", description: "Shown only under “On more gifts”, with the visitor's picture, never in the grid.", schema: z.boolean(), default: false }),
+  details: pf<string>({ scope: "product", metafield: "details", metafieldType: "multi_line_text_field", type: "text", store: "open_store", label: "Size and materials", schema: z.string().max(2000), default: "" }),
+  badge: pf<string>({ scope: "variant", metafield: "badge", metafieldType: "single_line_text_field", type: "text", store: "open_store", label: "Badge", description: "A short label on the size chip, e.g. Bestseller.", schema: z.string().min(1).max(24), default: "" }),
+  lead_days: pf<string>({ scope: "variant", metafield: "lead_days", metafieldType: "single_line_text_field", type: "text", store: "open_store", label: "Making time (working days)", description: "e.g. 4-6. With the store's shipping time it gives the delivery estimate.", schema: z.string().regex(dayRange, "Working days, e.g. 4-6"), default: "" }),
+} as const;
+
+export type ProductFieldKey = keyof typeof PRODUCT_FIELDS;
+export type ProductFieldValue<K extends ProductFieldKey> = (typeof PRODUCT_FIELDS)[K] extends ProductFieldDef<infer T> ? T : never;

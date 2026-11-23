@@ -5,12 +5,22 @@ import type { SessionUser } from "@/lib/auth/types";
 import { t } from "@/lib/i18n";
 import { AdminNavLink } from "./AdminNavLink";
 
-const GROUPS = [
+type NavItem = readonly [href: string, label: string, also?: readonly string[]];
+const GROUPS: readonly (readonly [string, readonly NavItem[]])[] = [
   ["admin.groups.insights", [["/settings/insights", "admin.nav.dashboard"], ["/settings/customers", "admin.nav.customers"], ["/settings/cards", "admin.nav.cards"]]],
   ["admin.groups.setup", [["/settings", "admin.nav.general"]]],
   ["admin.groups.cards", [["/settings/themes", "admin.nav.themes"], ["/settings/template", "admin.nav.template"]]],
   ["admin.groups.redeem", [["/settings/redeem", "admin.nav.redeem"]]],
-  ["admin.groups.shop", [["/settings/shop", "admin.nav.shop"]]],
+  [
+    "admin.groups.shop",
+    [
+      ["/settings/shop", "admin.nav.shop", ["/settings/shop/products", "/settings/shop/template", "/settings/shop/rules"]],
+      ["/settings/shop/pages", "admin.nav.shopPages"],
+      ["/settings/shop/magic-store", "admin.nav.magicStore"],
+      ["/settings/shop/library", "admin.nav.shopLibrary"],
+      ["/settings/shop/scenes", "admin.nav.shopScenes"],
+    ],
+  ],
   ["admin.groups.system", [["/settings/emails", "admin.nav.emails"], ["/settings/tracking", "admin.nav.tracking"], ["/settings/data-sources", "admin.nav.dataSources"], ["/settings/super-users", "admin.nav.superUsers"], ["/settings/activity", "admin.nav.activity"]]],
 ] as const;
 
@@ -29,8 +39,8 @@ export function AdminShell({ user, children }: { user: SessionUser; children: Re
           {GROUPS.map(([g, items]) => (
             <div key={g} className="contents lg:block">
               <p className="hidden px-3 pb-1 pt-5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/60 lg:block">{t(g)}</p>
-              {items.map(([href, label]) => (
-                <AdminNavLink key={href} href={href} label={t(label)} />
+              {items.map(([href, label, also]) => (
+                <AdminNavLink key={href} href={href} label={t(label)} exact={href === "/settings/shop"} also={also} />
               ))}
             </div>
           ))}

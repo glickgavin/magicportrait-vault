@@ -46,7 +46,34 @@ export type ShopProduct = {
   /** `mmp_shop.template` JSON text; null when unset. */
   template: { value: string; updatedAt: string | null } | null;
   variants: ShopVariant[];
+  /** The Magic Store's extra fields (docs/open-store.md); only read for products in the Magic Store collection. */
+  store?: OpenStoreFields;
 };
+
+/** A product's Magic Store fields and the Shopify extras the open store shows. Raw values: checked by lib/open-store/fields.ts. */
+export type OpenStoreFields = {
+  /** `mmp_shop.imagen_theme`: the Imagen theme slug. */
+  imagenTheme: string | null;
+  /** `mmp_shop.generation`: picture settings JSON text. */
+  generation: string | null;
+  /** `mmp_shop.related`: product gids under "On more gifts", in order. */
+  related: string[];
+  /** `mmp_shop.open_store_related`, as stored ("true"/"false"). */
+  relatedOnly: string | null;
+  /** `mmp_shop.details`: size and materials. */
+  details: string | null;
+  createdAt: string;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  /** The standard reviews metafields, when a reviews app writes them. */
+  rating: number | null;
+  ratingCount: number | null;
+  /** Publications (sales channels) the product is published to. */
+  publicationIds: string[];
+};
+
+/** Product metafields Settings may write (CLAUDE.md, allowed write 5): mmp_shop keys only, checked by the caller. */
+export type ProductMetafieldChange = { set: { key: string; type: string; value: string }[]; clear: string[] };
 
 export type ShopFieldDefinition = { id: string; key: string; name: string; type: string; ownerType: "PRODUCT" | "PRODUCTVARIANT"; choices: string[] | null };
 
@@ -95,6 +122,13 @@ export interface ShopCatalogSource {
   setVariantRules(productId: string, namespace: string, changes: VariantRuleChange[]): Promise<WriteResult>;
   /** Allowed write 5: the choices of the occasions or categories definition (the list, in order). */
   setListChoices(namespace: string, key: ShopListKey, choices: string[]): Promise<WriteResult>;
+  /**
+   * Allowed write 5: other `mmp_shop` fields on one product (the short description and the Magic Store fields),
+   * from Settings › Shop's one product page. The caller allows only known keys.
+   */
+  setProductMetafields(productId: string, namespace: string, change: ProductMetafieldChange): Promise<WriteResult>;
+  /** Allowed write 5: the Imagen theme dropdown (the `mmp_shop.imagen_theme` definition's choices), from Settings › Shop › Magic Store. */
+  setThemeChoices(namespace: string, choices: string[]): Promise<WriteResult>;
   /** Allowed write 5: creates whichever `mmp_shop` definitions are missing. */
   createFieldDefinitions(namespace: string, defs: FieldDefinitionSpec[]): Promise<{ created: string[]; failed: { key: string; reason: string }[] }>;
   discountByCode(code: string): Promise<DiscountInfo | null>;
