@@ -187,7 +187,6 @@ Visitors who aren't signed in. Identity, dashboards, experiments and privacy for
 | `store_visitor_linked` | server, business | A visitor linked to a proven email | `via` (`sign_in` · `order` · `email_link`), `visitors_linked` |
 | `error_store_cart` | server | A Shopify cart call failed | `stage`, `status_code` |
 | `admin_open_store_themes_refreshed` | server, business | Imagen themes copied into the Shopify dropdown | `themes`, `added`, `removed` |
-| `admin_open_store_product_updated` | server, business | A product's open-store fields changed in Settings | `product_id`, `fields` (names only) |
 
 Every store event carries the super properties `area: "open_store"`, `signed_in`, `returning` (the visitor has been before) and `preview` (true for a super user's preview). `store_added_to_cart` and `store_checkout_started` reach Klaviyo only once they're in `klaviyo.events` and the visitor has a proven email or ticked for offers.
 
@@ -211,7 +210,7 @@ Every store event carries the super properties `area: "open_store"`, `signed_in`
 
 `shop_added_to_cart` and `shop_checkout_started` reach Klaviyo only once they're added to the `klaviyo.events` setting (they aren't by default), for an abandoned-cart flow later. The shop funnel in PostHog: `page_view_shop_ideas` → `shop_product_opened` → `shop_added_to_cart` → `shop_checkout_started` → `shop_order_paid`, broken down by `page`.
 
-`settings_viewed`, `setting_changed` (`key`, `section`; never the value), `super_user_added` / `super_user_removed`, `admin_theme_created`, `admin_version_published`, `admin_version_archived`, `data_source_tested` (`source`, `ok`), `admin_shop_product_updated` (`product_id`, `fields`: which of page and occasions changed; never their values), `admin_shop_occasions_updated` (`count`, `added`, `removed`), `admin_shop_fields_created` (`created`, `failed`), `admin_shop_template_published` (`product_id`, `zone`: corners or wrap), `admin_shop_template_uploaded` (`product_id`, `kind`: background or overlay), `admin_shop_scene_made` (`product_id`, `preset`, `model`, `ok`, `reason` when it failed, `ms`; never the prompt or the picture). Super users sit in the existing test-account cohort so they never count as customers.
+`settings_viewed`, `setting_changed` (`key`, `section`; never the value), `super_user_added` / `super_user_removed`, `admin_theme_created`, `admin_version_published`, `admin_version_archived`, `data_source_tested` (`source`, `ok`), `admin_shop_product_updated` (`product_id`, `fields`: the names of the fields that changed, shop or Magic Store, from the one product page in Settings › Shop; never their values), `admin_shop_occasions_updated` (`count`, `added`, `removed`), `admin_shop_fields_created` (`created`, `failed`), `admin_shop_template_published` (`product_id`, `zone`: corners or wrap), `admin_shop_template_uploaded` (`product_id`, `kind`: background or overlay), `admin_shop_scene_made` (`product_id`, `preset`, `model`, `ok`, `reason` when it failed, `ms`; never the prompt or the picture). Super users sit in the existing test-account cohort so they never count as customers.
 
 Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 

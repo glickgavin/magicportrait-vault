@@ -60,7 +60,7 @@ They can leave and come back: the visitor cookie brings back their pictures on e
 
 `/store` shows the collection in `open_store.home_collection` (default `magic-store`). Only products that pass the open-store check appear (below); a collection with none shows "Nothing here yet" and the circles.
 
-**A product is in the open store** when it's in the Magic Store collection, active, published to the Storefront token's sales channel (carts need it, as in the shop), has an available variant, every variant has the `mmp_shop` rules (`docs/shop.md` › Product rules), it has a template (`mmp_shop.template`), and it has an Imagen theme (`mmp_shop.imagen_theme`) or is marked `mmp_shop.open_store_related = true` (shown only as a related product). Settings › Open store lists every product in the Magic Store collection and says why any is hidden. Products are read the same way the shop reads them: live through the Admin API, cached for 5 minutes, never copied into our database.
+**A product is in the open store** when it's in the Magic Store collection, active, published to the Storefront token's sales channel (carts need it, as in the shop), has an available variant, every variant has the `mmp_shop` rules (`docs/shop.md` › Product rules), it has a template (`mmp_shop.template`), and it has an Imagen theme (`mmp_shop.imagen_theme`) or is marked `mmp_shop.open_store_related = true` (shown only as a related product). Settings › Shop › Products lists every product and says why any is hidden in each store. Products are read the same way the shop reads them: live through the Admin API, cached for 5 minutes, never copied into our database.
 
 ## Product page
 
@@ -117,14 +117,14 @@ Each product's generation is set in product metafields, namespace `mmp_shop`, ne
 - They're filled in only for Magic Store products, and the app reads them only for those.
 - Like the shop's fields, they aren't readable by the storefront.
 
-**The Imagen theme becomes a dropdown** (`mmp_shop.imagen_theme`): its allowed values (Shopify's `choices` validation) will be the theme slugs from Imagen's theme list. Settings › Open store fills and refreshes them with **Refresh themes from Imagen**, so nobody types a slug by hand. Until then it's plain text.
+**The Imagen theme becomes a dropdown** (`mmp_shop.imagen_theme`): its allowed values (Shopify's `choices` validation) will be the theme slugs from Imagen's theme list. Settings › Shop › Magic Store fills and refreshes them with **Refresh themes from Imagen**, so nobody types a slug by hand. Until then it's plain text.
 
 #### Product settings use the store's settings framework
 
 Product fields are declared in `lib/settings/registry.ts` next to the store's settings, with the same parts: key, type, default, validation, label and help text. The only differences are their scope (`product` or `variant`) and where the value is stored (a `mmp_shop` metafield instead of the `settings` table).
 
 - **Defaults:** each product field falls back to a store-level setting, e.g. a product's `images_to_show` falls back to `open_store.images_to_show`, and its photo tips to `open_store.photo_tips`. Code calls `getProductSetting(product, 'images_to_show')` and gets the product's value or the store's default, as `getSetting()` does for the store.
-- **Editing:** Settings › Open store › Products uses the same form controls as the store settings. It saves through `metafieldsSet` (`CLAUDE.md`, allowed write 5), the same way Settings › Shop saves the shop's product fields.
+- **Editing:** a product's Magic Store fields sit on its one product page in Settings › Shop, next to its shop fields (Settings: one area for both stores, below). They use the same form controls as the store settings and save through `metafieldsSet` (`CLAUDE.md`, allowed write 5), like the shop's fields.
 - **Validation:** a product field is checked by the same Zod rules whether it's set in Settings or read back from Shopify. A bad value set by hand in Shopify admin is flagged in the product table, and the store default is used instead.
 
 | Metafield (name in Shopify) | Type | Example | Notes |
@@ -150,11 +150,11 @@ Product fields are declared in `lib/settings/registry.ts` next to the store's se
 }
 ```
 
-`subject` is `pet`, `person` or `any` and only changes the copy. `images_to_show` caps the "Pick your favourite" strip (Imagen decides how many it makes). Settings › Open store checks each value against the theme list from Imagen (`GET /api-themes`) and flags unknown or inactive themes.
+`subject` is `pet`, `person` or `any` and only changes the copy. `images_to_show` caps the "Pick your favourite" strip (Imagen decides how many it makes). Settings › Shop › Products checks each value against the theme list from Imagen (`GET /api-themes`) and flags unknown or inactive themes.
 
 #### Photos and names
 
-**How many photos a product needs is set on the Imagen theme, not in Shopify.** The theme already knows what it paints (one pet, two pets, a person and a pet), so Imagen's theme list is the one place that says how many photos it takes and which are required (the field name is in Imagen's API docs). The product page shows that many photo slots. Shopify's `generation.photos` only words them: slot 1 uses the first entry's label and name label, slot 2 the second, and so on; a slot without an entry is "Photo 2", "Photo 3". If Imagen's theme list turns out not to say, `generation.photos` sets the count instead (one entry per photo), and Settings › Open store warns when Shopify and Imagen disagree.
+**How many photos a product needs is set on the Imagen theme, not in Shopify.** The theme already knows what it paints (one pet, two pets, a person and a pet), so Imagen's theme list is the one place that says how many photos it takes and which are required (the field name is in Imagen's API docs). The product page shows that many photo slots. Shopify's `generation.photos` only words them: slot 1 uses the first entry's label and name label, slot 2 the second, and so on; a slot without an entry is "Photo 2", "Photo 3". If Imagen's theme list turns out not to say, `generation.photos` sets the count instead (one entry per photo), and Settings › Shop › Products warns when Shopify and Imagen disagree.
 
 Names go one per photo, when the theme prints names; `name_max` applies to each.
 
@@ -236,16 +236,37 @@ Each card shows the product drawn with their picture, its title and "From" price
 
 - **Visitor id:** as in Visitors and saved data. Every generation, picture, photo and cart call checks that the cookie (or the signed-in email linked to the visitor) owns what it touches.
 - **Bot check** on `POST /api/store/generations` (Vercel BotID). Bots get a polite refusal and nothing reaches Imagen.
-- **Limits:** `open_store.generations_per_visitor_per_day` (default 5), `open_store.generations_per_ip_per_day` (default 15), and a daily total across everyone, `open_store.generations_daily_cap` (default 1,500), after which the page says the studio is busy and shows placeholders. Settings › Open store shows today's count and Imagen's cost.
+- **Limits:** `open_store.generations_per_visitor_per_day` (default 5), `open_store.generations_per_ip_per_day` (default 15), and a daily total across everyone, `open_store.generations_daily_cap` (default 1,500), after which the page says the studio is busy and shows placeholders. Settings › Shop › Magic Store shows today's count and Imagen's cost.
 - **Uploads:** checked by content; HEIC converted on the server (or refused with "save it as JPEG" if conversion fails); saved as JPEG in `store-uploads` with location and camera data removed.
 - **Consent** under the upload: "Use a photo you have the right to use. We keep your photo and picture so you can come back to them. Privacy policy". Photos of children are likely, so the copy says plainly that the photo is kept.
 - **What Imagen keeps:** Imagen stores uploads under `user-uploads/` and results in the public `images` bucket, permanently. A data-deletion request needs a delete call on Imagen's side too (open question).
 - **No personal data in tracking:** no photo, picture URL or name in PostHog, Klaviyo or logs; only the product, theme, status and our ids. Session replay masks the picture area and the upload.
 - **Not indexed while hidden;** when on, product pages carry the product's SEO title and description and an Open Graph image of the placeholder (never a visitor's picture).
 
-## Settings › Open store
+## Settings: one area for both stores
 
-Built on the same settings framework as the rest of Settings. **Store:** switches, the store's collection (`collection`, default `magic-store`), the menu handle, the home collection, the discount code and label, the reassurance rows, the limits, `shipping_days`, `upload_max_px`, `min_photo_px`, `slow_after_s`, `timeout_s`, `visitor_cookie_days`, the email ask (`ask_email_while_painting`, its copy, `email_link_days`), and the store-level defaults for every product field. **Products:** a table of the Magic Store collection (theme, photos the theme takes, related products, status and why hidden), and each product's fields edited as in Product settings, above; **Refresh themes from Imagen**. **Numbers:** today's visitors, generations, failures, median time and cost from `store_generations`, and the storage `store-uploads` uses.
+Decided 23 Nov: the same product can be in both the Store collection (the signed-in Gifts and Products pages) and the Magic Store collection. So there's **one Settings area, Settings › Shop, for everything about products and both stores**, rather than a separate Settings › Shop › Magic Store. Every page in it uses the same settings framework (the registry, `getSetting`, `getProductSetting`, the same form controls).
+
+The SHOP group in the Settings menu:
+
+| Page | Route | What's on it |
+|---|---|---|
+| **Products** | `/settings/shop` | One list of every product in either collection, each product once. Chips show where it's sold ("Gifts & Products", "Magic Store", or both) and, for each, whether it's shown or hidden and why. Filters: All · Gifts & Products · Magic Store · Hidden. Columns: picture, title, page and occasions, Magic Store theme |
+| **One product** | `/settings/shop/products/<product id>` | Every field of that product, for both stores, on one page (below) |
+| **Template editor** | `/settings/shop/template/<product id>` | As today; used by both stores |
+| **Gifts & Products pages** | `/settings/shop/pages` | That store's own settings: who sees it (switches), discount codes and labels, the VIP tag, the occasion list. They move here from today's Settings › Shop page |
+| **Magic Store** | `/settings/shop/magic-store` | That store's own settings: who sees it (switches), its collection (`open_store.collection`, default `magic-store`), the menu, the home collection, the discount, the reassurance rows, the limits, timings, photo sizes, the visitor cookie, the email ask, and the store defaults for every product field. **Refresh themes from Imagen**. The numbers (Settings › Shop › Magic Store numbers, below) and the PostHog dashboard link |
+| **Photo library**, **AI room photos** | as today | Unchanged |
+
+**One product page**, top to bottom:
+
+1. **Where it's sold.** Whether it's in the Store collection, the Magic Store collection or both, with links to the product and the collections in Shopify admin. Membership is changed in Shopify, not here, because collections aren't an allowed write.
+2. **Both stores:** the template (with **Open template editor**), the short description, and each variant's print rules (maker, print area, picture zone, placement, smallest image, most it may crop, can adjust, which pictures, background, extra). These fields are shared, so changing one changes it for both stores, and the page says so.
+3. **Gifts & Products pages:** page, occasions, categories.
+4. **Magic Store:** theme (a dropdown of Imagen's themes, with how many photos each takes), picture settings (photo and name labels, name length, photo tips, step labels, results to show), more gifts (a picker of Magic Store products), related only, and size and materials. Per variant: badge and making time. An empty field shows the store default in grey (Product settings use the store's settings framework, above).
+5. **Status:** for each store, shown or hidden and why, using the same checks the pages use.
+
+A section for a store the product isn't in stays folded, with "Not in the Magic Store collection. Add it in Shopify to sell it there." (or the same for Store). Saving writes only the fields that changed, through `metafieldsSet` (`CLAUDE.md`, allowed write 5), and records `admin_shop_product_updated` with the field names.
 
 ## Analytics and PostHog
 
@@ -272,7 +293,7 @@ The store reports into the same PostHog project as the main site and the rest of
 
 ### First touch
 
-Each visitor's first touch is saved on their row as `store_visitors.first_touch` (jsonb): `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, the referrer's host (never its full address), the landing path, and the time. It goes on `store_order_paid` as `first_touch_source`. Settings › Open store can then show orders and revenue by channel from our own tables, without PostHog. The store emails and ads use UTM tags on every link: `utm_source=klaviyo`, `utm_campaign=<email name>`.
+Each visitor's first touch is saved on their row as `store_visitors.first_touch` (jsonb): `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, the referrer's host (never its full address), the landing path, and the time. It goes on `store_order_paid` as `first_touch_source`. Settings › Shop › Magic Store can then show orders and revenue by channel from our own tables, without PostHog. The store emails and ads use UTM tags on every link: `utm_source=klaviyo`, `utm_campaign=<email name>`.
 
 ### Where each event goes
 
@@ -306,7 +327,7 @@ Each visitor's first touch is saved on their row as `store_visitors.first_touch`
    - phone sessions that leave while painting.
 9. **Web vitals** for `/store` pages, especially LCP on product pages, which have large pictures.
 
-The dashboard is set up in PostHog by hand at the end of Open store 5; its link goes in Settings › Open store.
+The dashboard is set up in PostHog by hand at the end of Open store 5; its link goes in Settings › Shop › Magic Store.
 
 ### Experiments (PostHog feature flags)
 
@@ -325,7 +346,7 @@ The store's settings stay the defaults; a flag only overrides them for its test 
 - **Bots:** requests Vercel BotID flags as bots send no server events.
 - **Super users:** preview sessions carry `preview: true` and sit in the test-account cohort, so they never count.
 
-### Settings › Open store numbers
+### Settings › Shop › Magic Store numbers
 
 Today, 7 days and 30 days, from our own tables and Shopify orders with `_source` = `open_store`, so they don't depend on PostHog:
 - visitors;
@@ -347,7 +368,7 @@ Each by product, theme and first-touch channel, with a link to the PostHog dashb
 | `GET /api/store/files/<photo or picture id>` | A visitor's photo, picture or preview, after the ownership check |
 | `POST /api/store/cart/lines`, `PATCH`/`DELETE /api/store/cart/lines/<id>`, `GET /api/store/cart` | The guest cart |
 | `POST /api/store/email` | The optional email given while painting |
-| `/settings/open-store` | Settings › Open store |
+| `/settings/shop/magic-store`, `/settings/shop/products/<product id>` | Settings › Shop › Magic Store, and one product for both stores |
 
 Product pages sit under `/store/` rather than at `/product/<id>` so that one switch hides the whole store, and so they don't sit next to the signed-in shop's `/products`.
 
@@ -363,7 +384,7 @@ Product pages sit under `/store/` rather than at `/product/<id>` so that one swi
 
 | Part | What | Done when |
 |---|---|---|
-| Open store 1: catalogue | Admin API reads, as the shop's (the Magic Store collection, the menu, collections, products, variants, metafields, policies), behind `lib/open-store/sources/` with fixtures; the open-store check; product fields in the settings registry with `getProductSetting`; Settings › Open store with switches, store settings and the product table | A super user sees the Magic Store products and why each is or isn't in the store, and can set a product's theme |
+| Open store 1: catalogue | Admin API reads, as the shop's (the Magic Store collection, the menu, collections, products, variants, metafields, policies), behind `lib/open-store/sources/` with fixtures; the open-store check; product fields in the settings registry with `getProductSetting`; Settings › Shop as one area: the Products list for both collections, one product page for both stores, today's shop settings moved to Gifts & Products pages, and the new Magic Store page | A super user sees every product once with where it's sold and why it's hidden in each store, sets a product's shop and Magic Store fields on one page, and the Gifts and Products pages behave exactly as before |
 | Open store 2: store and product pages | Store page, product page before a picture (gallery, variants, delivery estimate, details, related with placeholders), cart icon | e2e at 390 × 844 and 1280 × 800, axe clean |
 | Open store 3: pictures | `lib/sources/imagen-api.ts` (live and fixtures), the visitor cookie and `store_visitors`, `store_photos`, `store_generations`, the `store-uploads` bucket and its file route, upload checks, bot check, limits, the creating and ready states, several photo slots, drawing on the template, result strip, related products with the picture, restore on return | Fixtures cover ready, slow, failed, timed out, limited and a two-photo theme; golden images of the pillow with a square and a 3:4 result; another visitor's cookie gets 404 on every file |
 | Open store 4: cart, checkout, sign-in and email | Guest Shopify cart on the visitor row, drawer, order-line keys, discount code, `orders/paid` linking the visitor, linking on sign-in, pictures on another device, the email ask while painting, the "Your picture is ready" email, the Klaviyo subscription through the outbox | A fixture checkout produces exactly the order-line keys; signing in on a second browser shows the first browser's pictures; the email's link opens the picture in a fresh browser |

@@ -93,7 +93,7 @@ Everything about a product lives in Shopify, including its sizes and the rules f
 | Where the picture sits on the blank photo | Product metafield `mmp_shop.template` | Saved by the template editor in Settings |
 | Discounts | Two discounts limited to the Store collection | See Discounts |
 
-**Settings › Shop › Products** lists every product in the Store collection with its page, occasions and product type, and lets super users change them there. Settings writes each change straight to the product in Shopify, so Shopify admin and Settings always show the same thing.
+**Settings › Shop › Products** lists every product in the Store collection with its page, occasions and product type, and lets super users change them there. Since 23 Nov it also lists the Magic Store collection's products, each product once, with one page per product for both stores (`docs/open-store.md` › Settings: one area for both stores); the shop's own settings (switches, discounts, VIP tag, occasions) move to Settings › Shop › Gifts & Products pages. Settings writes each change straight to the product in Shopify, so Shopify admin and Settings always show the same thing.
 
 **Occasions** are one list, kept in Shopify as the allowed values of the `mmp_shop.occasions` metafield definition. Settings › Shop › Occasions adds, renames, orders and retires them, and the Gifts page shows them in that order.
 
