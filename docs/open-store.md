@@ -112,7 +112,7 @@ Each product's generation is set in product metafields, namespace `mmp_shop`, ed
 
 | Metafield | Type | Example | Notes |
 |---|---|---|---|
-| `imagen_theme` | single line text | `the-admiral` | The Imagen theme slug sent as `theme_id`. One per product: the product's art style. Required for a product people make pictures on |
+| `imagen_theme` | single line text | `bathroom-01` | The Imagen theme slug sent as `theme_id`. One per product: the product's art style. Required for a product people make pictures on |
 | `generation` | JSON | below | Optional; defaults in brackets |
 | `open_store_related` | boolean | `true` | Shown only under "On more gifts", with the visitor's picture, never in the grid |
 | `badge` (variant) | single line text | `Bestseller` | Optional chip label |
@@ -144,10 +144,10 @@ Names go one per photo, when the theme prints names; `name_max` applies to each.
 
 The server, never the browser, calls Imagen's public API, the same one the main site uses (`/functions/v1/api-generate`, `/api-sessions/<id>`, `/api-themes`):
 
-- **Generate:** `POST /api-generate`, multipart `theme_id` (the slug), the photo (`source_image`, and the extra photos when the theme takes more than one) and the name(s). Exact field names come from Imagen's API docs. Header `X-Client-User-Id: open-store:<visitor id>`. Returns `session_id` and `status`.
+- **Generate** (confirmed by Imagen, 23 Nov): `POST {IMAGEN_API_URL}/api-generate` with `Authorization: Bearer <IMAGEN_API_KEY>` and multipart fields `theme_id` (the theme slug, e.g. `bathroom-01`), `name` (the pet's name; left out when empty) and `source_image` (the photo file). The field for extra photos, for themes that take more than one, is still to confirm. We also send `X-Client-User-Id: open-store:<visitor id>`, as the main site sends its own user id. Returns `session_id` and `status`.
 - **Status:** `GET /api-sessions/<session_id>`: `status`, `expected_image_count`, `images` (id, url, width, height), `total_cost_usd`.
 - **Themes:** `GET /api-themes` (and `?category=`): the theme list, including how many photos each theme takes.
-- **Key:** `IMAGEN_API_KEY`, a key Imagen issues for this app only, in Vercel env, Sensitive. Base URL `IMAGEN_API_URL`. Neither reaches the browser.
+- **Key:** `IMAGEN_API_KEY` (an `ik_live_…` key Imagen issued for this app), in Vercel env only, Sensitive. Base URL `IMAGEN_API_URL` = `https://ngyunrirwrjudbgaijek.supabase.co/functions/v1`. Neither reaches the browser, and the key is never written in the repo, logs or docs.
 - **Fixtures:** `DATA_SOURCE=fixtures` returns sample pictures from `public/shop-samples/scenes/` after a short delay, with a two-photo theme and `failed` and slow cases for tests.
 
 ## Visitors and saved data
@@ -291,7 +291,7 @@ Needed from people: the Imagen API key for this app and Imagen's API docs; the S
 
 Answered 23 Nov:
 
-- [x] **Imagen API.** Imagen will give this app its own key. The API takes the pet's name, and more than one photo when a theme needs it. Still to read in its docs: the field names, where a theme says how many photos it takes, average time and cost, and whether it moderates uploads. None of this blocks the build, which runs on fixtures until the key arrives.
+- [x] **Imagen API.** This app has its own key (issued 23 Nov, kept in Vercel only). Confirmed: the endpoint, Bearer auth, and the `theme_id`, `name` and `source_image` fields (Imagen API, above). Still to confirm: the field for extra photos, where a theme says how many photos it takes, average time and cost, and whether it moderates uploads. None of this blocks the build, which runs on fixtures.
 - [x] **Saving visitors' data.** Each visitor gets an id; photos and pictures are saved against it in `magic-vault` (Visitors and saved data).
 - [x] **One theme per product.** Art styles are Imagen themes, and each product has one.
 - [x] **Where it lives.** `/store`, with each product at `/store/product/<product id>`.
