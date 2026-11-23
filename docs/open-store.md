@@ -156,13 +156,13 @@ The server, never the browser, calls Imagen's public API, the same one the main 
 
 - On the first store page a visitor opens, the app sets the cookie `mmp_visitor`: a random 32-byte token, httpOnly, Secure, SameSite=Lax, for `open_store.visitor_cookie_days` (default 365).
 - The `store_visitors` row is created on their first real action (a photo or an Add to cart), not on a page view, so bots and passers-by leave nothing behind.
-- The row's `id` (a uuid) is the **visitor id** used everywhere: storage paths, generations, the cart attribute, Imagen's client user id and PostHog's distinct id. The cookie holds the token, and the table stores only `HMAC(VISITOR_SECRET, token)`, so an id seen in an admin page or an order can't be used to act as that visitor.
+- The row's `id` (a uuid) is the **visitor id** used everywhere: storage paths, generations, the cart attribute, Imagen's client user id, and PostHog's `store_visitor_id` property (Analytics and PostHog). The cookie holds the token, and the table stores only `HMAC(VISITOR_SECRET, token)`, so an id seen in an admin page or an order can't be used to act as that visitor.
 
 ### Tables and bucket (new migration in `magic-vault`)
 
 | Table | Columns |
 |---|---|
-| `store_visitors` | `id uuid pk`, `token_hash text unique`, `email text null` (lower-cased; set when they sign in or buy, so it's proven), `linked_via` (`sign_in` · `order` · `email_link`, null until linked), `email_given text null` (typed while painting, not proven), `email_given_at`, `marketing_consent_at`, `shopify_cart_id`, `shopify_checkout_url`, `first_seen_at`, `last_seen_at`, `created_at`, `updated_at` |
+| `store_visitors` | `id uuid pk`, `token_hash text unique`, `email text null` (lower-cased; set when they sign in or buy, so it's proven), `linked_via` (`sign_in` · `order` · `email_link`, null until linked), `email_given text null` (typed while painting, not proven), `email_given_at`, `marketing_consent_at`, `first_touch jsonb`, `posthog_distinct_id`, `shopify_cart_id`, `shopify_checkout_url`, `first_seen_at`, `last_seen_at`, `created_at`, `updated_at` |
 | `store_photos` | `id uuid pk`, `visitor_id` → `store_visitors` (cascade), `storage_path`, `width`, `height`, `created_at` |
 | `store_generations` | `id uuid pk`, `visitor_id` → `store_visitors` (cascade), `product_id` (Shopify gid), `theme`, `photo_ids uuid[]`, `names text[]` (private: never in analytics or logs), `imagen_session_id`, `status`, `images jsonb` (per result: Imagen image id, width, height, our `storage_path`), `chosen_index`, `cost_usd`, `order_id`, `ordered_at`, `created_at`, `finished_at` |
 
@@ -229,29 +229,95 @@ Each card shows the product drawn with their picture, its title and "From" price
 
 Switches, the menu handle, the home collection, the discount code and label, the reassurance rows, the limits, `shipping_days`, `upload_max_px`, `min_photo_px`, `slow_after_s`, `timeout_s`, `visitor_cookie_days`, the email ask (`ask_email_while_painting`, its copy, `email_link_days`); a product table (theme, photos the theme takes, related products, status and why hidden); today's visitors, generations, failures, median time and cost from `store_generations`, and the storage `store-uploads` uses.
 
-## Tracking
+## Analytics and PostHog
 
-New events (`docs/analytics.md`). PostHog's distinct id is the visitor id; when the visitor is linked to an email, PostHog merges the two the way it does for signed-in customers. Events go to PostHog only until the visitor has an email; the paid order goes to `activity_log` under the order's email.
+The store reports into the same PostHog project as the main site and the rest of this app (`docs/analytics.md`: project 540098, US cloud, `/ingest` proxy, `track()` as the only way to send an event). The full event list with properties is in `docs/analytics.md` › Open store; this section says what it's for and how it's set up.
 
-| Event | When | Props |
-|---|---|---|
-| `page_view_store` | A store page shown | `collection`, `products_shown` |
-| `store_category_tapped`, `store_sort_changed`, `store_filter_changed` | Browsing | `collection`, `value` |
-| `page_view_store_product` | A product page shown | `product_handle`, `has_picture` |
-| `store_variant_selected` | A chip chosen | `product_handle`, `option`, `value` |
-| `store_photo_chosen` | Photo accepted or refused in the browser | `ok`, `reason` |
-| `store_generation_started` (server) | Imagen called | `product_handle`, `theme`, `has_name` |
-| `store_generation_ready` (server) | Imagen done | `product_handle`, `theme`, `seconds`, `images`, `cost_usd` |
-| `store_generation_failed` (server) | Failed, timed out, limited or refused | `product_handle`, `reason` |
-| `store_email_given` | Email given while painting | `marketing_consent` (true or false; never the address) |
-| `store_picture_emailed` (server) | "Your picture is ready" sent | `product_id` |
-| `store_result_picked` | Another result chosen | `product_handle`, `index` |
-| `store_related_tapped` | A product under "On more gifts" | `from_handle`, `to_handle`, `position` |
-| `store_added_to_cart` | Add to cart | `product_handle`, `variant_id`, `price` |
-| `store_cart_opened`, `store_checkout_started` | Drawer opened, Checkout | `lines`, `subtotal` |
-| `store_order_paid` (server) | Paid order with `_source` = `open_store` | `order_id`, `lines`, `revenue` |
+### What it has to answer
 
-PostHog dashboard: a funnel Store page → Product page → Photo chosen → Picture ready → Added to cart → Checkout → Paid, split by product and theme.
+1. **Conversion at each step:** of the people who land, how many open a product, add a photo, get a picture, add to cart, start checkout and pay?
+2. **Products and themes:** which products and themes get pictures made, and which pictures people actually buy?
+3. **Picture health and cost:** how long pictures take, how often they fail and why, and what Imagen costs per picture and per paid order.
+4. **Channels:** where visitors come from (the store emails, ads, the main site, direct), and the pictures, orders and revenue per channel.
+5. **More gifts:** how often "On more gifts" adds a second product, and what it does to the order value.
+6. **The email ask:** how many give an email while painting, how many tick for offers, and how many of those come back and buy.
+7. **Coming back:** how many visitors return, and how many orders come on a later visit.
+
+### Identity
+
+- **Anonymous visitors** keep PostHog's own anonymous id, shared with magicportraits.ai through the cross-subdomain cookie, so a visitor who arrives from the main site keeps their history. The visitor id is set once as the person property `store_visitor_id` and sent on every store event.
+- **Server events** (pictures, cart, orders) use the PostHog id the browser sends with each store API call. It's kept on the visitor row (`store_visitors.posthog_distinct_id`), so `orders/paid`, which has no browser, can still credit the right person.
+- **Proven email** (sign-in, the email's link, or a paid order): the browser calls `identify(email)` on sign-in, as today. For a paid order the server aliases the visitor's PostHog id to the order's email, so the whole journey from first visit to order sits on one person.
+- **An email typed while painting is never used to identify anyone**, because it isn't proven. It sets only the person property `store_email_given: true`.
+- **Person properties:** `store_visitor_id`, `store_first_seen_at` (set once), `store_first_touch_source` (set once), `store_pictures_made` (increment), `store_orders` (increment), `store_email_given`, `store_marketing_consent`.
+- **Super properties on every store event:** `app: "vault"`, `area: "open_store"`, `signed_in`, `returning`, `preview`, and the `utm_*` of the visit.
+
+### First touch
+
+Each visitor's first touch is saved on their row as `store_visitors.first_touch` (jsonb): `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, the referrer's host (never its full address), the landing path, and the time. It goes on `store_order_paid` as `first_touch_source`. Settings › Open store can then show orders and revenue by channel from our own tables, without PostHog. The store emails and ads use UTM tags on every link: `utm_source=klaviyo`, `utm_campaign=<email name>`.
+
+### Where each event goes
+
+| Destination | What |
+|---|---|
+| PostHog | Every store event |
+| `activity_log` | The "business" events. Until the visitor has a proven email, rows have `email` null, `ref_type` = `store_visitor` and `ref_id` = the visitor id. The customer timeline in Settings shows them under an email through `store_visitors.email`, so rows are never rewritten |
+| Klaviyo | `Store Picture Ready` for visitors who ticked for offers (Asking for their email while we paint). `store_added_to_cart` and `store_checkout_started` only once they're in `klaviyo.events` and the visitor has a proven email or ticked for offers, for abandoned-picture and abandoned-cart flows later |
+
+### PostHog dashboard: "Magic Store"
+
+1. **Main funnel** (per person, 7-day window): `page_view_store_product` → `store_photo_chosen` (ok) → `store_generation_started` → `store_generation_ready` → `store_added_to_cart` → `store_checkout_started` → `store_order_paid`. Break down by product, `theme_slug`, first-touch `utm_source` and device type. A second version starts at `page_view_store` to see grid-to-product clicks.
+2. **Picture health:** generations started, ready and failed per day; failure reasons; p50 and p95 `seconds`; how many leave while painting (`store_generation_left`); Imagen cost per day.
+3. **Money:**
+   - Imagen cost per paid order: the sum of `cost_usd`, divided by `store_order_paid`.
+   - Pictures made per order.
+   - Revenue per visitor.
+   - Average order value.
+   - Share of orders with a second product added from "On more gifts" (`from: related`).
+4. **Channels:** visitors, picture rate, paid rate and revenue by first-touch `utm_source` and `utm_campaign`.
+5. **Products and themes:**
+   - Grid click rate by position.
+   - Picture rate by product: pictures started per product page view.
+   - Buy rate by theme: added to cart per picture ready, which shows which themes people like enough to buy.
+6. **Email ask:** shown → given → ticked for offers. Then emailed → link opened → paid within 30 days.
+7. **Coming back:** share of orders on a second or later visit; time from first picture to order.
+8. **Replay playlists:**
+   - sessions with `store_generation_failed`;
+   - sessions with `store_generation_ready` but no `store_added_to_cart`;
+   - `$rageclick` on product pages;
+   - phone sessions that leave while painting.
+9. **Web vitals** for `/store` pages, especially LCP on product pages, which have large pictures.
+
+The dashboard is set up in PostHog by hand at the end of Open store 5; its link goes in Settings › Open store.
+
+### Experiments (PostHog feature flags)
+
+The store's settings stay the defaults; a flag only overrides them for its test group. Each test reports **paid orders per visitor who started a picture**, with Imagen cost per order as the guardrail.
+
+- **Email ask:** on vs off. Does asking while painting change orders?
+- **Button wording:** "Create their picture" vs "See it on your pillow".
+- **Results:** one picture vs "Pick your favourite" of up to four. More choice, but more cost.
+- **More gifts:** with their picture vs the products' sample pictures.
+
+### Privacy in analytics
+
+- **Never in an event, person property or log:** the photo, the picture or its URL, the pet's name, or an email address (typed or proven). Send `has_name`, `photos`, `marketing_consent` instead.
+- **Session replay:** masks every input (name and email). The photo slots, the picture area, the circle with their photo, the cart and order previews, and the "On more gifts" pictures carry `ph-no-capture`. Product sample pictures may show.
+- **Addresses:** `before_send` drops query strings on `/store` pages except `utm_*` and `variant`, and the path token on `/g/`.
+- **Bots:** requests Vercel BotID flags as bots send no server events.
+- **Super users:** preview sessions carry `preview: true` and sit in the test-account cohort, so they never count.
+
+### Settings › Open store numbers
+
+Today, 7 days and 30 days, from our own tables and Shopify orders with `_source` = `open_store`, so they don't depend on PostHog:
+- visitors;
+- pictures started, ready and failed, with median seconds;
+- Imagen cost;
+- emails given, and the share who ticked for offers;
+- carts, paid orders and revenue;
+- cost per order.
+
+Each by product, theme and first-touch channel, with a link to the PostHog dashboard.
 
 ## Routes
 
@@ -283,7 +349,7 @@ Product pages sit under `/store/` rather than at `/product/<id>` so that one swi
 | Open store 2: store and product pages | Store page, product page before a picture (gallery, variants, delivery estimate, details, related with placeholders), cart icon | e2e at 390 × 844 and 1280 × 800, axe clean |
 | Open store 3: pictures | `lib/sources/imagen-api.ts` (live and fixtures), the visitor cookie and `store_visitors`, `store_photos`, `store_generations`, the `store-uploads` bucket and its file route, upload checks, bot check, limits, the creating and ready states, several photo slots, drawing on the template, result strip, related products with the picture, restore on return | Fixtures cover ready, slow, failed, timed out, limited and a two-photo theme; golden images of the pillow with a square and a 3:4 result; another visitor's cookie gets 404 on every file |
 | Open store 4: cart, checkout, sign-in and email | Guest Shopify cart on the visitor row, drawer, order-line keys, discount code, `orders/paid` linking the visitor, linking on sign-in, pictures on another device, the email ask while painting, the "Your picture is ready" email, the Klaviyo subscription through the outbox | A fixture checkout produces exactly the order-line keys; signing in on a second browser shows the first browser's pictures; the email's link opens the picture in a fresh browser |
-| Open store 5: tracking and docs | Events, the PostHog funnel, `docs/analytics.md`, `docs/schema.md`, `docs/data.md` | Docs match the build |
+| Open store 5: analytics and docs | Every event in `docs/analytics.md` › Open store with its properties; identity (PostHog id on the visitor row, alias on paid orders); first touch; the replay masks; the "Magic Store" dashboard, funnels and playlists in PostHog; the Settings numbers; `docs/schema.md`, `docs/data.md` | Each event checked in PostHog Live events with a test visitor; a test order shows the whole journey on one person; replays show no photo, picture, name or email; the `track()` wrapper rejects an unknown store event in tests |
 
 Needed from people: the Imagen API key for this app and Imagen's API docs; the Shopify navigation menu and collections; the first products with `imagen_theme`, templates and rules; the Storefront token's sales channel publishing them.
 

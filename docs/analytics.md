@@ -150,6 +150,47 @@ New ones:
 
 On sign-out call `posthog.reset()` so the next person on the device starts fresh.
 
+### Open store (Magic Store, `docs/open-store.md`)
+
+Visitors who aren't signed in. Identity, dashboards, experiments and privacy for these events are in `docs/open-store.md` › Analytics and PostHog. Never a photo, a picture URL, a pet's name or an email address in any property; only our ids, Shopify ids, theme slugs and counts. "Business" events also go to `activity_log`, under the visitor (`ref_type` = `store_visitor`) until the visitor has a proven email.
+
+| Event | Where | When | Props |
+|---|---|---|---|
+| `page_view_store` | browser | Store page or a category shown | `collection`, `products_shown`, `products_total` |
+| `store_category_tapped` | browser | A category circle or header link | `collection`, `position` |
+| `store_sort_changed`, `store_filter_changed` | browser | Sort or filter changed | `collection`, `value` |
+| `store_product_tapped` | browser | A product in the grid | `product_id`, `collection`, `position` |
+| `page_view_store_product` | browser | Product page shown | `product_id`, `theme_slug`, `has_picture`, `from` (`grid` · `related` · `cart` · `email_link` · `direct`) |
+| `store_variant_selected` | browser | A size or option chip | `product_id`, `option`, `value`, `has_picture` |
+| `store_info_opened` | browser | An accordion opened | `product_id`, `section` |
+| `store_photo_chosen` | browser | Photo accepted or refused in the browser | `product_id`, `ok`, `reason`, `slot`, `reused` |
+| `store_photo_uploaded` | server, business | Photo checked and saved | `ok`, `reason`, `width`, `height` |
+| `store_generation_started` | server, business | Imagen called | `product_id`, `theme_slug`, `session_id`, `photos`, `has_name`, `attempt` |
+| `store_generation_ready` | server, business | Imagen done | `product_id`, `theme_slug`, `session_id`, `seconds`, `images`, `cost_usd` |
+| `store_generation_failed` | server, business | Failed, timed out, limited or refused | `product_id`, `theme_slug`, `reason` (`imagen_failed` · `timeout` · `limit_visitor` · `limit_ip` · `daily_cap` · `bot` · `bad_photo`), `seconds` |
+| `store_generation_slow` | browser | "Still painting…" shown | `product_id`, `seconds` |
+| `store_generation_left` | browser | Page left while painting | `product_id`, `seconds` |
+| `store_result_picked` | browser | Another result chosen | `product_id`, `index`, `of` |
+| `store_try_again_tapped` | browser | Try another photo | `product_id`, `after` (`ready` · `failed`) |
+| `store_email_ask_shown`, `store_email_ask_closed` | browser | The email box while painting | `product_id` |
+| `store_email_given` | server, business | Email given while painting | `product_id`, `marketing_consent` |
+| `store_picture_emailed` | server, business | "Your picture is ready" sent | `product_id`, `theme_slug` |
+| `store_email_link_opened` | server, business | The email's link used | `product_id`, `expired` |
+| `store_related_shown` | browser | "On more gifts" in view | `product_id`, `count`, `with_picture` |
+| `store_related_tapped` | browser | A product under "On more gifts" | `from_product_id`, `to_product_id`, `position`, `with_picture` |
+| `store_added_to_cart` | server, business, Klaviyo-able | Add to cart | `product_id`, `variant_id`, `theme_slug`, `price`, `quantity`, `from` (`product` · `related`), `lines_after` |
+| `store_cart_opened` | browser | Cart drawer opened | `lines`, `subtotal` |
+| `store_cart_changed` | server, business | Quantity changed or line removed | `change`, `lines` |
+| `store_checkout_started` | server, business, Klaviyo-able | Shopify checkout link handed out | `lines`, `subtotal`, `signed_in` |
+| `store_order_paid` | server (orders/paid), business | Paid order with `_source` = `open_store` | `order_id`, `order_name`, `lines`, `revenue`, `currency`, `pictures_made`, `minutes_from_first_visit`, `first_touch_source`, `test` |
+| `store_signin_tapped` | browser | "Sign in" from a store page | `page` |
+| `store_visitor_linked` | server, business | A visitor linked to a proven email | `via` (`sign_in` · `order` · `email_link`), `visitors_linked` |
+| `error_store_cart` | server | A Shopify cart call failed | `stage`, `status_code` |
+| `admin_open_store_themes_refreshed` | server, business | Imagen themes copied into the Shopify dropdown | `themes`, `added`, `removed` |
+| `admin_open_store_product_updated` | server, business | A product's open-store fields changed in Settings | `product_id`, `fields` (names only) |
+
+Every store event carries the super properties `area: "open_store"`, `signed_in`, `returning` (the visitor has been before) and `preview` (true for a super user's preview). `store_added_to_cart` and `store_checkout_started` reach Klaviyo only once they're in `klaviyo.events` and the visitor has a proven email or ticked for offers.
+
 ### Settings (super users, internal)
 **Shop** (`docs/shop.md`). Never a picture URL, a gift name or a gift message; only kinds, our ids and Shopify ids.
 
@@ -214,6 +255,7 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 6. **Repeat use:** cards per person, retention on `card_create_tapped`, stickiness by week.
 7. **Quality:** `error_*` and `$exception` trends, render time (p50/p95 `render_ms`), web vitals for My Magic Portraits pages.
 8. **Replay playlists:** sessions that reach the message step but don't create a card, sessions with `$rageclick` in the builder, and sessions with `vault_lookup_empty`.
+9. **Magic Store:** its own dashboard, funnels and playlists, listed in `docs/open-store.md` › Analytics and PostHog.
 
 ## 6. Experiments (feature flags)
 
@@ -230,6 +272,7 @@ Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 - No personal data in URLs. Sign-in tokens are stripped by redirect, and admin pages use opaque ids. PostHog's `before_send` also drops the path token and query string on `/g/` and `/c/` pages.
 - Customer `email` is used only as the PostHog identity, as on the main site.
 - Respect the main site's consent setting; don't start replay before consent where it's required.
+- Open store: replay never shows a visitor's photo or picture (those elements carry `ph-no-capture`), and an email typed while painting is never used to identify anyone, because it isn't proven.
 
 ## 7a. Klaviyo
 
@@ -255,6 +298,7 @@ Business events go to both PostHog and `activity_log`:
 - `vault_signed_in`, `vault_test_signin`, `vault_signed_out`, `vault_code_requested`, `vault_lookup_*`
 - every `redeem_*_completed`, `redeem_*_saved` and `redeem_*_failed`
 - every server event, every Settings event, and `admin_card_viewed`.
+- the open store's events marked "business" in its table above.
 
 Everything else (`page_view_*`, taps, filters, UI-only events) goes to PostHog only.
 
