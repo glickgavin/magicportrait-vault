@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { productPageData, requireStoreVisible } from "@/lib/open-store/pages";
+import { pictureForPage } from "@/lib/open-store/restore";
 import { getSettings } from "@/lib/settings";
 import { StoreFrame } from "@/components/open-store/StoreFrame";
 import { ProductView } from "@/components/open-store/ProductView";
@@ -19,18 +20,22 @@ export async function generateMetadata({ params }: { params: Promise<{ productId
   return { title, description: d.product.seoDescription ?? undefined, openGraph: { title, description: d.product.seoDescription ?? undefined, images: d.gallery[0] ? [d.gallery[0].url] : [] } };
 }
 
-/** /store/product/<Shopify product id> (docs/open-store.md › Product page): before a picture in Open store 2. */
-export default async function StoreProduct({ params, searchParams }: { params: Promise<{ productId: string }>; searchParams: Promise<{ variant?: string; from?: string }> }) {
+/**
+ * /store/product/<Shopify product id> (docs/open-store.md › Product page). `?g=<picture id>` carries a picture over
+ * from another product (On more gifts); without it, the newest picture made for this product comes back.
+ */
+export default async function StoreProduct({ params, searchParams }: { params: Promise<{ productId: string }>; searchParams: Promise<{ variant?: string; from?: string; g?: string }> }) {
   const user = await requireStoreVisible();
   const { productId } = await params;
   if (!/^\d{1,20}$/.test(productId)) notFound();
-  const [data, sp, s] = await Promise.all([productPageData(productId), searchParams, getSettings(["open_store.min_photo_px", "shop.upload_max_mb"] as const)]);
+  const [data, sp, s] = await Promise.all([productPageData(productId), searchParams, getSettings(["open_store.min_photo_px", "shop.upload_max_mb", "open_store.upload_max_px"] as const)]);
   if (!data) notFound();
   const initial = data.variants.find((v) => v.legacyId === sp.variant && v.available)?.id ?? null;
+  const restored = await pictureForPage(data.product.id, typeof sp.g === "string" ? sp.g : null);
   const from = (FROM as readonly string[]).includes(sp.from ?? "") ? sp.from! : "direct";
   return (
     <StoreFrame user={user} active={null}>
-      <ProductView data={data} initialVariantId={initial} minPhotoPx={s["open_store.min_photo_px"]} maxMb={s["shop.upload_max_mb"]} from={from} />
+      <ProductView data={data} initialVariantId={initial} minPhotoPx={s["open_store.min_photo_px"]} maxMb={s["shop.upload_max_mb"]} uploadMaxPx={s["open_store.upload_max_px"]} from={from} initialPicture={restored.picture} earlierPhotos={restored.photos} />
     </StoreFrame>
   );
 }

@@ -1,4 +1,8 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import sharp from "sharp";
 import { z } from "zod";
 import { env } from "@/lib/env";
 import { SourceNotConfigured } from "./index";
@@ -6,7 +10,7 @@ import { SourceNotConfigured } from "./index";
 /**
  * Imagen's public API (docs/open-store.md › Imagen API), used only by the open store, server-side, with this
  * app's own key. CLAUDE.md, allowed write 6: new sessions through this API only; never Imagen's database.
- * Open store 1 reads the theme list; picture sessions are added in Open store 3.
+ * The theme list, new picture sessions, their status, and fetching a finished picture to keep our own copy.
  */
 export type ImagenTheme = {
   slug: string;
@@ -17,10 +21,31 @@ export type ImagenTheme = {
   category: string | null;
 };
 
+/** Imagen's session statuses; `cancelled` and `awaiting_face_selection` count as failed in the open store. */
+export type ImagenStatus = "pending" | "preprocessing" | "generating" | "done" | "failed" | "cancelled" | "awaiting_face_selection";
+export type ImagenImage = { id: string; url: string; width: number | null; height: number | null };
+export type ImagenSession = { status: ImagenStatus; expectedImageCount: number | null; images: ImagenImage[]; costUsd: number | null };
+export type GenerateInput = {
+  theme: string;
+  /** One per photo; empty names are left out. Private: never logged. */
+  names: string[];
+  /** JPEG photos, in slot order. */
+  photos: Buffer[];
+  /** `open-store:<visitor id>`, sent as X-Client-User-Id. */
+  clientUserId: string;
+};
+
 export interface ImagenApiSource {
   readonly kind: "live" | "fixtures";
   themes(): Promise<ImagenTheme[]>;
+  generate(input: GenerateInput): Promise<{ sessionId: string; status: ImagenStatus }>;
+  session(sessionId: string): Promise<ImagenSession>;
+  /** A finished picture's bytes (for our copy in store-uploads). */
+  download(url: string): Promise<Buffer>;
 }
+
+const STATUSES: ImagenStatus[] = ["pending", "preprocessing", "generating", "done", "failed", "cancelled", "awaiting_face_selection"];
+export const asStatus = (v: unknown): ImagenStatus => (STATUSES.includes(v as ImagenStatus) ? (v as ImagenStatus) : "pending");
 
 /** Made-up themes for tests and local dev: one takes two photos, one is inactive. */
 export const FX_IMAGEN_THEMES: ImagenTheme[] = [
@@ -32,10 +57,69 @@ export const FX_IMAGEN_THEMES: ImagenTheme[] = [
   { slug: "retired-01", name: "Retired style", active: false, photos: 1, category: "pets" },
 ];
 
+/**
+ * Fixture sessions (DATA_SOURCE=fixtures; made-up pictures only). The session id carries everything, so they
+ * survive a dev-server reload: how it behaves, the theme and when it started. The first name picks the case:
+ * "Oops" fails, "Slowpoke" takes 20 s, "Forever" never finishes (for the time-out), "Faces" asks to pick faces;
+ * anything else is ready after about 3 s with a 3:4 and a square result (two-photo themes get three).
+ */
+export const FX_TIMINGS = { ready: 3_000, slow: 20_000, fail: 1_500 } as const;
+type FxCase = "ready" | "slow" | "fail" | "forever" | "faces";
+const FX_SCENES: Record<string, string[]> = {
+  "admiral-01": ["admiral-teddy.jpg", "admiral-cat.jpg", "tommy-boy.jpg"],
+  "bathroom-01": ["bartholomew.jpg", "lamb-plumber.jpg"],
+  "journal-02": ["frenchie-journal.jpg", "husky-journal.jpg"],
+  "plumber-01": ["cat-plumber.jpg", "rottweiler-plumber.jpg"],
+  "duo-portrait-01": ["beagle-peg.jpg", "beagle-peg-2.jpg", "shepherd-peg.jpg"],
+};
+const FX_SHAPES: [number, number][] = [
+  [1536, 2048],
+  [2048, 2048],
+  [1536, 2048],
+];
+
+function fxCase(names: string[]): FxCase {
+  const n = (names[0] ?? "").trim().toLowerCase();
+  return n === "oops" ? "fail" : n === "slowpoke" ? "slow" : n === "forever" ? "forever" : n === "faces" ? "faces" : "ready";
+}
+
 export class ImagenApiFixtures implements ImagenApiSource {
   readonly kind = "fixtures" as const;
+  constructor(private now: () => number = Date.now) {}
   async themes(): Promise<ImagenTheme[]> {
     return structuredClone(FX_IMAGEN_THEMES);
+  }
+  async generate(input: GenerateInput): Promise<{ sessionId: string; status: ImagenStatus }> {
+    if (!input.photos.length) throw new Error("imagen_api_http_400");
+    const theme = FX_IMAGEN_THEMES.find((t) => t.slug === input.theme && t.active);
+    if (!theme) throw new Error("imagen_api_http_404");
+    return { sessionId: `fx_${fxCase(input.names)}_${theme.slug}_${this.now()}_${randomBytes(4).toString("hex")}`, status: "pending" };
+  }
+  async session(sessionId: string): Promise<ImagenSession> {
+    const m = /^fx_(ready|slow|fail|forever|faces)_([a-z0-9-]+)_(\d+)_[0-9a-f]+$/.exec(sessionId);
+    if (!m) throw new Error("imagen_api_http_404");
+    const [, c, theme, at] = m as unknown as [string, FxCase, string, string];
+    const age = this.now() - Number(at);
+    const scenes = FX_SCENES[theme] ?? FX_SCENES["admiral-01"];
+    const count = (FX_IMAGEN_THEMES.find((t) => t.slug === theme)?.photos ?? 1) > 1 ? 3 : 2;
+    const expected = { status: "pending" as ImagenStatus, expectedImageCount: count, images: [] as ImagenImage[], costUsd: null };
+    if (c === "fail") return age < FX_TIMINGS.fail ? { ...expected, status: "preprocessing" } : { ...expected, status: "failed" };
+    if (c === "faces") return age < FX_TIMINGS.fail ? { ...expected, status: "preprocessing" } : { ...expected, status: "awaiting_face_selection" };
+    const total = c === "slow" ? FX_TIMINGS.slow : FX_TIMINGS.ready;
+    if (age < total * 0.2) return expected;
+    if (age < total * 0.45) return { ...expected, status: "preprocessing" };
+    if (age < total || c === "forever") return { ...expected, status: "generating" };
+    const images = Array.from({ length: count }, (_, i) => {
+      const [w, h] = FX_SHAPES[i % FX_SHAPES.length];
+      return { id: `${sessionId}_${i}`, url: `fixture://${scenes[i % scenes.length]}?w=${w}&h=${h}`, width: w, height: h };
+    });
+    return { status: "done", expectedImageCount: count, images, costUsd: 0.04 * count };
+  }
+  async download(url: string): Promise<Buffer> {
+    const m = /^fixture:\/\/([a-z0-9-]+\.jpg)\?w=(\d+)&h=(\d+)$/.exec(url);
+    if (!m) throw new Error("imagen_api_bad_url");
+    const file = await readFile(path.join(process.cwd(), "public/shop-samples/scenes", m[1]));
+    return sharp(file).resize(Number(m[2]), Number(m[3]), { fit: "cover", position: "top" }).png({ compressionLevel: 6 }).toBuffer();
   }
 }
 
@@ -75,13 +159,73 @@ export function parseThemes(body: unknown): ImagenTheme[] {
   return out;
 }
 
+const rawSession = z
+  .object({
+    status: z.string().optional(),
+    expected_image_count: z.number().nullable().optional(),
+    total_cost_usd: z.union([z.number(), z.string()]).nullable().optional(),
+    images: z
+      .array(z.object({ id: z.union([z.string(), z.number()]), url: z.string().url(), width: z.number().nullable().optional(), height: z.number().nullable().optional() }).passthrough())
+      .nullable()
+      .optional(),
+  })
+  .passthrough();
+
+/** Imagen's `GET /api-sessions/<id>` body, tolerant of missing fields. */
+export function parseSession(body: unknown): ImagenSession {
+  const r = rawSession.safeParse(body && typeof body === "object" && "session" in body ? (body as { session: unknown }).session : body);
+  if (!r.success) return { status: "pending", expectedImageCount: null, images: [], costUsd: null };
+  const cost = r.data.total_cost_usd == null ? null : Number(r.data.total_cost_usd);
+  return {
+    status: asStatus(r.data.status),
+    expectedImageCount: r.data.expected_image_count ?? null,
+    images: (r.data.images ?? []).map((i) => ({ id: String(i.id), url: i.url, width: i.width ?? null, height: i.height ?? null })),
+    costUsd: Number.isFinite(cost) ? cost : null,
+  };
+}
+
+/** Pictures are fetched only from Imagen's own hosts (its API host and its storage). */
+const MAX_DOWNLOAD = 30 * 1024 * 1024;
+
 export class ImagenApiLive implements ImagenApiSource {
   readonly kind = "live" as const;
   constructor(private cfg: { url: string; key: string }) {}
+  private get base() {
+    return this.cfg.url.replace(/\/$/, "");
+  }
   async themes(): Promise<ImagenTheme[]> {
-    const res = await fetch(`${this.cfg.url.replace(/\/$/, "")}/api-themes`, { headers: { authorization: `Bearer ${this.cfg.key}` }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    const res = await fetch(`${this.base}/api-themes`, { headers: { authorization: `Bearer ${this.cfg.key}` }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
     if (!res.ok) throw new Error(`imagen_api_http_${res.status}`);
     return parseThemes(await res.json());
+  }
+  async generate(input: GenerateInput): Promise<{ sessionId: string; status: ImagenStatus }> {
+    const form = new FormData();
+    form.set("theme_id", input.theme);
+    const name = input.names.map((n) => n.trim()).filter(Boolean).join(" & ");
+    if (name) form.set("name", name);
+    form.set("source_image", new Blob([new Uint8Array(input.photos[0])], { type: "image/jpeg" }), "photo.jpg");
+    // The field for extra photos is still to confirm with Imagen (BUILD_LOG › Blocked).
+    input.photos.slice(1).forEach((p, i) => form.set(`source_image_${i + 2}`, new Blob([new Uint8Array(p)], { type: "image/jpeg" }), `photo-${i + 2}.jpg`));
+    const res = await fetch(`${this.base}/api-generate`, { method: "POST", headers: { authorization: `Bearer ${this.cfg.key}`, "x-client-user-id": input.clientUserId }, body: form, cache: "no-store", signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`imagen_api_http_${res.status}`);
+    const body = (await res.json()) as { session_id?: unknown; status?: unknown };
+    if (typeof body.session_id !== "string" || !body.session_id) throw new Error("imagen_api_no_session");
+    return { sessionId: body.session_id, status: asStatus(body.status) };
+  }
+  async session(sessionId: string): Promise<ImagenSession> {
+    const res = await fetch(`${this.base}/api-sessions/${encodeURIComponent(sessionId)}`, { headers: { authorization: `Bearer ${this.cfg.key}` }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) throw new Error(`imagen_api_http_${res.status}`);
+    return parseSession(await res.json());
+  }
+  async download(url: string): Promise<Buffer> {
+    const u = new URL(url);
+    const apiHost = new URL(this.base).host;
+    if (u.protocol !== "https:" || u.host !== apiHost) throw new Error("imagen_api_bad_url");
+    const res = await fetch(u, { cache: "no-store", signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`imagen_api_http_${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > MAX_DOWNLOAD) throw new Error("imagen_api_too_large");
+    return buf;
   }
 }
 

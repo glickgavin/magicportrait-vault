@@ -11,6 +11,7 @@ import { discountInfo } from "@/lib/shop";
 import { discounted, percentOff } from "@/lib/shop/money";
 import { promoFor, type PromoView } from "@/lib/shop/shell";
 import { target } from "@/lib/shop/fit";
+import type { VariantRules } from "@/lib/shop/rules";
 import { parseTemplate, type Template } from "@/lib/shop/template";
 import { canSeeOpenStore } from "./access";
 import { gridProducts, type StoreEntry } from "./catalog";
@@ -143,7 +144,26 @@ export type VariantView = {
   background: string | null;
 };
 
-export type RelatedCard = CardView & { href: string };
+/** How to draw a picture on a product: its template and its first sellable size's print shape and rules. */
+export type DrawInfo = {
+  template: Template;
+  aspect: number;
+  placement: "cover" | "contain" | "wrap_zone";
+  background: string | null;
+  /** For the fit check (docs/shop.md › Product rules), so only products that suit the picture are offered. */
+  rules: { imageKinds: VariantRules["imageKinds"]; minShortSidePx: number; maxCropPct: number; placement: VariantRules["placement"]; printPx: VariantRules["printPx"]; zonePx: VariantRules["zonePx"] };
+};
+
+export type RelatedCard = CardView & { href: string; draw: DrawInfo | null };
+
+function drawInfo(e: StoreEntry): DrawInfo | null {
+  const template = parseTemplate(e.product.template?.value);
+  const sv = e.sellable.find((x) => x.variant.availableForSale) ?? e.sellable[0];
+  if (!template || !sv) return null;
+  const t = target(sv.rules);
+  const r = sv.rules;
+  return { template, aspect: t.w / t.h, placement: r.placement, background: r.background ?? null, rules: { imageKinds: r.imageKinds, minShortSidePx: r.minShortSidePx, maxCropPct: r.maxCropPct, placement: r.placement, printPx: r.printPx, zonePx: r.zonePx } };
+}
 
 /** Everything the product page needs before a picture (docs/open-store.md › Product page). Null: not in the store. */
 export async function productPageData(legacyId: string) {
@@ -193,7 +213,8 @@ export async function productPageData(legacyId: string) {
     }),
   );
   // "Also made from one photo": related-only products are allowed here (and only here).
-  const related: RelatedCard[] = relatedEntries(p, magic.entries, 3).map((e) => ({ ...card(e, pricing, themeNames), href: `/store/product/${e.product.legacyId}` }));
+  // Up to 8 candidates: the page shows the first 3, or with a picture, the first 3 that suit it.
+  const related: RelatedCard[] = relatedEntries(p, magic.entries, 8).map((e) => ({ ...card(e, pricing, themeNames), href: `/store/product/${e.product.legacyId}`, draw: drawInfo(e) }));
   const details: DescriptionBlock[] = [...descriptionBlocks(p.descriptionHtml, p.description), ...(p.store?.details ? descriptionBlocks(null, p.store.details) : [])];
   const homeTitle = magic.collection?.handle === s["open_store.home_collection"] ? magic.collection.title : null;
   return {

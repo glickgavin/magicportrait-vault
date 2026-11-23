@@ -2,22 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Clock, Gift, Heart, Info, Lock, Minus, Plus, Star, Truck } from "lucide-react";
+import { Camera, Check, Clock, Gift, Heart, Info, Loader2, Lock, Minus, Plus, Star, Truck } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import type { ProductPageData, VariantView } from "@/lib/open-store/pages";
-import { optionGroups, variantFor } from "@/lib/open-store/view";
+import type { ProductPageData, RelatedCard, VariantView } from "@/lib/open-store/pages";
+import { fillStep, optionGroups, variantFor } from "@/lib/open-store/view";
 import type { DescriptionBlock } from "@/lib/shop/description";
+import { defaultCrop, fitVariant } from "@/lib/shop/fit";
 import { formatMoney } from "@/lib/shop/money";
 import { t, tn } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
+import { ShopPreview } from "@/components/shop/ShopPreview";
 import { ProductCard } from "./ProductCard";
 import { Stars } from "./Stars";
+import { fileUrl, usePicture, type PictureView, type SlotPhoto } from "./use-picture";
 
 const ICONS = { truck: Truck, heart: Heart, lock: Lock, gift: Gift, star: Star, clock: Clock } as const;
-
-/** A photo chosen for a slot, still only in the browser (Open store 3 sends it to make the picture). */
-export type ChosenPhoto = { file: File; url: string; width: number; height: number };
 
 function Blocks({ blocks }: { blocks: DescriptionBlock[] }) {
   return (
@@ -50,51 +50,145 @@ async function readImage(file: File): Promise<{ url: string; width: number; heig
   return ok ? { url, ...ok } : null;
 }
 
-export function ProductView({ data, initialVariantId, minPhotoPx, maxMb, from }: { data: ProductPageData; initialVariantId: string | null; minPhotoPx: number; maxMb: number; from: string }) {
+/** The crop that puts a picture in a print shape: all of it for "contain", else the largest top-kept window. */
+function cropFor(w: number, h: number, aspect: number, placement: VariantView["placement"]) {
+  return placement === "contain" ? { x: 0, y: 0, w, h } : defaultCrop(w, h, Math.round(aspect * 10000), 10000);
+}
+
+const REFUSED: Record<string, (minPx: number, mb: number) => string> = {
+  too_small: (px) => t("store.photoTooSmall", { px }),
+  too_large: (_px, mb) => t("store.photoFormats", { mb }),
+  unsupported: () => t("store.photoHeic"),
+  not_an_image: () => t("store.photoNotImage"),
+  empty: () => t("store.photoNotImage"),
+};
+
+export type EarlierPhoto = { fileId: string; width: number; height: number };
+
+export function ProductView({
+  data,
+  initialVariantId,
+  minPhotoPx,
+  maxMb,
+  uploadMaxPx,
+  from,
+  initialPicture,
+  earlierPhotos,
+}: {
+  data: ProductPageData;
+  initialVariantId: string | null;
+  minPhotoPx: number;
+  maxMb: number;
+  uploadMaxPx: number;
+  from: string;
+  initialPicture: PictureView | null;
+  earlierPhotos: EarlierPhoto[];
+}) {
   const router = useRouter();
   const uid = useId();
   const groups = useMemo(() => optionGroups(data.variants), [data.variants]);
   const [variantId, setVariantId] = useState<string>(initialVariantId ?? data.variants.find((v) => v.available)?.id ?? data.variants[0]?.id);
   const variant: VariantView | undefined = data.variants.find((v) => v.id === variantId) ?? data.variants[0];
   const [shown, setShown] = useState(0);
-  const [photos, setPhotos] = useState<(ChosenPhoto | null)[]>(() => data.slots.map(() => null));
+  const [photos, setPhotos] = useState<(SlotPhoto | null)[]>(() =>
+    data.slots.map((_, i) => {
+      const id = initialPicture?.photos[i];
+      const known = id ? earlierPhotos.find((p) => p.fileId === id) : null;
+      return id ? { fileId: id, url: fileUrl(id), width: known?.width ?? 0, height: known?.height ?? 0 } : null;
+    }),
+  );
   const [names, setNames] = useState<string[]>(() => data.slots.map(() => ""));
   const [photoError, setPhotoError] = useState<{ slot: number; text: string } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [qty, setQty] = useState(1);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const relatedRef = useRef<HTMLElement | null>(null);
+  const stageRef = useRef<HTMLElement | null>(null);
+  const started = useRef<number | null>(null);
+  const slowSent = useRef(false);
   const pid = data.product.legacyId;
   const themeName = data.theme?.name ?? null;
 
+  const { state, create, choose: pickResult, reset } = usePicture({
+    productId: pid,
+    uploadMaxPx,
+    initial: initialPicture,
+    onEvent: (e) => {
+      if (e === "started") {
+        started.current = Date.now();
+        slowSent.current = false;
+      }
+      if (e === "ready" || e === "failed") {
+        started.current = null;
+        setShown(0);
+      }
+      // The steps and then the picture show in the picture area, above the button on phones.
+      if (e === "started" || e === "ready") stageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    },
+  });
+  const picture = state.phase === "ready" ? state.picture : null;
+  const result = picture ? (picture.images[picture.chosen] ?? picture.images[0]) : null;
+  const creating = state.phase === "creating";
+  const petName = names[0]?.trim() || null;
+
   useEffect(() => {
-    trackClient("page_view_store_product", { product_id: pid, theme_slug: data.theme?.slug ?? null, has_picture: false, from });
-  }, [pid, data.theme?.slug, from]);
+    trackClient("page_view_store_product", { product_id: pid, theme_slug: data.theme?.slug ?? null, has_picture: Boolean(initialPicture), from });
+  }, [pid, data.theme?.slug, from, initialPicture]);
+
+  // "Still painting…" once per picture; leaving the page while painting.
+  useEffect(() => {
+    if (state.phase === "creating" && state.slow && !slowSent.current) {
+      slowSent.current = true;
+      trackClient("store_generation_slow", { product_id: pid, seconds: started.current ? Math.round((Date.now() - started.current) / 1000) : null });
+    }
+  }, [state, pid]);
+  useEffect(() => {
+    const left = () => {
+      if (started.current) trackClient("store_generation_left", { product_id: pid, seconds: Math.round((Date.now() - started.current) / 1000) });
+    };
+    window.addEventListener("pagehide", left);
+    return () => window.removeEventListener("pagehide", left);
+  }, [pid]);
+
+  // Related products: the first 3, or with a picture, the first 3 the picture suits.
+  const related: RelatedCard[] = useMemo(() => {
+    if (!result) return data.related.slice(0, 3);
+    return data.related.filter((r) => r.draw && fitVariant({ kind: "portrait", width: result.width, height: result.height }, r.draw.rules).ok).slice(0, 3);
+  }, [data.related, result]);
 
   // "On more gifts" in view (once).
+  const withPicture = Boolean(result);
   useEffect(() => {
     const el = relatedRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver((es) => {
       if (es.some((e) => e.isIntersecting)) {
-        trackClient("store_related_shown", { product_id: pid, count: data.related.length, with_picture: false });
+        trackClient("store_related_shown", { product_id: pid, count: related.length, with_picture: withPicture });
         io.disconnect();
       }
     });
     io.observe(el);
     return () => io.disconnect();
-  }, [pid, data.related.length]);
+  }, [pid, related.length, withPicture]);
 
   // Object URLs for chosen photos are freed when the page goes.
-  useEffect(() => () => photos.forEach((p) => p && URL.revokeObjectURL(p.url)), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => photos.forEach((p) => p && "file" in p && URL.revokeObjectURL(p.url)), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chosen = Object.fromEntries((variant?.options ?? []).map((o) => [o.name, o.value]));
   const pickOption = (name: string, value: string) => {
     const next = variantFor(data.variants, { ...chosen, [name]: value });
     if (!next) return;
     setVariantId(next.id);
-    router.replace(`?variant=${next.legacyId}`, { scroll: false });
-    trackClient("store_variant_selected", { product_id: pid, option: name, value, has_picture: false });
+    const q = new URLSearchParams(window.location.search);
+    q.set("variant", next.legacyId);
+    router.replace(`?${q.toString()}`, { scroll: false });
+    trackClient("store_variant_selected", { product_id: pid, option: name, value, has_picture: withPicture });
+  };
+
+  /** A new photo needs a new picture; the old one stays saved and comes back on return. */
+  const photoChanged = () => {
+    if (state.phase !== "idle" && state.phase !== "creating") reset();
   };
 
   async function choose(slot: number, file: File | undefined) {
@@ -106,7 +200,7 @@ export function ProductView({ data, initialVariantId, minPhotoPx, maxMb, from }:
     };
     if (file.size > maxMb * 1024 * 1024) return fail("too_large", t("store.photoFormats", { mb: maxMb }));
     const img = await readImage(file);
-    // HEIC often can't be read by the browser; the server converts it (Open store 3), so it's accepted here.
+    // HEIC often can't be read by the browser; the server converts it, so it's accepted here.
     const heic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
     if (!img && !heic) return fail("not_an_image", t("store.photoNotImage"));
     if (img && Math.min(img.width, img.height) < minPhotoPx) {
@@ -115,19 +209,50 @@ export function ProductView({ data, initialVariantId, minPhotoPx, maxMb, from }:
     }
     setPhotos((list) => {
       const next = [...list];
-      if (next[slot]) URL.revokeObjectURL(next[slot]!.url);
+      const old = next[slot];
+      if (old && "file" in old) URL.revokeObjectURL(old.url);
       next[slot] = { file, url: img?.url ?? "", width: img?.width ?? 0, height: img?.height ?? 0 };
       return next;
     });
+    photoChanged();
     trackClient("store_photo_chosen", { product_id: pid, ok: true, reason: null, slot: slot + 1, reused: false });
   }
 
-  const ready = photos.every(Boolean);
-  const gallery = data.gallery;
-  const main = gallery[shown] ?? gallery[0];
+  function reuse(slot: number, p: EarlierPhoto) {
+    setPhotoError(null);
+    setPhotos((list) => list.map((x, i) => (i === slot ? { fileId: p.fileId, url: fileUrl(p.fileId), width: p.width, height: p.height } : x)));
+    photoChanged();
+    trackClient("store_photo_chosen", { product_id: pid, ok: true, reason: null, slot: slot + 1, reused: true });
+  }
+
+  function tryAgain() {
+    trackClient("store_try_again_tapped", { product_id: pid, after: state.phase === "ready" ? "ready" : "failed" });
+    reset();
+    setPhotos(data.slots.map(() => null));
+    setShown(0);
+    setTimeout(() => document.getElementById(`${uid}-slot-0`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 0);
+  }
+
+  // A photo refused by the server shows under its slot.
+  useEffect(() => {
+    if (state.phase === "refused") setPhotoError({ slot: state.slot, text: (REFUSED[state.reason] ?? REFUSED.not_an_image)(minPhotoPx, maxMb) });
+  }, [state, minPhotoPx, maxMb]);
+
+  const filled = photos.every(Boolean);
+  const steps = data.stepTemplates.map((s) => fillStep(s, petName, data.product.title));
   const price = variant ? variant.price : null;
   const was = variant?.was ?? null;
   const save = price && was ? Number(was) - Number(price) : 0;
+
+  // Gallery: before a picture, the product's media (the first is its sample). After: their picture drawn on the
+  // product, then the picture on its own, then the other media marked "Example".
+  type Slide = { kind: "drawn" } | { kind: "alone" } | { kind: "media"; url: string; alt: string; example: boolean };
+  const canDraw = Boolean(result && data.template && variant?.aspect);
+  const slides: Slide[] = result
+    ? [...(canDraw ? [{ kind: "drawn" as const }] : []), { kind: "alone" as const }, ...data.gallery.slice(1).map((g) => ({ kind: "media" as const, url: g.url, alt: g.alt, example: true }))]
+    : data.gallery.map((g, i) => ({ kind: "media" as const, url: g.url, alt: g.alt, example: i > 0 }));
+  const slide = slides[Math.min(shown, slides.length - 1)];
+  const theirPhoto = photos[0]?.url || null;
 
   const accordion = (key: string, title: string, body: React.ReactNode, className?: string) => (
     <div className={cn("border-b border-[#EDEAE2]", className)}>
@@ -155,6 +280,27 @@ export function ProductView({ data, initialVariantId, minPhotoPx, maxMb, from }:
     </div>
   );
 
+  const mainPicture = () => {
+    if (slide?.kind === "drawn" && result && data.template && variant?.aspect)
+      return (
+        <ShopPreview
+          template={data.template}
+          pictureUrl={fileUrl(result.file)}
+          crop={cropFor(result.width, result.height, variant.aspect, variant.placement)}
+          pictureSize={{ width: result.width, height: result.height }}
+          placement={variant.placement}
+          aspect={variant.aspect}
+          background={variant.background}
+          width={640}
+          alt={t("store.yourPictureOn", { product: data.product.title })}
+          className="rounded-none lg:rounded-[16px]"
+        />
+      );
+    if (slide?.kind === "alone" && result) return <img src={fileUrl(result.file)} alt={t("store.yourPicture")} data-testid="store-picture" className="block aspect-square w-full bg-page object-contain lg:rounded-[16px]" />;
+    if (slide?.kind === "media") return <img src={slide.url} alt={slide.alt} className="block aspect-square w-full bg-page object-cover object-top lg:rounded-[16px]" />;
+    return <span className="block aspect-square w-full bg-page lg:rounded-[16px]" aria-hidden="true" />;
+  };
+
   return (
     <div className="mx-auto max-w-[1280px] lg:px-10">
       {data.breadcrumb && (
@@ -168,25 +314,67 @@ export function ProductView({ data, initialVariantId, minPhotoPx, maxMb, from }:
       )}
 
       <div className="lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-[52px] lg:pb-12">
-        <section aria-label={t("store.pictures")} className="flex flex-col gap-2.5 lg:sticky lg:top-[88px] lg:flex-row-reverse lg:gap-4">
-          <div className="ph-no-capture relative lg:flex-1">
-            {main ? <img src={main.url} alt={main.alt} className="block aspect-square w-full bg-page object-cover object-top lg:rounded-[16px]" /> : <span className="block aspect-square w-full bg-page lg:rounded-[16px]" aria-hidden="true" />}
-            {shown === 0 && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.sample")}</span>}
-            {shown > 0 && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.example")}</span>}
-            {data.pricing.pct != null && <span className="absolute right-3 top-3 rounded-full bg-[#B8059F] px-2.5 py-[5px] text-[12px] font-extrabold tracking-[0.06em] text-white">{t("store.off", { pct: Math.round(data.pricing.pct * 100) })}</span>}
+        <section ref={stageRef} aria-label={t("store.pictures")} className="scroll-mt-[72px] flex flex-col gap-2.5 lg:sticky lg:top-[88px] lg:flex-row-reverse lg:gap-4">
+          <div className="ph-no-capture relative lg:flex-1" data-ph-mask data-testid="store-stage">
+            <div className={cn("transition-opacity", creating && "opacity-40")}>{mainPicture()}</div>
+            {!result && !creating && shown === 0 && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.sample")}</span>}
+            {slide?.kind === "media" && slide.example && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.example")}</span>}
+            {!creating && data.pricing.pct != null && <span className="absolute right-3 top-3 rounded-full bg-[#B8059F] px-2.5 py-[5px] text-[12px] font-extrabold tracking-[0.06em] text-white">{t("store.off", { pct: Math.round(data.pricing.pct * 100) })}</span>}
+            {result && theirPhoto && slide?.kind !== "media" && <img src={theirPhoto} alt={t("store.yourPhoto")} className="absolute bottom-3 left-3 h-14 w-14 rounded-full border-[3px] border-white object-cover shadow-md" />}
+            {creating && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6" role="status" aria-live="polite" data-testid="store-creating">
+                <span className="relative flex h-[112px] w-[112px] items-center justify-center">
+                  <span className="absolute inset-0 animate-spin rounded-full border-4 border-[#F6D3EF] border-t-[#DD07C4]" aria-hidden="true" />
+                  {theirPhoto ? <img src={theirPhoto} alt="" className="h-[92px] w-[92px] rounded-full object-cover" /> : <span className="h-[92px] w-[92px] rounded-full bg-pink-tint" aria-hidden="true" />}
+                </span>
+                <ol className="flex w-full max-w-[300px] flex-col gap-2 rounded-[14px] bg-white/[0.94] p-3.5 text-[14px] shadow-sm">
+                  {steps.map((s, i) => {
+                    const done = state.step > i;
+                    const now = state.step === i;
+                    return (
+                      <li key={i} className={cn("flex items-center gap-2.5", done ? "text-[#2b2b2b]" : now ? "font-extrabold text-[#1a1a1a]" : "text-[#8a8a8a]")} aria-current={now ? "step" : undefined}>
+                        {done ? <Check className="h-4 w-4 text-[#1f8a4c]" aria-hidden="true" /> : now ? <Loader2 className="h-4 w-4 animate-spin text-[#B8059F]" aria-hidden="true" /> : <span className="h-4 w-4 rounded-full border-2 border-[#D9D5CA]" aria-hidden="true" />}
+                        {s}
+                      </li>
+                    );
+                  })}
+                </ol>
+                {state.slow && <p className="max-w-[300px] rounded-[12px] bg-white/[0.94] px-3 py-2 text-center text-[14px] font-bold text-[#8E047B]">{t("store.slow")}</p>}
+              </div>
+            )}
           </div>
-          {gallery.length > 1 && (
+          {!creating && slides.length > 1 && (
             <div className="flex gap-2 px-4 lg:flex-col lg:px-0">
-              {gallery.map((g, i) => (
-                <button key={g.url + i} type="button" aria-label={t("store.pictureN", { n: i + 1, count: gallery.length })} aria-current={i === shown ? "true" : undefined} onClick={() => setShown(i)} className={cn("h-16 w-16 flex-none overflow-hidden rounded-[10px] bg-page lg:h-[72px] lg:w-[72px]", i === shown ? "border-2 border-[#DD07C4]" : "border border-[#E7E3D8]")}>
-                  <img src={g.url} alt="" className="block h-full w-full object-cover object-top" />
+              {slides.map((g, i) => (
+                <button key={i} type="button" aria-label={t("store.pictureN", { n: i + 1, count: slides.length })} aria-current={i === shown ? "true" : undefined} onClick={() => setShown(i)} className={cn("ph-no-capture h-16 w-16 flex-none overflow-hidden rounded-[10px] bg-page lg:h-[72px] lg:w-[72px]", i === shown ? "border-2 border-[#DD07C4]" : "border border-[#E7E3D8]")}>
+                  <img src={g.kind === "media" ? g.url : fileUrl(result!.file)} alt="" className={cn("block h-full w-full object-top", g.kind === "alone" ? "object-contain" : "object-cover")} />
                 </button>
               ))}
             </div>
           )}
+          {picture && picture.images.length > 1 && (
+            <fieldset className="px-4 lg:hidden" data-testid="store-results">
+              <legend className="pb-2 text-[14px] font-extrabold">{t("store.pickFavourite")}</legend>
+              <ResultStrip picture={picture} max={data.imagesToShow} onPick={(n) => pickAndTrack(n)} />
+            </fieldset>
+          )}
         </section>
 
         <div>
+          {picture && (
+            <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-[14px] bg-pink-tint px-4 py-3 lg:mx-0 lg:mt-0 lg:mb-4" role="status" data-testid="store-ready">
+              <span className="text-[15px] font-extrabold text-[#8E047B]">{petName ? t("store.readyNamed", { name: petName }) : t("store.ready")}</span>
+              <button type="button" onClick={tryAgain} className="h-10 flex-none rounded-[10px] border-[1.5px] border-[#8E047B] bg-white px-3 text-[14px] font-extrabold text-[#8E047B]">
+                {t("store.tryAnother")}
+              </button>
+            </div>
+          )}
+          {picture && picture.images.length > 1 && (
+            <fieldset className="mx-0 mb-4 hidden lg:block" data-testid="store-results-desktop">
+              <legend className="pb-2 text-[14px] font-extrabold">{t("store.pickFavourite")}</legend>
+              <ResultStrip picture={picture} max={data.imagesToShow} onPick={(n) => pickAndTrack(n)} />
+            </fieldset>
+          )}
           <section className="flex flex-col gap-2 px-4 pt-5 lg:px-0 lg:pt-0">
             <h1 className="font-serif text-[30px] font-normal leading-[1.12] text-[#1a1a1a] lg:text-[40px]">{themeName ? `${data.product.title} · ${themeName}` : data.product.title}</h1>
             {data.product.rating != null && data.product.ratingCount != null && (
@@ -248,96 +436,157 @@ export function ProductView({ data, initialVariantId, minPhotoPx, maxMb, from }:
             );
           })}
 
-          {data.slots.map((slot, i) => {
-            const p = photos[i];
-            return (
-              <section key={i} className="mx-4 mt-6 flex flex-col gap-2.5 lg:mx-0" aria-labelledby={`${uid}-slot-${i}`}>
-                <span id={`${uid}-slot-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
-                  {slot.label}
-                </span>
-                <input
-                  ref={(el) => {
-                    inputs.current[i] = el;
-                  }}
-                  id={`${uid}-file-${i}`}
-                  type="file"
-                  accept="image/jpeg,image/png,image/heic,image/heif,image/webp"
-                  className="sr-only"
-                  aria-label={p ? `${t("store.change")}: ${slot.label}` : `${t("store.choosePhoto")}: ${slot.label}`}
-                  onChange={(e) => {
-                    void choose(i, e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                />
-                {p ? (
-                  <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border border-[#E7E3D8] p-2.5" data-testid="photo-added">
-                    {p.url ? <img src={p.url} alt={t("store.yourPhoto")} className="h-14 w-14 flex-none rounded-[10px] object-cover" /> : <span className="h-14 w-14 flex-none rounded-[10px] bg-page" aria-hidden="true" />}
-                    <span className="min-w-0 flex-1 text-[14px] font-extrabold">{t("store.photoAdded")}</span>
-                    <button type="button" onClick={() => inputs.current[i]?.click()} className="h-10 rounded-[10px] border-[1.5px] border-[#1f1f1f] px-3.5 text-[14px] font-extrabold">
-                      {t("store.change")}
-                    </button>
-                  </div>
-                ) : (
-                  <label htmlFor={`${uid}-file-${i}`} className="relative flex cursor-pointer flex-col items-center gap-2 rounded-[16px] border-2 border-dashed border-[#D9A6CF] bg-[#FFF8FD] px-[18px] py-6 text-center focus-within:ring-2 focus-within:ring-[#DD07C4]">
-                    <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-pink-tint">
-                      <Camera className="h-[26px] w-[26px] text-[#B8059F]" aria-hidden="true" />
-                    </span>
-                    <span className="text-[16px] font-extrabold text-[#1a1a1a]">{t("store.choosePhoto")}</span>
-                    <span className="text-[13px] leading-[1.45] text-[#616161]">{t("store.photoFormats", { mb: maxMb })}</span>
-                  </label>
-                )}
-                {photoError?.slot === i && (
-                  <p role="alert" className="text-[14px] font-bold text-[#a1251b]">
-                    {photoError.text}
-                  </p>
-                )}
-                {i === 0 && data.photoTips && (
-                  <div className="flex items-start gap-2.5 px-0.5 pt-0.5">
-                    <Info className="mt-px h-[18px] w-[18px] flex-none text-[#8E047B]" aria-hidden="true" />
-                    <span className="text-[13px] leading-[1.5] text-[#4d4d4d]">{data.photoTips}</span>
-                  </div>
-                )}
-                {slot.nameLabel && (
-                  <div className="mt-2 flex flex-col gap-2">
-                    <label htmlFor={`${uid}-name-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
-                      {slot.nameLabel}
+          {!picture &&
+            data.slots.map((slot, i) => {
+              const p = photos[i];
+              const earlier = earlierPhotos.filter((e) => !photos.some((x) => x && "fileId" in x && x.fileId === e.fileId));
+              return (
+                <section key={i} className="mx-4 mt-6 flex flex-col gap-2.5 lg:mx-0" aria-labelledby={`${uid}-slot-${i}`}>
+                  <span id={`${uid}-slot-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
+                    {slot.label}
+                  </span>
+                  <input
+                    ref={(el) => {
+                      inputs.current[i] = el;
+                    }}
+                    id={`${uid}-file-${i}`}
+                    type="file"
+                    accept="image/jpeg,image/png,image/heic,image/heif,image/webp"
+                    className="sr-only"
+                    disabled={creating}
+                    aria-label={p ? `${t("store.change")}: ${slot.label}` : `${t("store.choosePhoto")}: ${slot.label}`}
+                    onChange={(e) => {
+                      void choose(i, e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                  {p ? (
+                    <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border border-[#E7E3D8] p-2.5" data-testid="photo-added" data-ph-mask>
+                      {p.url ? <img src={p.url} alt={t("store.yourPhoto")} className="h-14 w-14 flex-none rounded-[10px] object-cover" /> : <span className="h-14 w-14 flex-none rounded-[10px] bg-page" aria-hidden="true" />}
+                      <span className="min-w-0 flex-1 text-[14px] font-extrabold">{t("store.photoAdded")}</span>
+                      <button type="button" disabled={creating} onClick={() => inputs.current[i]?.click()} className="h-10 rounded-[10px] border-[1.5px] border-[#1f1f1f] px-3.5 text-[14px] font-extrabold disabled:opacity-50">
+                        {t("store.change")}
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor={`${uid}-file-${i}`} className="relative flex cursor-pointer flex-col items-center gap-2 rounded-[16px] border-2 border-dashed border-[#D9A6CF] bg-[#FFF8FD] px-[18px] py-6 text-center focus-within:ring-2 focus-within:ring-[#DD07C4]">
+                      <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-pink-tint">
+                        <Camera className="h-[26px] w-[26px] text-[#B8059F]" aria-hidden="true" />
+                      </span>
+                      <span className="text-[16px] font-extrabold text-[#1a1a1a]">{t("store.choosePhoto")}</span>
+                      <span className="text-[13px] leading-[1.45] text-[#616161]">{t("store.photoFormats", { mb: maxMb })}</span>
                     </label>
-                    <input
-                      id={`${uid}-name-${i}`}
-                      type="text"
-                      value={names[i]}
-                      maxLength={data.nameMax}
-                      autoComplete="off"
-                      placeholder={slot.namePlaceholder ? `e.g. ${slot.namePlaceholder}` : undefined}
-                      onChange={(e) => setNames((n) => n.map((x, j) => (j === i ? e.target.value : x)))}
-                      className="ph-no-capture h-[52px] rounded-[12px] border-[1.5px] border-[#D9D5CA] bg-white px-3.5 text-[16px] text-[#1a1a1a]"
-                    />
-                    <span className="self-end text-[12px] text-[#6b6b6b]" aria-live="polite">
-                      {t("store.nameCount", { count: names[i].length, max: data.nameMax })}
-                    </span>
-                  </div>
-                )}
-              </section>
-            );
-          })}
-          <p className="mx-4 mt-3 text-[12px] leading-[1.5] text-[#616161] lg:mx-0">
-            {t("store.consent")}{" "}
-            <a href="https://magicportraits.ai/policies/privacy-policy" className="underline" target="_blank" rel="noreferrer">
-              {t("store.privacy")}
-            </a>
-          </p>
+                  )}
+                  {!p && earlier.length > 0 && (
+                    <div className="flex flex-col gap-2" data-testid="earlier-photos">
+                      <span className="text-[13px] font-bold text-[#4d4d4d]">{t("store.usePhotoBefore")}</span>
+                      <div className="ph-no-capture flex gap-2" data-ph-mask>
+                        {earlier.slice(0, 6).map((e, n) => (
+                          <button key={e.fileId} type="button" onClick={() => reuse(i, e)} aria-label={t("store.earlierPhotoN", { n: n + 1 })} className="h-14 w-14 flex-none overflow-hidden rounded-[10px] border border-[#E7E3D8]">
+                            <img src={fileUrl(e.fileId)} alt="" className="h-full w-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {photoError?.slot === i && (
+                    <p role="alert" className="text-[14px] font-bold text-[#a1251b]">
+                      {photoError.text}
+                    </p>
+                  )}
+                  {i === 0 && data.photoTips && (
+                    <div className="flex items-start gap-2.5 px-0.5 pt-0.5">
+                      <Info className="mt-px h-[18px] w-[18px] flex-none text-[#8E047B]" aria-hidden="true" />
+                      <span className="text-[13px] leading-[1.5] text-[#4d4d4d]">{data.photoTips}</span>
+                    </div>
+                  )}
+                  {slot.nameLabel && (
+                    <div className="mt-2 flex flex-col gap-2">
+                      <label htmlFor={`${uid}-name-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
+                        {slot.nameLabel}
+                      </label>
+                      <input
+                        id={`${uid}-name-${i}`}
+                        type="text"
+                        value={names[i]}
+                        maxLength={data.nameMax}
+                        autoComplete="off"
+                        disabled={creating}
+                        placeholder={slot.namePlaceholder ? `e.g. ${slot.namePlaceholder}` : undefined}
+                        onChange={(e) => setNames((n) => n.map((x, j) => (j === i ? e.target.value : x)))}
+                        className="ph-no-capture h-[52px] rounded-[12px] border-[1.5px] border-[#D9D5CA] bg-white px-3.5 text-[16px] text-[#1a1a1a]"
+                      />
+                      <span className="self-end text-[12px] text-[#6b6b6b]" aria-live="polite">
+                        {t("store.nameCount", { count: names[i].length, max: data.nameMax })}
+                      </span>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          {!picture && (
+            <p className="mx-4 mt-3 text-[12px] leading-[1.5] text-[#616161] lg:mx-0">
+              {t("store.consent")}{" "}
+              <a href="https://magicportraits.ai/policies/privacy-policy" className="underline" target="_blank" rel="noreferrer">
+                {t("store.privacy")}
+              </a>
+            </p>
+          )}
 
           <section className="mx-4 mt-3.5 flex flex-col gap-2.5 lg:mx-0">
-            <button
-              type="button"
-              disabled={!ready}
-              data-testid="store-create"
-              onClick={() => setNote(t("store.createSoon"))}
-              className="bg-primary-gradient shadow-primary h-14 rounded-[12px] text-[17px] font-extrabold text-white disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#E7E3D8] disabled:text-[#6b6b6b] disabled:shadow-none"
-            >
-              {t("store.create")}
-            </button>
-            <span className="text-center text-[13px] text-[#616161]">{t("store.createNote")}</span>
+            {picture ? (
+              <div className="flex gap-2.5">
+                <div className="flex h-14 flex-none items-center rounded-[12px] border-[1.5px] border-[#D9D5CA]" role="group" aria-label={t("store.quantity")}>
+                  <button type="button" aria-label={t("store.less")} disabled={qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-full w-11 items-center justify-center disabled:opacity-40">
+                    <Minus className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <span className="w-6 text-center text-[16px] font-extrabold" aria-live="polite">
+                    {qty}
+                  </span>
+                  <button type="button" aria-label={t("store.moreQty")} disabled={qty >= 10} onClick={() => setQty((q) => Math.min(10, q + 1))} className="flex h-full w-11 items-center justify-center disabled:opacity-40">
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+                <button type="button" data-testid="store-add" onClick={() => setNote(t("store.cartSoon"))} className="bg-primary-gradient shadow-primary h-14 flex-1 rounded-[12px] text-[17px] font-extrabold text-white">
+                  {price ? t("store.addToCartPrice", { price: formatMoney(Number(price) * qty, data.pricing.currency) }) : t("store.addToCart")}
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled={!filled || creating}
+                  data-testid="store-create"
+                  onClick={() => {
+                    setPhotoError(null);
+                    void create(photos as SlotPhoto[], names);
+                  }}
+                  className="bg-primary-gradient shadow-primary flex h-14 items-center justify-center gap-2 rounded-[12px] text-[17px] font-extrabold text-white disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#E7E3D8] disabled:text-[#6b6b6b] disabled:shadow-none"
+                >
+                  {creating && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+                  {creating ? t("store.creating") : t("store.create")}
+                </button>
+                <span className="text-center text-[13px] text-[#616161]">{t("store.createNote")}</span>
+              </>
+            )}
+            {state.phase === "failed" && (
+              <div role="alert" className="flex flex-col items-start gap-2.5 rounded-[14px] bg-[#FDECEA] p-3.5 text-[14px] font-bold text-[#a1251b]" data-testid="store-failed">
+                {t("store.failed")}
+                <button type="button" onClick={tryAgain} className="h-10 rounded-[10px] border-[1.5px] border-[#a1251b] bg-white px-3 font-extrabold">
+                  {t("store.tryAnother")}
+                </button>
+              </div>
+            )}
+            {state.phase === "limited" && (
+              <p role="alert" className="rounded-[14px] bg-page p-3.5 text-[14px] font-bold text-[#2b2b2b]" data-testid="store-limited">
+                {state.count != null ? tn("store.limited", state.count) : t("store.limitedIp")}
+              </p>
+            )}
+            {state.phase === "busy" && (
+              <p role="alert" className="rounded-[14px] bg-page p-3.5 text-[14px] font-bold text-[#2b2b2b]">
+                {t("store.busy")}
+              </p>
+            )}
             {note && (
               <p role="status" className="text-center text-[14px] font-bold text-[#8E047B]">
                 {note}
@@ -387,27 +636,60 @@ export function ProductView({ data, initialVariantId, minPhotoPx, maxMb, from }:
         ))}
       </ol>
 
-      {data.related.length > 0 && (
+      {related.length > 0 && (
         <section
           ref={relatedRef}
           aria-labelledby={`${uid}-related`}
           className="flex flex-col gap-3.5 px-4 pb-[30px] pt-7 lg:px-0 lg:pt-12"
           onClick={(e) => {
             const a = (e.target as HTMLElement).closest("a");
-            const n = a ? data.related.findIndex((r) => a.getAttribute("href")?.startsWith(r.href)) : -1;
-            if (n >= 0) trackClient("store_related_tapped", { from_product_id: pid, to_product_id: data.related[n].legacyId, position: n + 1, with_picture: false });
+            const n = a ? related.findIndex((r) => a.getAttribute("href")?.startsWith(r.href)) : -1;
+            if (n >= 0) trackClient("store_related_tapped", { from_product_id: pid, to_product_id: related[n].legacyId, position: n + 1, with_picture: withPicture });
           }}
         >
           <h2 id={`${uid}-related`} className="font-serif text-[24px] font-normal leading-[1.15] text-[#1a1a1a] lg:text-[32px]">
-            {t("store.alsoMade")}
+            {result ? (petName ? t("store.onMoreGiftsNamed", { name: petName }) : t("store.onMoreGifts")) : t("store.alsoMade")}
           </h2>
           <div className="grid grid-cols-3 gap-2.5 lg:gap-6" data-testid="store-related">
-            {data.related.map((r, i) => (
-              <ProductCard key={r.id} card={r} currency={data.pricing.currency} position={i + 1} collection="related" small from="related" />
-            ))}
+            {result && picture
+              ? related.map((r) => <RelatedWithPicture key={r.id} card={r} picture={picture} result={result} currency={data.pricing.currency} />)
+              : related.map((r, i) => <ProductCard key={r.id} card={r} currency={data.pricing.currency} position={i + 1} collection="related" small from="related" />)}
           </div>
         </section>
       )}
     </div>
+  );
+
+  function pickAndTrack(n: number) {
+    if (!picture) return;
+    void pickResult(picture, n);
+    trackClient("store_result_picked", { product_id: pid, index: n + 1, of: Math.min(picture.images.length, data.imagesToShow) });
+  }
+}
+
+function ResultStrip({ picture, max, onPick }: { picture: PictureView; max: number; onPick: (n: number) => void }) {
+  return (
+    <div className="ph-no-capture flex gap-2" data-ph-mask role="radiogroup">
+      {picture.images.slice(0, max).map((img, n) => (
+        <button key={img.file} type="button" role="radio" aria-checked={picture.chosen === n} aria-label={t("store.resultN", { n: n + 1 })} onClick={() => onPick(n)} className={cn("h-[72px] w-[72px] flex-none overflow-hidden rounded-[10px] bg-page", picture.chosen === n ? "border-[3px] border-[#DD07C4]" : "border border-[#E7E3D8]")}>
+          <img src={fileUrl(img.file)} alt="" className="h-full w-full object-cover object-top" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A product under "On more gifts", drawn with their picture; opens that product with the same picture. */
+function RelatedWithPicture({ card, picture, result, currency }: { card: RelatedCard; picture: PictureView; result: PictureView["images"][number]; currency: string }) {
+  const d = card.draw!;
+  return (
+    <Link href={`${card.href}?from=related&g=${picture.id}`} className="group flex flex-col gap-1" data-testid="store-related-card">
+      <ShopPreview template={d.template} pictureUrl={fileUrl(result.file)} crop={cropFor(result.width, result.height, d.aspect, d.placement)} pictureSize={{ width: result.width, height: result.height }} placement={d.placement} aspect={d.aspect} background={d.background} width={220} alt={t("store.yourPictureOn", { product: card.title })} className="rounded-[10px]" />
+      <span data-testid="store-card-title" className="pt-1 text-[13px] font-extrabold leading-[1.3] group-hover:underline">
+        {card.title}
+      </span>
+      <span className="text-[13px] text-[#2b2b2b]">{card.many ? t("store.from", { price: formatMoney(card.price, currency) }) : formatMoney(card.price, currency)}</span>
+      <span className="text-[13px] font-extrabold text-[#8E047B]">{t("store.seeIt")}</span>
+    </Link>
   );
 }

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { VISITOR_COOKIE, isVisitorToken, newVisitorTokenWeb } from "@/lib/open-store/visitor-token";
 
 /** Shop pages; their loading placeholders stream, so a page's own notFound() can't set the 404 status. */
 const SHOP_PAGE = /^\/(gifts|products|cart)(\/|$)/;
@@ -41,6 +42,16 @@ export async function proxy(request: NextRequest) {
       const hidden = request.nextUrl.pathname.startsWith("/api/") ? NextResponse.json({ error: "not_found" }, { status: 404 }) : NextResponse.rewrite(new URL("/_store-hidden", request.url), { status: 404 });
       for (const c of response.cookies.getAll()) hidden.cookies.set(c);
       return hidden;
+    }
+    // The visitor cookie, on the first store page they open (docs/open-store.md › The visitor id). No database row
+    // until their first real action, so bots and passers-by leave nothing behind.
+    const has = request.cookies.get(VISITOR_COOKIE)?.value;
+    if (!request.nextUrl.pathname.startsWith("/api/") && !(has && isVisitorToken(has))) {
+      const { getSettings } = await import("@/lib/settings");
+      const days = await getSettings(["open_store.visitor_cookie_days"] as const)
+        .then((x) => x["open_store.visitor_cookie_days"])
+        .catch(() => 365);
+      response.cookies.set(VISITOR_COOKIE, newVisitorTokenWeb(), { httpOnly: true, secure: request.nextUrl.protocol === "https:", sameSite: "lax", path: "/", maxAge: Math.round(days * 86400) });
     }
   }
   return response;

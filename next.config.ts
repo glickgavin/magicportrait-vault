@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withBotId } from "botid/next/config";
 
 const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
 const posthogAssets = posthogHost.replace("://us.i.", "://us-assets.i.").replace("://eu.i.", "://eu-assets.i.");
@@ -16,7 +17,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@napi-rs/canvas", "sharp", "postgres", "archiver", "agentmail", "svix"],
   // The renderer reads fonts, the placeholder artwork and the sample portrait from disk at runtime.
   outputFileTracingIncludes: {
-    "/api/**": ["./assets/**", "./public/theme-placeholders/**", "./public/fixtures/**", "./public/fonts/card/**"],
+    "/api/**": ["./assets/**", "./public/theme-placeholders/**", "./public/fixtures/**", "./public/fonts/card/**", "./public/shop-samples/**"],
     "/settings/**": ["./assets/**", "./public/theme-placeholders/**", "./public/fonts/card/**"],
   },
   images: { unoptimized: true },
@@ -35,4 +36,5 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// BotID (the open store's picture requests): its script and challenge are served through these rewrites.
+export default withBotId(nextConfig);
