@@ -59,7 +59,9 @@ test.describe("open store pictures", () => {
     await expect(page.getByTestId("store-add")).toContainText("Add to cart · $59.99");
     const results = page.locator(":is([data-testid=store-results],[data-testid=store-results-desktop]):visible");
     await expect(results.getByRole("radio")).toHaveCount(2);
+    const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().includes("/api/store/generations/"));
     await results.getByRole("radio", { name: "Picture 2" }).click();
+    expect((await saved).status()).toBe(200);
     await expect(results.getByRole("radio", { name: "Picture 2" })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByRole("heading", { name: "Teddy on more gifts" })).toBeVisible();
     const cards = page.getByTestId("store-related-card");
