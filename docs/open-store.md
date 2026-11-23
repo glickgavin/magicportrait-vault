@@ -108,7 +108,7 @@ While the picture is being made, a box under the picture area asks for their ema
 
 ### Generation settings in Shopify
 
-Each product's generation is set in product metafields, namespace `mmp_shop`, edited in Shopify admin or in Settings › Open store:
+Each product's generation is set in product metafields, namespace `mmp_shop`, edited in Shopify admin or in Settings › Open store. Each one has a metafield definition, pinned, so it shows as a named field on every product page in Shopify admin. The **Imagen theme** definition (`mmp_shop.imagen_theme`) is a dropdown: its allowed values (Shopify's `choices` validation) are the theme slugs from Imagen's theme list. Settings › Open store refreshes them with **Refresh themes from Imagen**, so nobody types a slug by hand. Today (23 Nov) Shopify has the shop's definitions (`page`, `occasions`, `template`, `short_description`, `categories`) but none of these yet.
 
 | Metafield | Type | Example | Notes |
 |---|---|---|---|
