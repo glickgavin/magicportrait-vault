@@ -1,10 +1,16 @@
 import "server-only";
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
-import { createVisitor, touchVisitor, visitorByHash, type StoreVisitorRow } from "@/lib/db/store";
+import { cookies, headers } from "next/headers";
+import { createVisitor, setVisitorPosthogId, touchVisitor, visitorByHash, type StoreVisitorRow } from "@/lib/db/store";
 import { env } from "@/lib/env";
 import { getSettings } from "@/lib/settings";
+import { decodeFirstTouch, FIRST_TOUCH_COOKIE } from "./first-touch";
 import { VISITOR_COOKIE, isVisitorToken } from "./visitor-token";
+
+/** The browser's PostHog id, sent by the store's own API calls (`x-ph-id`), so server events credit the same person. */
+export const POSTHOG_ID_HEADER = "x-ph-id";
+// Anonymous ids only: once the browser has identified by email, its id is the email, which never goes on the row.
+const isPosthogId = (v: string | null): v is string => Boolean(v && /^[A-Za-z0-9._:$+-]{8,200}$/.test(v));
 
 /**
  * The visitor id (docs/open-store.md › The visitor id). The cookie holds a random 32-byte token; the table keeps
@@ -53,7 +59,17 @@ export async function ensureVisitor(): Promise<StoreVisitorRow> {
     (await cookies()).set(VISITOR_COOKIE, token, visitorCookieOptions(days, env.appUrl.startsWith("https:")));
   }
   const hash = visitorTokenHash(token);
-  const row = (await visitorByHash(hash)) ?? (await createVisitor(hash));
+  const phId = (await headers()).get(POSTHOG_ID_HEADER);
+  const jar = await cookies();
+  let row = await visitorByHash(hash);
+  if (!row) {
+    // The first real action: the row takes the first touch kept since the first store page, then the cookie goes.
+    row = await createVisitor(hash, { firstTouch: decodeFirstTouch(jar.get(FIRST_TOUCH_COOKIE)?.value), posthogId: isPosthogId(phId) ? phId : null });
+    if (jar.get(FIRST_TOUCH_COOKIE)) jar.delete(FIRST_TOUCH_COOKIE);
+  } else if (isPosthogId(phId) && phId !== row.posthog_distinct_id) {
+    await setVisitorPosthogId(row.id, phId);
+    row = { ...row, posthog_distinct_id: phId };
+  }
   // At most one write a minute per visitor.
   if (Date.now() - new Date(row.last_seen_at).getTime() > 60_000) await touchVisitor(row.id).catch(() => undefined);
   return row;

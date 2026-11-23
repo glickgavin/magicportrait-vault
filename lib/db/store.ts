@@ -10,6 +10,8 @@ export type StoreVisitorRow = {
   email_given: string | null;
   shopify_cart_id: string | null;
   shopify_checkout_url: string | null;
+  posthog_distinct_id: string | null;
+  first_touch: Record<string, unknown> | null;
   created_at: string;
   last_seen_at: string;
 };
@@ -37,7 +39,7 @@ export type StoreGenerationRow = {
   finished_at: string | null;
 };
 
-const V_COLS = "id, email, linked_via, email_given, shopify_cart_id, shopify_checkout_url, created_at, last_seen_at";
+const V_COLS = "id, email, linked_via, email_given, shopify_cart_id, shopify_checkout_url, posthog_distinct_id, first_touch, created_at, last_seen_at";
 const P_COLS = "id, visitor_id, storage_path, width, height, created_at";
 const G_COLS = "id, visitor_id, product_id, theme, photo_ids, names, imagen_session_id, status, images, chosen_index, cost_usd, order_id, email_to, emailed_at, created_at, finished_at";
 
@@ -47,8 +49,8 @@ export async function visitorByHash(tokenHash: string): Promise<StoreVisitorRow 
 }
 
 /** Creates the visitor on their first real action; a second request with the same cookie gets the same row. */
-export async function createVisitor(tokenHash: string): Promise<StoreVisitorRow> {
-  must(await db().from("store_visitors").upsert({ token_hash: tokenHash }, { onConflict: "token_hash", ignoreDuplicates: true }), "create store visitor");
+export async function createVisitor(tokenHash: string, extra: { firstTouch?: Record<string, unknown> | null; posthogId?: string | null } = {}): Promise<StoreVisitorRow> {
+  must(await db().from("store_visitors").upsert({ token_hash: tokenHash, first_touch: extra.firstTouch ?? null, posthog_distinct_id: extra.posthogId ?? null }, { onConflict: "token_hash", ignoreDuplicates: true }), "create store visitor");
   const row = await visitorByHash(tokenHash);
   if (!row) throw new Error("create store visitor: not found after insert");
   return row;
@@ -58,6 +60,18 @@ export async function createVisitor(tokenHash: string): Promise<StoreVisitorRow>
 export async function visitorLinkedTo(visitorId: string, email: string): Promise<boolean> {
   const r = await db().from("store_visitors").select("id").eq("id", visitorId).eq("email", email.trim().toLowerCase()).maybeSingle();
   return Boolean(r.data);
+}
+
+/** The PostHog id the browser sent (so server events and paid orders credit the same person). */
+export async function setVisitorPosthogId(id: string, posthogId: string): Promise<void> {
+  await db().from("store_visitors").update({ posthog_distinct_id: posthogId }).eq("id", id);
+}
+
+/** For the person properties: pictures made and orders paid by this visitor. */
+export async function visitorCounts(visitorId: string): Promise<{ pictures: number; orders: number }> {
+  const r = await db().from("store_generations").select("order_id").eq("visitor_id", visitorId).limit(5000);
+  const rows = (r.data ?? []) as { order_id: string | null }[];
+  return { pictures: rows.length, orders: new Set(rows.flatMap((x) => (x.order_id ? [x.order_id] : []))).size };
 }
 
 export async function touchVisitor(id: string): Promise<void> {

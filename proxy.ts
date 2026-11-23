@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { VISITOR_COOKIE, isVisitorToken, newVisitorTokenWeb } from "@/lib/open-store/visitor-token";
+import { encodeFirstTouch, FIRST_TOUCH_COOKIE, firstTouchFrom } from "@/lib/open-store/first-touch";
 
 /** Shop pages; their loading placeholders stream, so a page's own notFound() can't set the 404 status. */
 const SHOP_PAGE = /^\/(gifts|products|cart)(\/|$)/;
@@ -64,6 +65,10 @@ export async function proxy(request: NextRequest) {
       response = NextResponse.next({ request });
       for (const c of kept) response.cookies.set(c);
       response.cookies.set(VISITOR_COOKIE, token, { httpOnly: true, secure: request.nextUrl.protocol === "https:", sameSite: "lax", path: "/", maxAge: Math.round(days * 86400) });
+      // First touch (utm tags, referrer host, landing path): kept until the visitor's first real action saves it.
+      if (!request.cookies.get(FIRST_TOUCH_COOKIE)) {
+        response.cookies.set(FIRST_TOUCH_COOKIE, encodeFirstTouch(firstTouchFrom(request.nextUrl, request.headers.get("referer"))), { httpOnly: true, secure: request.nextUrl.protocol === "https:", sameSite: "lax", path: "/", maxAge: 30 * 86400 });
+      }
     }
   }
   return response;

@@ -1,6 +1,6 @@
 /**
- * PostHog drops the token and query string on /g/ and /c/ pages, and never keeps
- * query strings that could carry an email (SPEC §14).
+ * PostHog drops the token and query string on /g/ and /c/ pages, keeps only utm_* and variant on /store pages
+ * (docs/open-store.md › Privacy in analytics), and never keeps query strings that could carry an email (SPEC §14).
  */
 export function sanitizeUrl(url: string | undefined | null): string | undefined | null {
   if (!url) return url;
@@ -12,6 +12,11 @@ export function sanitizeUrl(url: string | undefined | null): string | undefined 
       u.search = "";
     } else if (u.pathname.startsWith("/c/")) {
       u.search = "";
+    } else if (u.pathname === "/store" || u.pathname.startsWith("/store/")) {
+      // The open store: only utm_* and variant survive (no picture ids, no `from`, no search text).
+      for (const key of [...u.searchParams.keys()]) {
+        if (!/^(utm_(source|medium|campaign|content|term)|variant)$/.test(key)) u.searchParams.delete(key);
+      }
     } else {
       for (const key of [...u.searchParams.keys()]) {
         if (/email|token|code|^d$/i.test(key)) u.searchParams.delete(key);

@@ -154,6 +154,8 @@ On sign-out call `posthog.reset()` so the next person on the device starts fresh
 
 Visitors who aren't signed in. Identity, dashboards, experiments and privacy for these events are in `docs/open-store.md` › Analytics and PostHog. Never a photo, a picture URL, a pet's name or an email address in any property; only our ids, Shopify ids, theme slugs and counts. "Business" events also go to `activity_log`, under the visitor (`ref_type` = `store_visitor`) until the visitor has a proven email.
 
+How it's wired (Open store 5): every server-side store event goes through `storeTrack()` (`lib/open-store/analytics.ts`), which adds `store_visitor_id`, `area: "open_store"` and `preview`, sends it under the browser's own anonymous PostHog id (sent by the store's API calls as `x-ph-id` and kept on `store_visitors.posthog_distinct_id`), and sets the person properties `store_visitor_id`, `store_first_seen_at` and `store_first_touch_source` once, and `store_pictures_made`, `store_orders`, `store_email_given` and `store_marketing_consent` as they change. A paid order aliases that id to the order's email. Store pages register the super properties `area`, `signed_in`, `returning` and `preview` and remove them on the way out. PostHog keeps only `utm_*` and `variant` in `/store` addresses.
+
 | Event | Where | When | Props |
 |---|---|---|---|
 | `page_view_store` | browser | Store page or a category shown | `collection`, `products_shown`, `products_total` |

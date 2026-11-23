@@ -9,7 +9,7 @@ import { getProductSetting } from "@/lib/settings/product";
 import { processUpload, type UploadRefusal } from "@/lib/shop/upload";
 import { getImagenApi, type ImagenStatus } from "@/lib/sources/imagen-api";
 import { putObject } from "@/lib/storage";
-import { track, type TrackOptions } from "@/lib/track";
+import { storeTrack } from "./analytics";
 import { getStoreCatalog, imagenThemes } from "./index";
 
 /**
@@ -33,7 +33,6 @@ export type PhotoInput = { file: Buffer } | { photoId: string };
 const TERMINAL = new Set(["done", "failed", "timed_out"]);
 
 /** Server events about a visitor: no email until they're linked (identity is completed in Open store 5). */
-const asVisitor = (visitorId: string): TrackOptions => ({ distinctId: `store:${visitorId}`, source: "vault", actor: "customer" });
 const seconds = (gen: StoreGenerationRow, now: number) => Math.round((now - new Date(gen.created_at).getTime()) / 1000);
 
 async function dayStart(): Promise<Date> {
@@ -46,7 +45,7 @@ export async function saveStorePhoto(visitorId: string, input: Buffer): Promise<
   const s = await getSettings(["shop.upload_max_mb", "shop.upload_jpeg_quality", "open_store.min_photo_px", "open_store.upload_max_px"] as const);
   const r = await processUpload(input, { maxBytes: s["shop.upload_max_mb"] * 1024 * 1024, minShortSidePx: s["open_store.min_photo_px"], jpegQuality: s["shop.upload_jpeg_quality"] });
   if (!r.ok) {
-    await track("store_photo_uploaded", { ok: false, reason: r.reason, width: r.width ?? null, height: r.height ?? null, store_visitor_id: visitorId }, asVisitor(visitorId));
+    await storeTrack("store_photo_uploaded", { ok: false, reason: r.reason, width: r.width ?? null, height: r.height ?? null, store_visitor_id: visitorId }, { visitor: visitorId });
     return { ok: false, reason: r.reason };
   }
   // The browser shrinks big photos first; the server keeps the same cap for anything that skipped that.
@@ -60,7 +59,7 @@ export async function saveStorePhoto(visitorId: string, input: Buffer): Promise<
   const storagePath = `${visitorId}/photos/${id}.jpg`;
   await putObject("store-uploads", storagePath, jpeg, "image/jpeg");
   const photo = await insertStorePhoto({ id, visitorId, storagePath, width, height });
-  await track("store_photo_uploaded", { ok: true, reason: null, width, height, store_visitor_id: visitorId }, asVisitor(visitorId));
+  await storeTrack("store_photo_uploaded", { ok: true, reason: null, width, height, store_visitor_id: visitorId }, { visitor: visitorId });
   return { ok: true, photo };
 }
 
@@ -81,7 +80,7 @@ export async function startGeneration(input: { visitor: StoreVisitorRow; product
   const since = await dayStart();
   const ipHash = hashKey(input.ip);
   const [mine, fromIp, all] = await Promise.all([countGenerations({ since, visitorId: input.visitor.id }), countGenerations({ since, ipHash }), countGenerations({ since })]);
-  const refused = async (reason: string) => track("store_generation_failed", { product_id: entry.product.legacyId, theme_slug: entry.theme, reason, seconds: 0, store_visitor_id: input.visitor.id }, asVisitor(input.visitor.id));
+  const refused = async (reason: string) => storeTrack("store_generation_failed", { product_id: entry.product.legacyId, theme_slug: entry.theme, reason, seconds: 0, store_visitor_id: input.visitor.id }, { visitor: input.visitor });
   if (mine >= s["open_store.generations_per_visitor_per_day"]) {
     await refused("limit_visitor");
     return { error: "limit_visitor", count: mine };
@@ -131,10 +130,10 @@ export async function startGeneration(input: { visitor: StoreVisitorRow; product
     sessionId: session.sessionId,
     status: ourStatus(session.status) ?? "pending",
   });
-  await track(
+  await storeTrack(
     "store_generation_started",
     { product_id: entry.product.legacyId, theme_slug: entry.theme, session_id: session.sessionId, photos: rows.length, has_name: names.some(Boolean), attempt: mine + 1, store_visitor_id: input.visitor.id },
-    asVisitor(input.visitor.id),
+    { visitor: input.visitor, set: { store_pictures_made: mine + 1 } },
   );
   return { ok: true, generation };
 }
@@ -152,11 +151,11 @@ export async function refreshGeneration(gen: StoreGenerationRow, now = Date.now(
   if (next.status !== gen.status && TERMINAL.has(next.status)) {
     const product = await productLegacyId(gen.product_id);
     if (next.status === "done") {
-      await track("store_generation_ready", { product_id: product, theme_slug: gen.theme, session_id: gen.imagen_session_id, seconds: seconds(gen, now), images: next.images.length, cost_usd: next.cost_usd, store_visitor_id: gen.visitor_id }, asVisitor(gen.visitor_id));
+      await storeTrack("store_generation_ready", { product_id: product, theme_slug: gen.theme, session_id: gen.imagen_session_id, seconds: seconds(gen, now), images: next.images.length, cost_usd: next.cost_usd, store_visitor_id: gen.visitor_id }, { visitor: gen.visitor_id });
       // Asked for it by email while it was painting: it goes now (once).
       if (next.email_to) await import("./email").then((m) => m.sendPictureEmail(next.id)).catch((e: Error) => console.error(`[open-store] picture email: ${e.message}`));
     } else {
-      await track("store_generation_failed", { product_id: product, theme_slug: gen.theme, reason: next.status === "timed_out" ? "timeout" : "imagen_failed", seconds: seconds(gen, now), store_visitor_id: gen.visitor_id }, asVisitor(gen.visitor_id));
+      await storeTrack("store_generation_failed", { product_id: product, theme_slug: gen.theme, reason: next.status === "timed_out" ? "timeout" : "imagen_failed", seconds: seconds(gen, now), store_visitor_id: gen.visitor_id }, { visitor: gen.visitor_id });
     }
   }
   return next;

@@ -1,5 +1,6 @@
 "use client";
 
+import { storeFetch } from "./store-fetch";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Loader2, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -31,7 +32,7 @@ export function StoreCart({ count: initial }: { count: number }) {
   }, []);
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/store/cart", { cache: "no-store" }).catch(() => null);
+    const r = await storeFetch("/api/store/cart", { cache: "no-store" }).catch(() => null);
     if (r?.ok) show(((await r.json()) as { cart: StoreCartView }).cart);
   }, [show]);
 
@@ -53,7 +54,7 @@ export function StoreCart({ count: initial }: { count: number }) {
   async function change(lineId: string, quantity: number | null) {
     setBusy(lineId);
     setError(null);
-    const r = await fetch(`/api/store/cart/lines/${lineId}`, quantity == null ? { method: "DELETE" } : { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ quantity }) }).catch(() => null);
+    const r = await storeFetch(`/api/store/cart/lines/${lineId}`, quantity == null ? { method: "DELETE" } : { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ quantity }) }).catch(() => null);
     if (r?.ok) show(((await r.json()) as { cart: StoreCartView }).cart);
     else setError(t("store.cartError"));
     setBusy(null);
@@ -62,7 +63,7 @@ export function StoreCart({ count: initial }: { count: number }) {
   async function checkout() {
     setBusy("checkout");
     setError(null);
-    const r = await fetch("/api/store/checkout", { method: "POST" }).catch(() => null);
+    const r = await storeFetch("/api/store/checkout", { method: "POST" }).catch(() => null);
     const body = r?.ok ? ((await r.json()) as { url?: string }) : null;
     if (body?.url) {
       window.location.assign(body.url);

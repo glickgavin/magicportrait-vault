@@ -3,6 +3,8 @@ import { requireSuperUser } from "@/lib/auth/session";
 import { settingRows } from "@/lib/admin/data";
 import { getStoreCatalog, imagenThemes } from "@/lib/open-store";
 import { getOpenStoreSource } from "@/lib/open-store/sources";
+import { storeNumbers } from "@/lib/open-store/numbers-load";
+import { StoreNumbers } from "@/components/admin/shop/StoreNumbers";
 import { getSettings } from "@/lib/settings";
 import { getShopCatalogSource } from "@/lib/shop/sources";
 import { SettingField } from "@/components/admin/SettingField";
@@ -29,7 +31,7 @@ const GROUPS: [string, string, string[]][] = [
 export default async function MagicStoreSettings() {
   await requireSuperUser();
   const s = await getSettings(["open_store.collection", "open_store.menu_handle", "open_store.home_collection", "open_store.posthog_dashboard_url", "shop.metafield_namespace"] as const);
-  const [rows, catalog, themes, menu, home, defs] = await Promise.all([
+  const [rows, catalog, themes, menu, home, defs, numbers] = await Promise.all([
     settingRows(),
     getStoreCatalog({ fresh: true }).catch(() => null),
     imagenThemes({ fresh: true }),
@@ -42,6 +44,7 @@ export default async function MagicStoreSettings() {
     getShopCatalogSource()
       .then((src) => src.fieldDefinitions(s["shop.metafield_namespace"]))
       .catch(() => null),
+    storeNumbers().catch(() => null),
   ]);
   const pick = (keys: string[]) => keys.map((k) => rows.find((r) => r.key === k)).filter((r) => r !== undefined);
   const dropdown = defs?.find((d) => d.ownerType === "PRODUCT" && d.key === "imagen_theme")?.choices ?? null;
@@ -149,7 +152,12 @@ export default async function MagicStoreSettings() {
             <h2 id="store-numbers" className="text-[19px] font-extrabold">
               Numbers
             </h2>
-            <p className="mt-1 text-[14px] text-ink-2">Visitors, pictures, Imagen cost, emails, carts and orders for today, 7 and 30 days appear here once the store makes pictures.</p>
+            <p className="mt-1 text-[14px] text-ink-2">From the app&apos;s own tables, not PostHog. Test orders aren&apos;t counted.</p>
+            {numbers ? (
+              <StoreNumbers numbers={numbers} titles={new Map((catalog?.entries ?? []).map((e) => [e.product.legacyId, e.product.title]))} themes={new Map((themes ?? []).map((t) => [t.slug, t.name]))} />
+            ) : (
+              <p className="mt-2 text-[14px] text-ink-2">Couldn&apos;t read the numbers.</p>
+            )}
             {dashboard && (
               <div className="mt-3 flex flex-col gap-1 rounded-[14px] bg-black/[0.03] p-3">
                 <p className="text-[14px] font-semibold">{dashboard.label}</p>

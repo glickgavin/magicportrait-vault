@@ -1,5 +1,6 @@
 "use client";
 
+import { storeFetch } from "./store-fetch";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, Check, Clock, Gift, Heart, Info, Loader2, Lock, Minus, Plus, Star, Truck, X } from "lucide-react";
@@ -687,7 +688,7 @@ export function ProductView({
     if (!picture || !variant) return;
     setAdding(true);
     setNote(null);
-    const r = await fetch("/api/store/cart/lines", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ generationId: picture.id, variantId: variant.id, quantity: qty, from: from === "related" ? "related" : "product" }) }).catch(() => null);
+    const r = await storeFetch("/api/store/cart/lines", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ generationId: picture.id, variantId: variant.id, quantity: qty, from: from === "related" ? "related" : "product" }) }).catch(() => null);
     setAdding(false);
     if (!r?.ok) {
       setNote(t("store.addError"));
@@ -745,7 +746,7 @@ function EmailAsk({ generationId, productId, name, onDone, onClose }: { generati
     e.preventDefault();
     setSending(true);
     setError(null);
-    const r = await fetch("/api/store/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ generationId, email, consent }) }).catch(() => null);
+    const r = await storeFetch("/api/store/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ generationId, email, consent }) }).catch(() => null);
     setSending(false);
     if (r?.ok || r?.status === 409) onDone();
     else setError(r?.status === 400 ? t("store.emailInvalid") : t("store.cartError"));

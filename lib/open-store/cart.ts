@@ -2,14 +2,16 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { upsertMember } from "@/lib/db/members";
-import { generationById, generationsMadeBy, linkVisitorEmail, markGenerationsOrdered, setVisitorCart, visitorById, visitorsForEmail, type StoreVisitorRow } from "@/lib/db/store";
+import { generationById, generationsMadeBy, linkVisitorEmail, visitorCounts, markGenerationsOrdered, setVisitorCart, visitorById, visitorsForEmail, type StoreVisitorRow } from "@/lib/db/store";
 import { getSettings } from "@/lib/settings";
 import { fitVariant, target } from "@/lib/shop/fit";
 import { getShopCartSource } from "@/lib/shop/sources";
 import type { RemoteCart } from "@/lib/shop/sources/cart";
 import { parseTemplate } from "@/lib/shop/template";
 import { getObject, putObject, signedUrl } from "@/lib/storage";
-import { track, type TrackOptions } from "@/lib/track";
+import { aliasPerson } from "@/lib/track";
+import { storeTrack } from "./analytics";
+import { firstTouchSource, type FirstTouch } from "./first-touch";
 import { getStoreCatalog } from "./index";
 import { storeCartAttributes, storeLineAttributes, sessionIdsFromOrder, visitorIdFromOrder } from "./order-lines";
 import { ownsVisitor, type Asker } from "./owner";
@@ -29,7 +31,6 @@ export const addSchema = z.object({
 export type CartFail = { ok: false; status: number; error: string };
 const fail = (status: number, error: string): CartFail => ({ ok: false, status, error });
 
-const asVisitor = (visitorId: string, email: string | null): TrackOptions => (email ? { email, source: "vault", actor: "customer" } : { distinctId: `store:${visitorId}`, source: "vault", actor: "customer" });
 
 /** File id of a line's preview: `v_<visitor id>_<line id>` (the ownership check reads the visitor from it). */
 export const previewFileId = (visitorId: string, lineId: string) => `v_${visitorId}_${lineId}`;
@@ -119,14 +120,14 @@ export async function addStoreLine(a: Asker, visitor: StoreVisitorRow, input: z.
       : await src.create({ lines: [line], email: a.user?.email ?? owner.email ?? null, discountCodes: code ? [code] : [], attributes: storeCartAttributes(owner.id) });
   } catch (e) {
     console.error(`[open-store] Shopify cart failed: ${(e as Error).message}`);
-    await track("error_store_cart", { stage: current ? "add" : "create", status_code: Number(/HTTP_(\d+)/.exec((e as { code?: string }).code ?? "")?.[1] ?? 0) || null }, asVisitor(owner.id, null));
+    await storeTrack("error_store_cart", { stage: current ? "add" : "create", status_code: Number(/HTTP_(\d+)/.exec((e as { code?: string }).code ?? "")?.[1] ?? 0) || null }, { visitor: owner.id, email: null });
     return fail(502, "shopify_unavailable");
   }
   if (cart.id !== owner.shopify_cart_id) await setVisitorCart(owner.id, { id: cart.id, checkoutUrl: cart.checkoutUrl });
-  await track(
+  await storeTrack(
     "store_added_to_cart",
     { product_id: found.entry.product.legacyId, variant_id: found.sv.variant.legacyId, theme_slug: gen.theme, price: found.sv.variant.price, quantity: input.quantity, from: input.from, lines_after: cart.lines.length, store_visitor_id: owner.id },
-    asVisitor(owner.id, a.user?.email ?? null),
+    { visitor: owner, email: a.user?.email ?? null },
   );
   return { ok: true, lines: cart.lines.length };
 }
@@ -173,7 +174,7 @@ export async function changeStoreLine(a: Asker, lineId: string, quantity: number
   const f = await findLine(a, lineId);
   if (!f) return fail(404, "not_found");
   const cart = await (await getShopCartSource()).updateLines(f.cart.id, [{ id: f.line.id, quantity }]);
-  await track("store_cart_changed", { change: "quantity", lines: cart.lines.length, store_visitor_id: f.owner.id }, asVisitor(f.owner.id, a.user?.email ?? null));
+  await storeTrack("store_cart_changed", { change: "quantity", lines: cart.lines.length, store_visitor_id: f.owner.id }, { visitor: f.owner.id, email: a.user?.email ?? null });
   return { ok: true };
 }
 
@@ -181,7 +182,7 @@ export async function removeStoreLine(a: Asker, lineId: string): Promise<{ ok: t
   const f = await findLine(a, lineId);
   if (!f) return fail(404, "not_found");
   const cart = await (await getShopCartSource()).removeLines(f.cart.id, [f.line.id]);
-  await track("store_cart_changed", { change: "removed", lines: cart.lines.length, store_visitor_id: f.owner.id }, asVisitor(f.owner.id, a.user?.email ?? null));
+  await storeTrack("store_cart_changed", { change: "removed", lines: cart.lines.length, store_visitor_id: f.owner.id }, { visitor: f.owner.id, email: a.user?.email ?? null });
   return { ok: true };
 }
 
@@ -190,7 +191,7 @@ export async function storeCheckout(a: Asker): Promise<{ ok: true; url: string }
   const owner = await cartOwner(a);
   const cart = await remoteCart(owner);
   if (!owner || !cart || !cart.lines.length) return fail(409, "empty");
-  await track("store_checkout_started", { lines: cart.lines.length, subtotal: cart.subtotal.amount, signed_in: Boolean(a.user), store_visitor_id: owner.id }, asVisitor(owner.id, a.user?.email ?? null));
+  await storeTrack("store_checkout_started", { lines: cart.lines.length, subtotal: cart.subtotal.amount, signed_in: Boolean(a.user), store_visitor_id: owner.id }, { visitor: owner.id, email: a.user?.email ?? null });
   return { ok: true, url: cart.checkoutUrl };
 }
 
@@ -224,12 +225,14 @@ export async function recordStoreOrderPaid(payload: unknown): Promise<{ matched:
   if (email) {
     linked = await linkVisitorEmail(visitor.id, email, "order");
     await upsertMember(email, "store_order");
-    if (linked) await track("store_visitor_linked", { via: "order", visitors_linked: 1, store_visitor_id: visitor.id }, { email, source: "shopify", actor: "system" });
+    // The whole journey on one person: the browser's anonymous PostHog id joins the order's email.
+    if (visitor.posthog_distinct_id) await aliasPerson(email, visitor.posthog_distinct_id);
+    if (linked) await storeTrack("store_visitor_linked", { via: "order", visitors_linked: 1 }, { visitor, email, source: "shopify", actor: "system" });
   }
   await setVisitorCart(visitor.id, { id: null, checkoutUrl: null });
   if (marked || linked) {
     const lines = p.data.line_items.filter((l) => l.properties?.some((x) => x.name === "_image_kind" && x.value === "generated")).length;
-    await track(
+    await storeTrack(
       "store_order_paid",
       {
         order_id: p.data.id,
@@ -239,11 +242,10 @@ export async function recordStoreOrderPaid(payload: unknown): Promise<{ matched:
         currency: p.data.currency ?? null,
         pictures_made: await generationsMadeBy(visitor.id),
         minutes_from_first_visit: Math.round((Date.now() - new Date(visitor.created_at).getTime()) / 60_000),
-        first_touch_source: null,
+        first_touch_source: firstTouchSource(visitor.first_touch as FirstTouch | null),
         test: Boolean(p.data.test),
-        store_visitor_id: visitor.id,
       },
-      { ...(email ? { email } : { distinctId: `store:${visitor.id}` }), source: "shopify", actor: "system", ref: { type: "order", id: p.data.id } },
+      { visitor, email, source: "shopify", actor: "system", ref: { type: "order", id: p.data.id }, set: { store_orders: (await visitorCounts(visitor.id)).orders } },
     );
   }
   return { matched: true };

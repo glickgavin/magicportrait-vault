@@ -8,6 +8,7 @@ import { emailFooter } from "@/lib/email/footer";
 import { renderEmail } from "@/lib/email/render";
 import { getSettings } from "@/lib/settings";
 import { track } from "@/lib/track";
+import { storeTrack } from "./analytics";
 import { getStoreCatalog } from "./index";
 
 /**
@@ -16,13 +17,12 @@ import { getStoreCatalog } from "./index";
  */
 
 const legacy = (gid: string) => gid.split("/").pop() ?? gid;
-const asVisitor = (visitorId: string) => ({ distinctId: `store:${visitorId}`, source: "vault" as const, actor: "customer" as const });
 
 /** Saves the address on the visitor and the picture; sends at once when the picture is already ready. */
 export async function askForPictureEmail(gen: StoreGenerationRow, email: string, consent: boolean): Promise<{ ok: true; sent: boolean } | { ok: false; error: "already_asked" }> {
   await setEmailGiven(gen.visitor_id, email, consent);
   if (!(await requestPictureEmail(gen.id, email, consent))) return { ok: false, error: "already_asked" };
-  await track("store_email_given", { product_id: legacy(gen.product_id), marketing_consent: consent, store_visitor_id: gen.visitor_id }, asVisitor(gen.visitor_id));
+  await storeTrack("store_email_given", { product_id: legacy(gen.product_id), marketing_consent: consent }, { visitor: gen.visitor_id, set: { store_email_given: true, ...(consent ? { store_marketing_consent: true } : {}) } });
   const sent = gen.status === "done" ? await sendPictureEmail(gen.id) : false;
   return { ok: true, sent };
 }
@@ -51,7 +51,7 @@ export async function sendPictureEmail(generationId: string): Promise<boolean> {
     console.error(`[open-store] picture email failed: ${r.error}`);
     return false;
   }
-  await track("store_picture_emailed", { product_id: entry.product.legacyId, theme_slug: gen.theme, store_visitor_id: gen.visitor_id }, asVisitor(gen.visitor_id));
+  await storeTrack("store_picture_emailed", { product_id: entry.product.legacyId, theme_slug: gen.theme, store_visitor_id: gen.visitor_id }, { visitor: gen.visitor_id });
   if (claim.email_consent) {
     const { queueStoreSubscription } = await import("@/lib/klaviyo");
     await queueStoreSubscription(claim.email_to, { productTitle: entry.product.title, themeSlug: gen.theme, productUrl: `${env.appUrl}/store/product/${entry.product.legacyId}` }, gen.id);
@@ -71,5 +71,5 @@ export async function pictureLinkOpened(email: string, redirectPath: string, exp
   await track("store_email_link_opened", { product_id: gen ? legacy(gen.product_id) : null, expired }, { email, source: "vault", actor: "customer" });
   if (expired || !gen || gen.email_to !== email.trim().toLowerCase()) return;
   const { linkVisitorEmail } = await import("@/lib/db/store");
-  if (await linkVisitorEmail(gen.visitor_id, email, "email_link")) await track("store_visitor_linked", { via: "email_link", visitors_linked: 1, store_visitor_id: gen.visitor_id }, { email, source: "vault", actor: "customer" });
+  if (await linkVisitorEmail(gen.visitor_id, email, "email_link")) await storeTrack("store_visitor_linked", { via: "email_link", visitors_linked: 1 }, { visitor: gen.visitor_id, email });
 }

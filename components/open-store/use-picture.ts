@@ -1,5 +1,6 @@
 "use client";
 
+import { storeFetch } from "./store-fetch";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** What the page sees of a picture (lib/open-store/pictures.ts › GenerationView). */
@@ -77,7 +78,7 @@ export function usePicture(opts: { productId: string; uploadMaxPx: number; initi
       if (!alive.current) return;
       let view: PictureView | null = null;
       try {
-        const r = await fetch(`/api/store/generations/${id}`, { cache: "no-store" });
+        const r = await storeFetch(`/api/store/generations/${id}`, { cache: "no-store" });
         if (r.ok) view = ((await r.json()) as { generation: PictureView }).generation;
         else if (r.status === 404) {
           setState({ phase: "failed" });
@@ -116,7 +117,7 @@ export function usePicture(opts: { productId: string; uploadMaxPx: number; initi
       }
       let r: Response;
       try {
-        r = await fetch("/api/store/generations", { method: "POST", body: form });
+        r = await storeFetch("/api/store/generations", { method: "POST", body: form });
       } catch {
         setState({ phase: "failed" });
         return;
@@ -140,7 +141,7 @@ export function usePicture(opts: { productId: string; uploadMaxPx: number; initi
 
   const choose = useCallback(async (picture: PictureView, n: number) => {
     setState({ phase: "ready", picture: { ...picture, chosen: n } });
-    await fetch(`/api/store/generations/${picture.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ chosen: n }) }).catch(() => undefined);
+    await storeFetch(`/api/store/generations/${picture.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ chosen: n }) }).catch(() => undefined);
   }, []);
 
   const reset = useCallback(() => {

@@ -1,6 +1,6 @@
 import "server-only";
 import { linkVisitorEmail, visitorByHash } from "@/lib/db/store";
-import { track } from "@/lib/track";
+import { storeTrack } from "./analytics";
 import { visitorTokenHash } from "./visitor";
 
 /**
@@ -15,7 +15,7 @@ export async function linkOnSignIn(email: string, token: string): Promise<"none"
   if (visitor.email === e) return "same";
   if (visitor.email) return "fresh";
   if (await linkVisitorEmail(visitor.id, e, "sign_in")) {
-    await track("store_visitor_linked", { via: "sign_in", visitors_linked: 1, store_visitor_id: visitor.id }, { email: e, source: "vault", actor: "customer" });
+    await storeTrack("store_visitor_linked", { via: "sign_in", visitors_linked: 1 }, { visitor, email: e });
     return "linked";
   }
   return "same";
