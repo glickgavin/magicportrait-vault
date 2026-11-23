@@ -266,6 +266,7 @@ export const REGISTRY = {
   "shop.metafield_namespace": text("shop", "mmp_shop", { label: "Shop metafield namespace", description: "The only product fields the app may write (CLAUDE.md).", readOnly: true }),
   "shop.top_picks_count": num("shop", 5, { label: "Product ideas per picture", min: 1, max: 12 }),
   "shop.product_cache_minutes": num("shop", 5, { label: "Product cache (minutes)", min: 0, max: 60 }),
+  "shop.catalog_changed_at": num("shop", 0, { label: "Shop products last changed in Settings", description: "Set automatically whenever Settings › Shop saves to Shopify, so every server reloads the products at once instead of waiting for the product cache.", readOnly: true, min: 0, max: 9_999_999_999_999 }),
   "shop.discount_code_normal": text("shop", "SITEWIDE OFF", { label: "Discount code: normal customers", description: "A Shopify discount code limited to the Store collection. Empty: no discount.", max: 60 }),
   "shop.discount_code_vip": text("shop", "", { label: "Discount code: VIP customers", description: "Empty: VIPs get the normal code.", max: 60 }),
   "shop.vip_customer_tag": text("shop", "VIP", { label: "VIP customer tags", description: "The Shopify customer tags that mark a VIP, separated by commas, e.g. VIP, member-active. A customer with any one of them is a VIP (any case).", allowEmpty: false, max: 300 }),

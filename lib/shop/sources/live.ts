@@ -2,7 +2,7 @@ import "server-only";
 import { opName, timed } from "@/lib/perf";
 import type { ShopifyTokenProvider } from "@/lib/sources/shopify-auth";
 import { parseList } from "../fields";
-import type { DiscountInfo, FieldDefinitionSpec, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopProduct, WriteResult } from "./types";
+import type { DiscountInfo, FieldDefinitionSpec, ProductFieldChanges, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopListKey, ShopProduct, VariantRuleChange, WriteResult } from "./types";
 
 /**
  * The shop's Shopify Admin reads and its two kinds of write (CLAUDE.md, allowed writes 4–5).
@@ -18,6 +18,7 @@ const Q_PRODUCTS = `query ShopStoreProducts($id: ID!, $after: String, $ns: Strin
         media(first: 20) { nodes { id alt mediaContentType preview { image { url width height } } } }
         page: metafield(namespace: $ns, key: "page") { value }
         occasions: metafield(namespace: $ns, key: "occasions") { value }
+        categories: metafield(namespace: $ns, key: "categories") { value }
         shortDescription: metafield(namespace: $ns, key: "short_description") { value }
         template: metafield(namespace: $ns, key: "template") { value updatedAt }
         variants(first: 100) {
@@ -121,6 +122,7 @@ type Raw = {
         media: { nodes: { id: string; alt: string | null; mediaContentType: string; preview: { image: { url: string; width: number | null; height: number | null } | null } | null }[] };
         page: { value: string } | null;
         occasions: { value: string } | null;
+        categories: { value: string } | null;
         shortDescription: { value: string } | null;
         template: { value: string; updatedAt: string | null } | null;
         variants: {
@@ -196,6 +198,7 @@ export class ShopCatalogLive implements ShopCatalogSource {
             .map((m) => ({ id: m.id, url: m.preview!.image!.url, alt: m.alt, width: m.preview!.image!.width, height: m.preview!.image!.height })),
           page: p.page?.value ?? null,
           occasions: parseList(p.occasions?.value),
+          categories: parseList(p.categories?.value),
           shortDescription: p.shortDescription?.value?.trim() || null,
           template: p.template ? { value: p.template.value, updatedAt: p.template.updatedAt } : null,
           variants: p.variants.nodes.map((v) => ({
@@ -229,17 +232,19 @@ export class ShopCatalogLive implements ShopCatalogSource {
     return out;
   }
 
-  async setProductFields(productId: string, namespace: string, fields: { page?: string | null; occasions?: string[] }): Promise<WriteResult> {
+  async setProductFields(productId: string, namespace: string, fields: ProductFieldChanges): Promise<WriteResult> {
     if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId)) return { ok: false, reason: "bad_product_id" };
-    const set: { ownerId: string; namespace: string; key: "page" | "occasions"; type: string; value: string }[] = [];
-    const clear: { ownerId: string; namespace: string; key: "page" | "occasions" }[] = [];
+    const set: { ownerId: string; namespace: string; key: "page" | ShopListKey; type: string; value: string }[] = [];
+    const clear: { ownerId: string; namespace: string; key: "page" | ShopListKey }[] = [];
     if (fields.page !== undefined) {
       if (fields.page) set.push({ ownerId: productId, namespace, key: "page", type: "single_line_text_field", value: fields.page });
       else clear.push({ ownerId: productId, namespace, key: "page" });
     }
-    if (fields.occasions !== undefined) {
-      if (fields.occasions.length) set.push({ ownerId: productId, namespace, key: "occasions", type: "list.single_line_text_field", value: JSON.stringify(fields.occasions) });
-      else clear.push({ ownerId: productId, namespace, key: "occasions" });
+    for (const key of ["occasions", "categories"] as const) {
+      const list = fields[key];
+      if (list === undefined) continue;
+      if (list.length) set.push({ ownerId: productId, namespace, key, type: "list.single_line_text_field", value: JSON.stringify(list) });
+      else clear.push({ ownerId: productId, namespace, key });
     }
     if (set.length) {
       const d = await this.gql<{ metafieldsSet: { userErrors: { message: string; code?: string }[] } }>(M_SET, { metafields: set });
@@ -252,6 +257,23 @@ export class ShopCatalogLive implements ShopCatalogSource {
     return { ok: true };
   }
 
+  async setVariantRules(productId: string, namespace: string, changes: VariantRuleChange[]): Promise<WriteResult> {
+    if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId)) return { ok: false, reason: "bad_product_id" };
+    if (changes.some((c) => !/^gid:\/\/shopify\/ProductVariant\/\d+$/.test(c.variantId))) return { ok: false, reason: "bad_variant_id" };
+    const set = changes.flatMap((c) => c.set.map((f) => ({ ownerId: c.variantId, namespace, key: f.key, type: f.type, value: f.value })));
+    const clear = changes.flatMap((c) => c.clear.map((key) => ({ ownerId: c.variantId, namespace, key })));
+    // metafieldsSet takes at most 25 at a time.
+    for (let i = 0; i < set.length; i += 25) {
+      const d = await this.gql<{ metafieldsSet: { userErrors: { message: string; code?: string }[] } }>(M_SET, { metafields: set.slice(i, i + 25) });
+      if (d.metafieldsSet.userErrors.length) return { ok: false, reason: d.metafieldsSet.userErrors.map((e) => e.code || e.message).join(",").slice(0, 200) };
+    }
+    for (let i = 0; i < clear.length; i += 25) {
+      const d = await this.gql<{ metafieldsDelete: { userErrors: { message: string }[] } }>(M_DELETE, { metafields: clear.slice(i, i + 25) });
+      if (d.metafieldsDelete.userErrors.length) return { ok: false, reason: d.metafieldsDelete.userErrors.map((e) => e.message).join(",").slice(0, 200) };
+    }
+    return { ok: true };
+  }
+
   async setProductTemplate(productId: string, namespace: string, templateJson: string): Promise<WriteResult> {
     if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId)) return { ok: false, reason: "bad_product_id" };
     const d = await this.gql<{ metafieldsSet: { userErrors: { message: string; code?: string }[] } }>(M_SET, { metafields: [{ ownerId: productId, namespace, key: "template", type: "json", value: templateJson }] });
@@ -259,9 +281,9 @@ export class ShopCatalogLive implements ShopCatalogSource {
     return errs.length ? { ok: false, reason: errs.map((e) => e.code || e.message).join(",").slice(0, 200) } : { ok: true };
   }
 
-  async setOccasionChoices(namespace: string, choices: string[]): Promise<WriteResult> {
+  async setListChoices(namespace: string, key: ShopListKey, choices: string[]): Promise<WriteResult> {
     const d = await this.gql<{ metafieldDefinitionUpdate: { userErrors: { message: string; code?: string }[] } }>(M_DEF_UPDATE, {
-      definition: { namespace, key: "occasions", ownerType: "PRODUCT", validations: [{ name: "choices", value: JSON.stringify(choices) }] },
+      definition: { namespace, key, ownerType: "PRODUCT", validations: [{ name: "choices", value: JSON.stringify(choices) }] },
     });
     const errs = d.metafieldDefinitionUpdate.userErrors;
     return errs.length ? { ok: false, reason: errs.map((e) => e.code || e.message).join(",").slice(0, 200) } : { ok: true };

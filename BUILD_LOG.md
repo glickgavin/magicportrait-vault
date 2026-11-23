@@ -403,7 +403,7 @@ Spec: `docs/shop.md`. Branch `claude/shop`. Mockups: the "Gifts & Products mocku
 - **Preview templates** for all 10 products (Settings › Shop › template editor). Every product is hidden until it has one. This session can't open Shopify's product photos (cdn.shopify.com isn't reachable), so they weren't drawn here.
 - **Smallest picture.** 95% of portraits made in the last 60 days are 512 × 512 px (the rest 1024 × 1024). With `shop.default_min_short_side_px` at 1000 every size is hidden for them. Today's tiles already print from the same 512 px pictures; Gavin to choose the minimum.
 - **Magic Puzzle** has no print rules yet (its print area for 30 / 252 / 500 pieces isn't known), so it stays hidden.
-- **Print system.** It takes orders from Shopify on its own (Gavin, 10 Nov), so there's no fulfilment secret or endpoint to set up. It must take the picture from `_image_url` on shop lines, the same key today's portrait lines use. Adjust is off on every size (`mmp_shop.adjustable = false`), so what prints is the centred crop the preview shows, whether or not it reads `_shop_crop`.
+- **Print system.** It takes orders from Shopify on its own (Gavin, 10 Nov), so there's no fulfilment secret or endpoint to set up. It must take the picture from `_image_url` on shop lines, the same key today's portrait lines use. Adjust is off on every size (`mmp_shop.adjustable = false`), so what prints is the default crop the preview shows (top kept, sides trimmed evenly; centred before 16 Nov), whether or not it reads `_shop_crop`.
 - **Tests** still can't run here: the image downloads come from `pkg-containers.githubusercontent.com` (GitHub) and `production.cloudfront.docker.com` (Docker Hub), which are blocked, and Docker Hub rate-limits. `api.supabase.com` is now blocked too, so `pnpm db:apply-remote` can't run from this session.
 
 ## Done on the live systems (10 Nov, with Gavin's OK)
@@ -502,3 +502,25 @@ Gavin's idea: read only the newest 3 Imagen sessions and 3 orders, with "Show mo
 - Editor: "Curved edges, for a cushion or other soft product" adds draggable curve points (also arrow keys). The shape warning measures a curved zone across its middle (the cushion is 1.02 wide for 1 tall, not the 1.10 its corners suggest).
 - Photo library: the cushion is in it as a blank product (`public/shop-library/blanks/blank-pillow-linen/`, 12 sample photos), so "Use this photo" in the Magic Pillow editor sets photo, overlay, corners and curves in one go. Not published to Shopify.
 
+
+## 16 Nov: the customer's own picture on Gifts and Products
+- **Done.** Gifts and Products pick the person's newest picture (or `?pic=`, checked as theirs) and draw it on every product card that suits it; a bar shows it, their other pictures (one tap switches) and **Change photo**. Cards open Product ideas with that product's sheet open. No pictures yet: the old "Start with a picture" box. `landingPictures` in `lib/shop/pages.ts`.
+- **Fixed: hidden shop pages answered 200.** The loading placeholders (perf work) make every customer page stream, so a page's own `notFound()` showed the not-found page with status 200. `proxy.ts` now answers `/gifts`, `/products` and `/cart` with a real 404 while the shop is hidden from that person.
+- **Known:** a shop page for a picture that isn't theirs still shows the not-found page with status 200 (same streaming cause). The server re-checks ownership and shows nothing of the picture; checking ownership in the proxy would need Imagen calls on every request.
+- **Shop e2e fixed:** the local stack needed `supabase db reset` (it predated the shop settings, so the tests' setting changes did nothing); the test seed lifts the shop upload/cart/checkout limits; `getByLabel("Page", { exact: true })`; the cart helper waits for the cart's refresh; the template test accepts Make or Edit. All 29 shop e2e tests pass at 390 and 1280.
+
+## 17 Nov: Products page categories work like Gifts occasions
+- **Done.** New product field `mmp_shop.categories` (a list, like occasions). Settings › Shop has a **Categories** editor next to Occasions (add, rename, reorder, remove; refused while a product uses it) and category chips on each product. The Products page groups and orders by category. A product with no category falls back to its Shopify product type, so the live page is unchanged until categories are set. Event `admin_shop_categories_updated`.
+- **To switch it on live:** Settings › Shop › **Create 1 shop field in Shopify** (creates `mmp_shop.categories`, seeded with today's product types), then tick categories on each product.
+- **Print rules entered in Shopify** (17 Nov, at Gavin's request): Magic Puzzle (`JIGSAW-PUZZLE-30/252/500`) and Acrylic Glass Art (`GLOBAL-MOU-ACRY-4X6 … 20X30`), maker prodigi, print areas from the Prodigi API.
+- **Open:** Next.js 16.4.4 reports a known security vulnerability (`next dev`/`next build` stop once on an upgrade notice; a retry continues, and this was why the e2e web server sometimes "failed to start"). Upgrade as its own change.
+- **Tests:** the shop e2e cart helper waits for the cart to load; the print-rules test presses Save with the keyboard (a dev-only Next.js badge can cover it at 390 px).
+
+## 17 Nov: Settings › Shop changes show at once; landing shows only their own picture
+- **Fixed: categories didn't show on Products after saving.** Each server kept its own copy of the Shopify products for `shop.product_cache_minutes` (5), and a save only cleared the copy on the server that handled it. Now every Settings › Shop save to Shopify also stamps the new read-only setting `shop.catalog_changed_at`; every server re-reads Shopify when its copy is older than the stamp (settings are re-read within seconds). The live row is created on the first save (upsert); `seed.sql` has it too.
+- **Gifts and Products load without flashing the plain product photos.** While their pictures load, the "Choose your picture" box shows placeholder tiles and each product card shows a pulsing placeholder; then every card shows their own picture. Product photos only appear for products the picture doesn't suit, or for someone with no pictures yet.
+- Shop e2e: the cart helper repeats (reload, remove) until a fresh load shows an empty cart.
+
+## 18 Nov: Next.js security upgrade
+- **Done.** `next` and `eslint-config-next` 16.4.4 → 16.4.6. Fixes GHSA-mfr8-8qww-v76h and GHSA-vc7v-qv4w-wrv8 (moderate; both are cache leaks in `'use cache'` / `unstable_cache`, which this app doesn't use). `next dev` and `next build` no longer stop on the upgrade notice.
+- **Still open:** `pnpm audit` reports two moderate advisories in `glob` / `minimatch`, pulled in by `archiver` (hi-res download zips). They need an `archiver` upgrade; separate change.

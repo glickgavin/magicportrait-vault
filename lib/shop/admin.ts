@@ -3,10 +3,10 @@ import { z } from "zod";
 import { getSettings } from "@/lib/settings";
 import { track } from "@/lib/track";
 import type { CatalogEntry } from "./catalog";
-import { fieldSpecs, normalisePage, pageLabel } from "./fields";
+import { fieldSpecs, IMAGE_KINDS, MAKERS, normalisePage, pageLabel, PLACEMENTS } from "./fields";
 import { discountInfo, discountSettingFor, getCatalog, invalidateCatalog } from "./index";
 import { getShopCatalogSource } from "./sources";
-import type { DiscountInfo, ShopFieldDefinition } from "./sources/types";
+import type { DiscountInfo, ProductFieldChanges, ShopFieldDefinition, ShopListKey, VariantRuleChange } from "./sources/types";
 import { parseTemplate, templateSchema, type Template } from "./template";
 
 /** Settings › Shop (docs/shop.md). Every write here is CLAUDE.md allowed write 5: `mmp_shop` only. */
@@ -23,10 +23,12 @@ export const productUpdateSchema = z
     productId: z.string().regex(/^gid:\/\/shopify\/Product\/\d{1,20}$/),
     page: z.enum(["gifts", "products", "all", "none"]).optional(),
     occasions: z.array(occasionName).max(30).optional(),
+    categories: z.array(occasionName).max(30).optional(),
   })
-  .refine((v) => v.page !== undefined || v.occasions !== undefined, "Nothing to change");
+  .refine((v) => v.page !== undefined || v.occasions !== undefined || v.categories !== undefined, "Nothing to change");
 
 export const occasionsUpdateSchema = z.object({ occasions: z.array(occasionName).min(1).max(30) }).refine((v) => new Set(v.occasions.map((o) => o.toLowerCase())).size === v.occasions.length, "Each occasion once");
+export const categoriesUpdateSchema = z.object({ categories: z.array(occasionName).min(1).max(30) }).refine((v) => new Set(v.categories.map((o) => o.toLowerCase())).size === v.categories.length, "Each category once");
 
 export type ShopOverview =
   | {
@@ -37,6 +39,9 @@ export type ShopOverview =
       missingDefinitions: string[];
       occasions: string[];
       occasionsFromDefinition: boolean;
+      /** The Products page categories, in order (the definition's choices, else what products use). */
+      categories: string[];
+      categoriesFromDefinition: boolean;
       discounts: { normal: { code: string | null; label: string; info: DiscountInfo | null }; vip: { code: string | null; label: string; info: DiscountInfo | null; fallsBack: boolean } };
       collectionId: string;
     }
@@ -58,7 +63,9 @@ export async function shopOverview(): Promise<ShopOverview> {
     const occDef = definitions.find((d) => d.ownerType === "PRODUCT" && d.key === "occasions");
     const inUse = [...new Set(entries.flatMap((e) => e.product.occasions))];
     const occasions = occDef?.choices?.length ? occDef.choices : inUse;
-    const missingDefinitions = fieldSpecs(occasions)
+    const catDef = definitions.find((d) => d.ownerType === "PRODUCT" && d.key === "categories");
+    const categories = catDef?.choices?.length ? catDef.choices : categoriesInUse(entries);
+    const missingDefinitions = fieldSpecs(occasions, categories)
       .map((f) => `${f.ownerType}:${f.key}`)
       .filter((k) => !have.has(k));
     const [n, v] = await Promise.all([discountSettingFor("normal"), discountSettingFor("vip")]);
@@ -71,6 +78,8 @@ export async function shopOverview(): Promise<ShopOverview> {
       missingDefinitions,
       occasions,
       occasionsFromDefinition: Boolean(occDef?.choices?.length),
+      categories,
+      categoriesFromDefinition: Boolean(catDef?.choices?.length),
       discounts: { normal: { ...n, info: ni }, vip: { ...v, info: v.code === n.code ? ni : vi, fallsBack: !s["shop.discount_code_vip"].trim() } },
       collectionId: s["shop.collection_id"],
     };
@@ -117,7 +126,15 @@ export async function updateProductFields(actor: { email: string }, input: z.inf
       if (bad.length) return { ok: false, status: 400, error: `Not in the occasion list: ${bad.join(", ")}` };
     }
   }
-  const fields: { page?: string | null; occasions?: string[] } = {};
+  if (input.categories) {
+    const defs = await src.fieldDefinitions(ns);
+    const choices = defs.find((d) => d.ownerType === "PRODUCT" && d.key === "categories")?.choices;
+    if (choices?.length) {
+      const bad = input.categories.filter((o) => !choices.includes(o));
+      if (bad.length) return { ok: false, status: 400, error: `Not in the category list: ${bad.join(", ")}` };
+    }
+  }
+  const fields: ProductFieldChanges = {};
   const changed: string[] = [];
   if (input.page !== undefined) {
     const next = input.page === "none" ? null : pageLabel(input.page);
@@ -130,38 +147,55 @@ export async function updateProductFields(actor: { email: string }, input: z.inf
     fields.occasions = input.occasions;
     changed.push("occasions");
   }
+  if (input.categories !== undefined && JSON.stringify(input.categories) !== JSON.stringify(entry.product.categories)) {
+    fields.categories = input.categories;
+    changed.push("categories");
+  }
   if (!changed.length) return { ok: true };
   const r = await src.setProductFields(input.productId, ns, fields);
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };
-  invalidateCatalog();
+  await invalidateCatalog();
   await track("admin_shop_product_updated", { product_id: entry.product.legacyId, fields: changed }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }
 
-/** Replaces the occasion list (the `mmp_shop.occasions` definition's choices), in the order given. */
-export async function updateOccasions(actor: { email: string }, occasions: string[]): Promise<AdminResult & { inUse?: string[] }> {
+/** The categories products use: their own, else their Shopify product type (how the Products page grouped before). */
+export function categoriesInUse(entries: CatalogEntry[]): string[] {
+  return [...new Set(entries.flatMap((e) => (e.product.categories.length ? e.product.categories : e.product.productType.trim() ? [e.product.productType.trim()] : [])))];
+}
+
+const LIST_WORDS: Record<ShopListKey, { one: string; event: "admin_shop_occasions_updated" | "admin_shop_categories_updated" }> = {
+  occasions: { one: "occasion", event: "admin_shop_occasions_updated" },
+  categories: { one: "category", event: "admin_shop_categories_updated" },
+};
+
+/** Replaces the occasion or category list (that `mmp_shop` definition's choices), in the order given. */
+export async function updateList(actor: { email: string }, key: ShopListKey, list: string[]): Promise<AdminResult & { inUse?: string[] }> {
   const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
   const src = await getShopCatalogSource();
   let before: string[] = [];
   let entries: CatalogEntry[] = [];
   try {
     const defs = await src.fieldDefinitions(ns);
-    const def = defs.find((d) => d.ownerType === "PRODUCT" && d.key === "occasions");
+    const def = defs.find((d) => d.ownerType === "PRODUCT" && d.key === key);
     if (!def) return { ok: false, status: 409, error: "Create the shop fields in Shopify first." };
     before = def.choices ?? [];
     entries = await getCatalog({ fresh: true });
   } catch (e) {
     return { ok: false, status: 502, error: errorText(e) };
   }
-  const removed = before.filter((o) => !occasions.includes(o));
-  const inUse = removed.filter((o) => entries.some((e) => e.product.occasions.includes(o)));
+  const removed = before.filter((o) => !list.includes(o));
+  const inUse = removed.filter((o) => entries.some((e) => e.product[key].includes(o)));
   if (inUse.length) return { ok: false, status: 409, error: `Still used by a product: ${inUse.join(", ")}. Take it off those products first.`, inUse };
-  const r = await src.setOccasionChoices(ns, occasions);
+  const r = await src.setListChoices(ns, key, list);
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };
-  invalidateCatalog();
-  await track("admin_shop_occasions_updated", { count: occasions.length, added: occasions.filter((o) => !before.includes(o)).length, removed: removed.length }, { email: actor.email, actor: `super_user:${actor.email}` });
+  await invalidateCatalog();
+  await track(LIST_WORDS[key].event, { count: list.length, added: list.filter((o) => !before.includes(o)).length, removed: removed.length }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }
+
+/** The occasion list (kept for the existing route and tests). */
+export const updateOccasions = (actor: { email: string }, occasions: string[]) => updateList(actor, "occasions", occasions);
 
 /** Creates whichever `mmp_shop` metafield definitions don't exist yet. Never changes existing ones. */
 export async function createMissingFields(actor: { email: string }): Promise<AdminResult & { created?: string[]; failed?: { key: string; reason: string }[] }> {
@@ -169,16 +203,20 @@ export async function createMissingFields(actor: { email: string }): Promise<Adm
   const src = await getShopCatalogSource();
   let have: Set<string>;
   let inUse: string[] = [];
+  let categories: string[] = [];
   try {
     have = new Set((await src.fieldDefinitions(ns)).map((d) => `${d.ownerType}:${d.key}`));
-    inUse = [...new Set((await getCatalog({ fresh: true })).flatMap((e) => e.product.occasions))];
+    const entries = await getCatalog({ fresh: true });
+    inUse = [...new Set(entries.flatMap((e) => e.product.occasions))];
+    categories = categoriesInUse(entries);
   } catch (e) {
     return { ok: false, status: 502, error: errorText(e) };
   }
-  const missing = fieldSpecs(inUse).filter((f) => !have.has(`${f.ownerType}:${f.key}`));
+  // A new categories field starts with the product types products have now, so nothing regroups by surprise.
+  const missing = fieldSpecs(inUse, categories).filter((f) => !have.has(`${f.ownerType}:${f.key}`));
   if (!missing.length) return { ok: true, created: [], failed: [] };
   const r = await src.createFieldDefinitions(ns, missing);
-  invalidateCatalog();
+  await invalidateCatalog();
   await track("admin_shop_fields_created", { created: r.created.length, failed: r.failed.length }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true, created: r.created, failed: r.failed };
 }
@@ -217,7 +255,76 @@ export async function publishTemplate(actor: { email: string }, input: { product
   const t: Template = { ...input.template, updated_at: new Date().toISOString() };
   const r = await (await getShopCatalogSource()).setProductTemplate(input.productId, ns, JSON.stringify(t));
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the template (${r.reason}).` };
-  invalidateCatalog();
+  await invalidateCatalog();
   await track("admin_shop_template_published", { product_id: entry.product.legacyId, zone: t.zone.kind }, { email: actor.email, actor: `super_user:${actor.email}` });
+  return { ok: true };
+}
+
+/** The print rules Settings › Shop › Print rules edits; `background` and `extra` are left as they are. */
+export const RULE_KEYS = ["maker", "maker_sku", "print_px", "placement", "zone_px", "min_short_side_px", "max_crop_pct", "adjustable", "image_kinds"] as const;
+export type RuleKey = (typeof RULE_KEYS)[number];
+
+const px = z.string().trim().regex(/^(\d{2,5}x\d{2,5})?$/i, "Width x height in pixels, e.g. 2400x3000");
+const intIn = (min: number, max: number) => z.string().trim().regex(/^(\d{1,6})?$/, "A whole number").refine((v) => v === "" || (Number(v) >= min && Number(v) <= max), `Between ${min} and ${max}`);
+
+/** "" clears a rule (optional ones fall back to their defaults; a size without the required three is hidden). */
+export const variantRulesSchema = z.object({
+  maker: z.enum(["", ...MAKERS]),
+  maker_sku: z.string().trim().max(200).regex(/^[^\s<>"'`]*$/, "No spaces or quotes"),
+  print_px: px,
+  placement: z.enum(["", ...PLACEMENTS]),
+  zone_px: px,
+  min_short_side_px: intIn(100, 20000),
+  max_crop_pct: intIn(0, 90),
+  adjustable: z.enum(["", "true", "false"]),
+  image_kinds: z.enum(["", ...IMAGE_KINDS]),
+});
+export type VariantRulesInput = z.infer<typeof variantRulesSchema>;
+
+export const rulesUpdateSchema = z.object({
+  productId: z.string().regex(/^gid:\/\/shopify\/Product\/\d{1,20}$/),
+  variants: z.array(z.object({ variantId: z.string().regex(/^gid:\/\/shopify\/ProductVariant\/\d{1,20}$/), rules: variantRulesSchema })).min(1).max(100),
+});
+
+/** A size's rules as the editor shows them ("" when unset). */
+export function rulesFor(metafields: { key: string; value: string }[]): VariantRulesInput {
+  const m = new Map(metafields.map((f) => [f.key, f.value.trim()]));
+  return Object.fromEntries(RULE_KEYS.map((k) => [k, k === "maker" || k === "placement" || k === "image_kinds" ? (m.get(k) ?? "").toLowerCase() : (m.get(k) ?? "")])) as VariantRulesInput;
+}
+
+/** Saves the print rules of a Store product's sizes: only what changed, set or cleared, in mmp_shop. */
+export async function updateVariantRules(actor: { email: string }, input: z.infer<typeof rulesUpdateSchema>): Promise<AdminResult> {
+  const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
+  let entries: CatalogEntry[];
+  try {
+    entries = await getCatalog({ fresh: true });
+  } catch (e) {
+    return { ok: false, status: 502, error: errorText(e) };
+  }
+  const entry = entries.find((e) => e.product.id === input.productId);
+  if (!entry) return { ok: false, status: 404, error: "That product isn't in the Store collection." };
+  const types = new Map(fieldSpecs([]).filter((f) => f.ownerType === "PRODUCTVARIANT").map((f) => [f.key, f.type]));
+  const changes: VariantRuleChange[] = [];
+  const changedKeys = new Set<string>();
+  for (const v of input.variants) {
+    const variant = entry.product.variants.find((x) => x.id === v.variantId);
+    if (!variant) return { ok: false, status: 400, error: "A size isn't on this product." };
+    const now = rulesFor(variant.metafields);
+    const next = { ...v.rules, print_px: v.rules.print_px.toLowerCase(), zone_px: v.rules.zone_px.toLowerCase() };
+    const set: VariantRuleChange["set"] = [];
+    const clear: string[] = [];
+    for (const k of RULE_KEYS) {
+      if (next[k] === now[k]) continue;
+      changedKeys.add(k);
+      if (next[k] === "") clear.push(k);
+      else set.push({ key: k, type: types.get(k) ?? "single_line_text_field", value: next[k] });
+    }
+    if (set.length || clear.length) changes.push({ variantId: v.variantId, set, clear });
+  }
+  if (!changes.length) return { ok: true };
+  const r = await (await getShopCatalogSource()).setVariantRules(input.productId, ns, changes);
+  if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };
+  await invalidateCatalog();
+  await track("admin_shop_rules_updated", { product_id: entry.product.legacyId, sizes: changes.length, fields: [...changedKeys] }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }

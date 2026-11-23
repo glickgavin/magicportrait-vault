@@ -69,7 +69,7 @@ export function ChoosePicture({ page, product, tab: initialTab, portraits, photo
             onDoubleClick={() => go(p.id, p.kind)}
             className={cn("relative aspect-square overflow-hidden rounded-[12px] bg-black/5 focus:outline-none focus-visible:ring-4 focus-visible:ring-magenta/40", selected === p.id && "ring-[3px] ring-magenta")}
           >
-            {p.url && <img src={p.url} alt="" className="ph-no-capture h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />}
+            {p.url && <img src={p.url} alt="" className="ph-no-capture h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />}
             {selected === p.id && (
               <span className="bg-avatar-gradient absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full shadow-[0_0_0_2px_#fff]">
                 <Check className="h-3.5 w-3.5 text-white" strokeWidth={3.5} aria-hidden="true" />
@@ -149,7 +149,7 @@ export function ChoosePicture({ page, product, tab: initialTab, portraits, photo
             </div>
             {upload && (
               <div role={upload.error ? "alert" : "status"} className={cn("flex items-center gap-3 rounded-[16px] p-2.5", upload.error ? "border border-[#c42b1c]/25 bg-[#fff4f2]" : "bg-white")}>
-                {upload.preview && <img src={upload.preview} alt="" className="h-13 w-13 flex-none rounded-[10px] object-cover" style={{ width: 52, height: 52, opacity: upload.error ? 0.6 : 1 }} />}
+                {upload.preview && <img src={upload.preview} alt="" className="h-13 w-13 flex-none rounded-[10px] object-cover object-top" style={{ width: 52, height: 52, opacity: upload.error ? 0.6 : 1 }} />}
                 <div className="min-w-0 flex-1">
                   {upload.error ? (
                     <p className="text-[14px] font-bold text-[#a3271a]">{upload.error}</p>
