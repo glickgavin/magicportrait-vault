@@ -4,7 +4,7 @@ import { db, must } from "@/lib/db/client";
 export type MemberRow = {
   id: string;
   email: string;
-  created_via: "sign_in" | "gift_offer" | "admin_lookup";
+  created_via: "sign_in" | "gift_offer" | "admin_lookup" | "store_order";
   first_signed_in_at: string | null;
   display_name: string | null;
   shopify_customer_id: string | null;

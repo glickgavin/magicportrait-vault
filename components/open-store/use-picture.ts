@@ -12,6 +12,7 @@ export type PictureView = {
   images: { file: string; width: number; height: number }[];
   chosen: number;
   photos: string[];
+  emailAsked: boolean;
 };
 
 export type PicturePhase =

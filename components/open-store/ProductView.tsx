@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Check, Clock, Gift, Heart, Info, Loader2, Lock, Minus, Plus, Star, Truck } from "lucide-react";
+import { Camera, Check, Clock, Gift, Heart, Info, Loader2, Lock, Minus, Plus, Star, Truck, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ProductPageData, RelatedCard, VariantView } from "@/lib/open-store/pages";
 import { fillStep, optionGroups, variantFor } from "@/lib/open-store/view";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { ShopPreview } from "@/components/shop/ShopPreview";
 import { ProductCard } from "./ProductCard";
 import { Stars } from "./Stars";
+import { STORE_CART_EVENT, type StoreCartEvent } from "./StoreCart";
 import { fileUrl, usePicture, type PictureView, type SlotPhoto } from "./use-picture";
 
 const ICONS = { truck: Truck, heart: Heart, lock: Lock, gift: Gift, star: Star, clock: Clock } as const;
@@ -74,6 +75,7 @@ export function ProductView({
   from,
   initialPicture,
   earlierPhotos,
+  askEmail = true,
 }: {
   data: ProductPageData;
   initialVariantId: string | null;
@@ -83,6 +85,7 @@ export function ProductView({
   from: string;
   initialPicture: PictureView | null;
   earlierPhotos: EarlierPhoto[];
+  askEmail?: boolean;
 }) {
   const router = useRouter();
   const uid = useId();
@@ -102,6 +105,15 @@ export function ProductView({
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
+  const [adding, setAdding] = useState(false);
+  const [emailDone, setEmailDone] = useState(false);
+  const [emailClosed, setEmailClosed] = useState(() => {
+    try {
+      return typeof window !== "undefined" && window.localStorage.getItem("mmp_store_email_ask_closed") === "1";
+    } catch {
+      return false;
+    }
+  });
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const relatedRef = useRef<HTMLElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
@@ -343,6 +355,12 @@ export function ProductView({
               </div>
             )}
           </div>
+          {creating && askEmail && state.id && !emailDone && !emailClosed && <EmailAsk generationId={state.id} productId={pid} name={petName} onDone={() => setEmailDone(true)} onClose={() => setEmailClosed(true)} />}
+          {creating && emailDone && (
+            <p role="status" className="mx-4 rounded-[14px] bg-pink-tint px-4 py-3 text-[14px] font-bold text-[#8E047B] lg:mx-0">
+              {t("store.emailWillSend")}
+            </p>
+          )}
           {!creating && slides.length > 1 && (
             <div className="flex gap-2 px-4 lg:flex-col lg:px-0">
               {slides.map((g, i) => (
@@ -363,7 +381,10 @@ export function ProductView({
         <div>
           {picture && (
             <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-[14px] bg-pink-tint px-4 py-3 lg:mx-0 lg:mt-0 lg:mb-4" role="status" data-testid="store-ready">
-              <span className="text-[15px] font-extrabold text-[#8E047B]">{petName ? t("store.readyNamed", { name: petName }) : t("store.ready")}</span>
+              <span className="flex flex-col gap-0.5">
+                <span className="text-[15px] font-extrabold text-[#8E047B]">{petName ? t("store.readyNamed", { name: petName }) : t("store.ready")}</span>
+                {(picture.emailAsked || emailDone) && <span className="text-[13px] text-[#8E047B]">{t("store.emailedToo")}</span>}
+              </span>
               <button type="button" onClick={tryAgain} className="h-10 flex-none rounded-[10px] border-[1.5px] border-[#8E047B] bg-white px-3 text-[14px] font-extrabold text-[#8E047B]">
                 {t("store.tryAnother")}
               </button>
@@ -547,8 +568,9 @@ export function ProductView({
                     <Plus className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
-                <button type="button" data-testid="store-add" onClick={() => setNote(t("store.cartSoon"))} className="bg-primary-gradient shadow-primary h-14 flex-1 rounded-[12px] text-[17px] font-extrabold text-white">
-                  {price ? t("store.addToCartPrice", { price: formatMoney(Number(price) * qty, data.pricing.currency) }) : t("store.addToCart")}
+                <button type="button" data-testid="store-add" disabled={adding || !variant?.available} onClick={() => void addToCart()} className="bg-primary-gradient shadow-primary flex h-14 flex-1 items-center justify-center gap-2 rounded-[12px] text-[17px] font-extrabold text-white disabled:opacity-60">
+                  {adding && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+                  {adding ? t("store.adding") : price ? t("store.addToCartPrice", { price: formatMoney(Number(price) * qty, data.pricing.currency) }) : t("store.addToCart")}
                 </button>
               </div>
             ) : (
@@ -569,6 +591,7 @@ export function ProductView({
                 <span className="text-center text-[13px] text-[#616161]">{t("store.createNote")}</span>
               </>
             )}
+            {picture && <p className="text-center text-[12px] text-[#616161]">{t("store.payments")}</p>}
             {state.phase === "failed" && (
               <div role="alert" className="flex flex-col items-start gap-2.5 rounded-[14px] bg-[#FDECEA] p-3.5 text-[14px] font-bold text-[#a1251b]" data-testid="store-failed">
                 {t("store.failed")}
@@ -660,6 +683,20 @@ export function ProductView({
     </div>
   );
 
+  async function addToCart() {
+    if (!picture || !variant) return;
+    setAdding(true);
+    setNote(null);
+    const r = await fetch("/api/store/cart/lines", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ generationId: picture.id, variantId: variant.id, quantity: qty, from: from === "related" ? "related" : "product" }) }).catch(() => null);
+    setAdding(false);
+    if (!r?.ok) {
+      setNote(t("store.addError"));
+      return;
+    }
+    const body = (await r.json()) as { cart: StoreCartEvent["cart"] };
+    window.dispatchEvent(new CustomEvent<StoreCartEvent>(STORE_CART_EVENT, { detail: { cart: body.cart, open: true } }));
+  }
+
   function pickAndTrack(n: number) {
     if (!picture) return;
     void pickResult(picture, n);
@@ -691,5 +728,66 @@ function RelatedWithPicture({ card, picture, result, currency }: { card: Related
       <span className="text-[13px] text-[#2b2b2b]">{card.many ? t("store.from", { price: formatMoney(card.price, currency) }) : formatMoney(card.price, currency)}</span>
       <span className="text-[13px] font-extrabold text-[#8E047B]">{t("store.seeIt")}</span>
     </Link>
+  );
+}
+
+/** "While we paint: want Teddy's picture by email?" Optional; never blocks or delays the picture. */
+function EmailAsk({ generationId, productId, name, onDone, onClose }: { generationId: string; productId: string; name: string | null; onDone: () => void; onClose: () => void }) {
+  const uid = useId();
+  const [email, setEmail] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    trackClient("store_email_ask_shown", { product_id: productId });
+  }, [productId]);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    setError(null);
+    const r = await fetch("/api/store/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ generationId, email, consent }) }).catch(() => null);
+    setSending(false);
+    if (r?.ok || r?.status === 409) onDone();
+    else setError(r?.status === 400 ? t("store.emailInvalid") : t("store.cartError"));
+  }
+  return (
+    <form onSubmit={submit} className="ph-no-capture relative mx-4 flex flex-col gap-2.5 rounded-[16px] border border-[#F0C9E8] bg-[#FFF8FD] p-4 lg:mx-0" data-ph-mask data-testid="store-email-ask" aria-labelledby={`${uid}-t`}>
+      <button
+        type="button"
+        aria-label={t("store.close")}
+        onClick={() => {
+          try {
+            window.localStorage.setItem("mmp_store_email_ask_closed", "1");
+          } catch {
+            /* a private window: it just shows again next time */
+          }
+          trackClient("store_email_ask_closed", { product_id: productId });
+          onClose();
+        }}
+        className="absolute right-1.5 top-1.5 flex h-10 w-10 items-center justify-center rounded-[10px] hover:bg-black/5"
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
+      </button>
+      <span id={`${uid}-t`} className="pr-9 text-[15px] font-extrabold text-[#1a1a1a]">
+        {name ? t("store.emailAskNamed", { name }) : t("store.emailAsk")}
+      </span>
+      <span className="text-[13px] leading-[1.45] text-[#4d4d4d]">{t("store.emailAskSub")}</span>
+      <label htmlFor={`${uid}-e`} className="sr-only">
+        {t("store.emailLabel")}
+      </label>
+      <input id={`${uid}-e`} type="email" required autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("store.emailPlaceholder")} className="h-12 rounded-[12px] border-[1.5px] border-[#D9D5CA] bg-white px-3.5 text-[16px]" />
+      <label className="flex items-start gap-2.5 text-[13px] leading-[1.45] text-[#4d4d4d]">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 flex-none accent-[#B8059F]" />
+        {t("store.emailConsent")}
+      </label>
+      {error && (
+        <p role="alert" className="text-[13px] font-bold text-[#a1251b]">
+          {error}
+        </p>
+      )}
+      <button type="submit" disabled={sending} className="h-12 rounded-[12px] bg-[#1a1a1a] text-[15px] font-extrabold text-white disabled:opacity-60">
+        {t("store.emailSend")}
+      </button>
+    </form>
   );
 }

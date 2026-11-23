@@ -3,7 +3,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { db, must } from "@/lib/db/client";
 import { env } from "@/lib/env";
 
-export type LinkPurpose = "gift_offer" | "admin_resend" | "mug_reminder" | "gift_reminder";
+export type LinkPurpose = "gift_offer" | "admin_resend" | "mug_reminder" | "gift_reminder" | "store_picture";
 
 /** 32 random bytes, base64url (43 chars). Never contains the email or the order number. */
 export function newToken(): string {

@@ -46,12 +46,24 @@ export async function proxy(request: NextRequest) {
     // The visitor cookie, on the first store page they open (docs/open-store.md › The visitor id). No database row
     // until their first real action, so bots and passers-by leave nothing behind.
     const has = request.cookies.get(VISITOR_COOKIE)?.value;
-    if (!request.nextUrl.pathname.startsWith("/api/") && !(has && isVisitorToken(has))) {
+    // Signed in: link this browser's visitor to the email, or start a fresh one on a shared device.
+    let fresh = false;
+    if (data.user?.email && has && isVisitorToken(has) && !request.nextUrl.pathname.startsWith("/api/")) {
+      const { linkOnSignIn } = await import("@/lib/open-store/link");
+      fresh = (await linkOnSignIn(data.user.email, has).catch(() => "none")) === "fresh";
+    }
+    if (!request.nextUrl.pathname.startsWith("/api/") && (fresh || !(has && isVisitorToken(has)))) {
       const { getSettings } = await import("@/lib/settings");
       const days = await getSettings(["open_store.visitor_cookie_days"] as const)
         .then((x) => x["open_store.visitor_cookie_days"])
         .catch(() => 365);
-      response.cookies.set(VISITOR_COOKIE, newVisitorTokenWeb(), { httpOnly: true, secure: request.nextUrl.protocol === "https:", sameSite: "lax", path: "/", maxAge: Math.round(days * 86400) });
+      const token = newVisitorTokenWeb();
+      // The page rendering now sees the new visitor too (not the shared device's previous one).
+      request.cookies.set(VISITOR_COOKIE, token);
+      const kept = response.cookies.getAll();
+      response = NextResponse.next({ request });
+      for (const c of kept) response.cookies.set(c);
+      response.cookies.set(VISITOR_COOKIE, token, { httpOnly: true, secure: request.nextUrl.protocol === "https:", sameSite: "lax", path: "/", maxAge: Math.round(days * 86400) });
     }
   }
   return response;

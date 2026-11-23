@@ -1,6 +1,7 @@
 import { notFoundJson } from "@/lib/auth/http";
 import { generationById, storePhotoById } from "@/lib/db/store";
 import { asker, canSeeVisitorFile } from "@/lib/open-store/owner";
+import { parsePreviewId, previewPath } from "@/lib/open-store/cart";
 import { parseFileId } from "@/lib/open-store/pictures";
 import { getObject } from "@/lib/storage";
 
@@ -12,6 +13,14 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const pv = parsePreviewId(id);
+  if (pv) {
+    // A cart line's preview: the visitor is part of the id, so it's checked like any of their files.
+    if (!(await canSeeVisitorFile(await asker(), pv.visitorId))) return notFoundJson();
+    const body = await getObject("store-uploads", previewPath(pv.visitorId, pv.lineId));
+    if (!body) return notFoundJson();
+    return new Response(new Uint8Array(body), { headers: { "content-type": "image/jpeg", "cache-control": "private, max-age=3600", "x-content-type-options": "nosniff" } });
+  }
   const f = parseFileId(id);
   if (!f) return notFoundJson();
   let visitorId: string;

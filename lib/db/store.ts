@@ -31,13 +31,15 @@ export type StoreGenerationRow = {
   chosen_index: number;
   cost_usd: number | null;
   order_id: string | null;
+  email_to?: string | null;
+  emailed_at?: string | null;
   created_at: string;
   finished_at: string | null;
 };
 
 const V_COLS = "id, email, linked_via, email_given, shopify_cart_id, shopify_checkout_url, created_at, last_seen_at";
 const P_COLS = "id, visitor_id, storage_path, width, height, created_at";
-const G_COLS = "id, visitor_id, product_id, theme, photo_ids, names, imagen_session_id, status, images, chosen_index, cost_usd, order_id, created_at, finished_at";
+const G_COLS = "id, visitor_id, product_id, theme, photo_ids, names, imagen_session_id, status, images, chosen_index, cost_usd, order_id, email_to, emailed_at, created_at, finished_at";
 
 export async function visitorByHash(tokenHash: string): Promise<StoreVisitorRow | null> {
   const r = await db().from("store_visitors").select(V_COLS).eq("token_hash", tokenHash).maybeSingle();
@@ -124,4 +126,62 @@ export async function generationStats(since: Date): Promise<{ made: number; done
     failed: rows.filter((r) => r.status === "failed" || r.status === "timed_out").length,
     costUsd: rows.reduce((a, r) => a + Number(r.cost_usd ?? 0), 0),
   };
+}
+
+// ---------------------------------------------------------------- Open store 4: cart, linking, ordered, email
+
+export async function setVisitorCart(visitorId: string, cart: { id: string | null; checkoutUrl: string | null }): Promise<void> {
+  must(await db().from("store_visitors").update({ shopify_cart_id: cart.id, shopify_checkout_url: cart.checkoutUrl }).eq("id", visitorId), "set store visitor cart");
+}
+
+export async function visitorById(id: string): Promise<StoreVisitorRow | null> {
+  const r = await db().from("store_visitors").select(V_COLS).eq("id", id).maybeSingle();
+  return (r.data as StoreVisitorRow | null) ?? null;
+}
+
+/** Every visitor linked to this (proven) email, newest first. */
+export async function visitorsForEmail(email: string): Promise<StoreVisitorRow[]> {
+  return must(await db().from("store_visitors").select(V_COLS).eq("email", email.trim().toLowerCase()).order("last_seen_at", { ascending: false }).limit(50), "store visitors for email") as StoreVisitorRow[];
+}
+
+/** Links a visitor to a proven email, only if it has none yet. True when it was linked now. */
+export async function linkVisitorEmail(visitorId: string, email: string, via: "sign_in" | "order" | "email_link"): Promise<boolean> {
+  const r = await db().from("store_visitors").update({ email: email.trim().toLowerCase(), linked_via: via }).eq("id", visitorId).is("email", null).select("id");
+  return Boolean(r.data?.length);
+}
+
+/** The typed (unproven) email while painting, and the marketing tick. */
+export async function setEmailGiven(visitorId: string, email: string, consent: boolean): Promise<void> {
+  const now = new Date().toISOString();
+  must(await db().from("store_visitors").update({ email_given: email.trim().toLowerCase(), email_given_at: now, ...(consent ? { marketing_consent_at: now } : {}) }).eq("id", visitorId), "set store email given");
+}
+
+/** Pictures ordered: by Imagen session id, only this visitor's (an order can't mark someone else's). */
+export async function markGenerationsOrdered(visitorId: string, sessionIds: string[], orderId: string): Promise<number> {
+  if (!sessionIds.length) return 0;
+  const r = await db().from("store_generations").update({ order_id: orderId, ordered_at: new Date().toISOString() }).eq("visitor_id", visitorId).in("imagen_session_id", sessionIds).is("order_id", null).select("id");
+  return r.data?.length ?? 0;
+}
+
+export async function generationsMadeBy(visitorId: string): Promise<number> {
+  const r = await db().from("store_generations").select("id", { count: "exact", head: true }).eq("visitor_id", visitorId);
+  return r.count ?? 0;
+}
+
+/** Records who asked for the picture by email; false when it was already asked for (one email per picture). */
+export async function requestPictureEmail(generationId: string, email: string, consent: boolean): Promise<boolean> {
+  const r = await db().from("store_generations").update({ email_to: email.trim().toLowerCase(), email_consent: consent }).eq("id", generationId).is("email_to", null).select("id");
+  return Boolean(r.data?.length);
+}
+
+/** Claims the picture's one email (so two status checks can't both send it). */
+export async function claimPictureEmail(generationId: string): Promise<{ email_to: string; email_consent: boolean } | null> {
+  const r = await db().from("store_generations").update({ emailed_at: new Date().toISOString() }).eq("id", generationId).eq("status", "done").not("email_to", "is", null).is("emailed_at", null).select("email_to, email_consent").maybeSingle();
+  return (r.data as { email_to: string; email_consent: boolean } | null) ?? null;
+}
+
+/** "Your picture is ready" emails to one address since `since` (the per-address daily limit). */
+export async function picturesEmailedTo(email: string, since: Date): Promise<number> {
+  const r = await db().from("store_generations").select("id", { count: "exact", head: true }).eq("email_to", email.trim().toLowerCase()).gte("emailed_at", since.toISOString());
+  return r.count ?? 0;
 }

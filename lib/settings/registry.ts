@@ -377,6 +377,9 @@ export const REGISTRY = {
   "open_store.ask_email_while_painting": bool("open_store", true, { label: "Ask for an email while painting", description: "An optional box under the picture while it's made: we email the picture when it's ready." }),
   "open_store.email_link_days": num("open_store", 30, { label: "The email's link works for (days)", min: 1, max: 90 }),
   "open_store.emails_per_address_per_day": num("open_store", 3, { label: "“Your picture is ready” emails per address per day", min: 1, max: 1000000 }),
+  "open_store.klaviyo_list_id": text("open_store", "", { label: "Klaviyo list for store subscribers", description: "Optional. Visitors who tick “Send me offers” are subscribed with consent; with a list id they're added to that list too.", pattern: /^[A-Za-z0-9]*$/, max: 40 }),
+  "open_store.klaviyo_source": text("open_store", "Magic Store: while painting", { label: "Klaviyo consent source", description: "Recorded with the subscription.", max: 80 }),
+  "open_store.picture_email_subject": text("open_store", "{name}'s picture is ready", { label: "“Your picture is ready” email subject", description: "{name} is the pet's name, or “Your” without one.", max: 120 }),
   "open_store.posthog_dashboard_url": text("open_store", "", { label: "PostHog dashboard link", description: "The “Magic Store” dashboard, linked from this page.", pattern: /^(https:\/\/[^\s]+)?$/, max: 300 }),
   // Store defaults for the product fields (PRODUCT_FIELDS below): a product's own value wins.
   "open_store.photos": json("open_store", [{ label: "Add their photo", name_label: "Their name (optional, shown on the picture)", name_placeholder: "Teddy" }] as PhotoSlotWords[], photoSlotsSchema as unknown as z.ZodType<PhotoSlotWords[]>, {

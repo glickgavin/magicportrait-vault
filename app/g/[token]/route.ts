@@ -34,6 +34,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ token: string 
   if (result.status === "unknown") return go("/signin");
   if (result.status === "expired") {
     await track("vault_signin_link_used", { order_id: result.link.order_legacy_id, expired: true }, { email: result.link.email });
+    if (result.link.purpose === "store_picture") await import("@/lib/open-store/email").then((m) => m.pictureLinkOpened(result.link.email, result.link.redirect_path, true)).catch(() => undefined);
     return go("/signin?expired=1");
   }
   const { link, firstUse } = result;
@@ -49,6 +50,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ token: string 
     await db().from("gift_offers").update({ first_used_at: now, email_opened_at: now }).eq("id", link.gift_offer_id).is("first_used_at", null);
     await track("gift_offer_email_opened", { order_id: link.order_legacy_id }, { email: link.email, ref: link.order_legacy_id ? { type: "order", id: link.order_legacy_id } : null });
   }
+  // "Your picture is ready" (open store): the email is proven now, so the picture's visitor is linked to it.
+  if (link.purpose === "store_picture") await import("@/lib/open-store/email").then((m) => m.pictureLinkOpened(link.email, link.redirect_path, false)).catch((e: Error) => console.error(`[open-store] link opened: ${e.message}`));
   const path = link.redirect_path.startsWith("/create") ? `/create?entry=${ENTRY[link.purpose] ?? "order_email"}` : link.redirect_path;
   return go(path);
 }

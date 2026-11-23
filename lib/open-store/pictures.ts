@@ -153,6 +153,8 @@ export async function refreshGeneration(gen: StoreGenerationRow, now = Date.now(
     const product = await productLegacyId(gen.product_id);
     if (next.status === "done") {
       await track("store_generation_ready", { product_id: product, theme_slug: gen.theme, session_id: gen.imagen_session_id, seconds: seconds(gen, now), images: next.images.length, cost_usd: next.cost_usd, store_visitor_id: gen.visitor_id }, asVisitor(gen.visitor_id));
+      // Asked for it by email while it was painting: it goes now (once).
+      if (next.email_to) await import("./email").then((m) => m.sendPictureEmail(next.id)).catch((e: Error) => console.error(`[open-store] picture email: ${e.message}`));
     } else {
       await track("store_generation_failed", { product_id: product, theme_slug: gen.theme, reason: next.status === "timed_out" ? "timeout" : "imagen_failed", seconds: seconds(gen, now), store_visitor_id: gen.visitor_id }, asVisitor(gen.visitor_id));
     }
@@ -224,6 +226,8 @@ export type GenerationView = {
   images: { file: string; width: number; height: number }[];
   chosen: number;
   photos: string[];
+  /** They asked for it by email (the address is never sent back). */
+  emailAsked: boolean;
 };
 
 export async function generationView(gen: StoreGenerationRow, now = Date.now()): Promise<GenerationView> {
@@ -239,5 +243,6 @@ export async function generationView(gen: StoreGenerationRow, now = Date.now()):
     images,
     chosen: Math.min(gen.chosen_index, Math.max(0, images.length - 1)),
     photos: gen.photo_ids.map(photoFileId),
+    emailAsked: Boolean(gen.email_to),
   };
 }

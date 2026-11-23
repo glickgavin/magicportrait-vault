@@ -10,7 +10,7 @@ export type TrackActor = "customer" | "recipient" | "system" | `super_user:${str
 export type RefType = "card" | "order" | "session" | "image" | "setting" | "theme" | "version" | "category" | "customer" | "request" | "delivery";
 
 export type OutboxInput = {
-  kind: "event" | "profile" | "deletion";
+  kind: "event" | "profile" | "deletion" | "subscription";
   dedupe_key?: string | null;
   email: string;
   event_name?: string | null;

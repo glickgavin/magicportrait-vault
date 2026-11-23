@@ -28,5 +28,12 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error(`[webhook] shop cart match failed: ${(e as Error).message}`);
   }
+  // The open store (docs/open-store.md): marks its pictures ordered and links the visitor. Never changes the reply.
+  try {
+    const { recordStoreOrderPaid } = await import("@/lib/open-store/cart");
+    await recordStoreOrderPaid(JSON.parse(raw));
+  } catch (e) {
+    console.error(`[webhook] open store match failed: ${(e as Error).message}`);
+  }
   return Response.json({ ok: true, created: r.created, status: r.status });
 }

@@ -97,12 +97,60 @@ export async function queueDeletion(email: string): Promise<void> {
     });
 }
 
+/**
+ * An open-store visitor ticked "Send me offers" (docs/open-store.md › Asking for their email): a marketing
+ * subscription with consent, and the `Store Picture Ready` event for the store's future flows. Only the product,
+ * theme and product page link go to Klaviyo; never the photo, the picture or the pet's name. Never called without the tick.
+ */
+export async function queueStoreSubscription(email: string, event: { productTitle: string; themeSlug: string; productUrl: string }, dedupeKey: string): Promise<void> {
+  const s = await getSettings(["klaviyo.enabled", "open_store.klaviyo_list_id", "open_store.klaviyo_source"] as const);
+  const e = email.trim().toLowerCase();
+  const status = s["klaviyo.enabled"] ? "pending" : "skipped";
+  const list = s["open_store.klaviyo_list_id"].trim();
+  const rows = [
+    {
+      kind: "subscription",
+      email: e,
+      event_name: "store_subscription",
+      dedupe_key: `store-sub:${dedupeKey}`,
+      status,
+      payload: {
+        data: {
+          type: "profile-subscription-bulk-create-job",
+          attributes: { custom_source: s["open_store.klaviyo_source"], profiles: { data: [{ type: "profile", attributes: { email: e, subscriptions: { email: { marketing: { consent: "SUBSCRIBED" } } } } }] } },
+          ...(list ? { relationships: { list: { data: { type: "list", id: list } } } } : {}),
+        },
+      },
+    },
+    {
+      kind: "event",
+      email: e,
+      event_name: "Store Picture Ready",
+      dedupe_key: `store-ready:${dedupeKey}`,
+      status,
+      payload: {
+        data: {
+          type: "event",
+          attributes: {
+            metric: { data: { type: "metric", attributes: { name: "Store Picture Ready" } } },
+            profile: { data: { type: "profile", attributes: { email: e } } },
+            properties: { product: event.productTitle, theme: event.themeSlug, product_url: event.productUrl },
+            time: new Date().toISOString(),
+          },
+        },
+      },
+    },
+  ];
+  const r = await db().from("outbound_events").upsert(rows, { onConflict: "dedupe_key", ignoreDuplicates: true }).select("id");
+  if (s["klaviyo.enabled"]) for (const row of (r.data ?? []) as { id: string }[]) await flushRow(row.id).catch(() => undefined);
+}
+
 // ------------------------------------------------------------------ transport
 
-type Row = { id: string; kind: "event" | "profile" | "deletion"; payload: Record<string, unknown>; attempts: number; status: string; event_name: string | null };
+type Row = { id: string; kind: "event" | "profile" | "deletion" | "subscription"; payload: Record<string, unknown>; attempts: number; status: string; event_name: string | null };
 export type SendOutcome = { ok: true; status: number } | { ok: false; status: number; retryAfterMs?: number; permanent: boolean; error: string };
 
-const ENDPOINT = { event: "events/", profile: "profile-import/", deletion: "data-privacy-deletion-jobs/" } as const;
+const ENDPOINT = { event: "events/", profile: "profile-import/", deletion: "data-privacy-deletion-jobs/", subscription: "profile-subscription-bulk-create-jobs/" } as const;
 
 export interface KlaviyoTransport {
   readonly kind: "live" | "fixtures";

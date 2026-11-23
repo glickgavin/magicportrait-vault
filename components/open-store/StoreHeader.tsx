@@ -4,8 +4,9 @@ import type { Circle } from "@/lib/open-store/pages";
 import { t } from "@/lib/i18n";
 import { MenuSheet } from "@/components/MenuSheet";
 import { AccountMenu } from "@/components/AccountMenu";
-import { TrackedLink } from "@/components/TrackedLink";
+import { Suspense } from "react";
 import { StoreCart } from "./StoreCart";
+import { StoreSignIn } from "./StoreSignIn";
 
 /**
  * The store's header (docs/open-store.md › Store page): the app's menu and logo, the cart on the right.
@@ -37,9 +38,9 @@ export function StoreHeader({ user, mainSiteUrl, thumbnails, cardsEnabled, circl
               <AccountMenu user={user} />
             </div>
           ) : (
-            <TrackedLink href="/signin?next=/store" event="store_signin_tapped" props={{ page: "store" }} className="hidden h-11 items-center px-3 text-[15px] font-bold text-ink hover:text-pink-dark lg:flex">
-              {t("store.signIn")}
-            </TrackedLink>
+            <Suspense fallback={null}>
+              <StoreSignIn className="hidden h-11 items-center px-3 text-[15px] font-bold text-ink hover:text-pink-dark lg:flex" />
+            </Suspense>
           )}
           <StoreCart count={cartCount} />
         </div>
