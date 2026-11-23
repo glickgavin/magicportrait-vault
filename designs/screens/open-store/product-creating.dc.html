@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Magic Pillow, creating the picture</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#B8059F}a:hover{color:#8E047B}
+@keyframes mmp-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.mmp-spin{animation:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 1240px; overflow: hidden; background: #ffffff; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #2b2b2b; display: flex; flex-direction: column">
+
+  <a href="#" style="display: block; padding: 9px 16px; background: linear-gradient(89deg, #FF8F3F -4.82%, #F24BDF 52.24%, #DD07C4 102.1%); color: #ffffff; text-align: center; font-size: 13px; line-height: 1.35; font-weight: 700; letter-spacing: 0.02em; text-decoration: none">Black Friday · 60% off everything + free shipping, until 1 Dec</a>
+
+  <header style="position: relative; height: 56px; flex: none; background: #F3F1E7; display: flex; align-items: center; justify-content: space-between; padding: 0 6px; border-bottom: 1px solid #E7E3D8">
+    <button type="button" aria-label="Open menu" style="width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1f1f1f" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+    </button>
+    <img src="/_blob/343a87ad97cf63453135adfd721f9851" alt="Magic Portraits AI" style="position: absolute; left: 50%; top: 13px; transform: translateX(-50%); height: 30px; width: auto">
+    <button type="button" aria-label="Cart, empty" style="width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1f1f1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path><circle cx="9.5" cy="20" r="1.3"></circle><circle cx="17.5" cy="20" r="1.3"></circle></svg>
+    </button>
+  </header>
+
+  <nav aria-label="Breadcrumb" style="padding: 10px 16px; font-size: 13px; color: #6b6b6b; display: flex; gap: 6px">
+    <a href="store-page.dc.html" style="color: #6b6b6b; text-decoration: none">Bestsellers</a><span aria-hidden="true">/</span><a href="#" style="color: #6b6b6b; text-decoration: none">Pillows</a><span aria-hidden="true">/</span><span style="color: #2b2b2b">The Admiral</span>
+  </nav>
+
+  <section aria-label="Pictures" style="display: flex; flex-direction: column; gap: 10px">
+    <div style="position: relative; width: 390px; height: 390px">
+      <img src="/_blob/7eba1c8470d14fa450b252b26d99fc66" alt="" style="display: block; width: 390px; height: 390px; object-fit: cover; filter: blur(3px) saturate(0.6)">
+      <div role="status" aria-live="polite" style="position: absolute; inset: 0; background: rgba(243,241,231,0.82); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 0 34px">
+        <span style="position: relative; width: 112px; height: 112px; display: block">
+          <span class="mmp-spin" style="position: absolute; inset: 0; border-radius: 999px; background: conic-gradient(from 0deg, #FF8F3F, #F24BDF, #DD07C4, rgba(221,7,196,0) 78%); animation: mmp-spin 1.4s linear infinite"></span>
+          <span style="position: absolute; inset: 5px; border-radius: 999px; background: #F3F1E7"></span>
+          <img src="/_blob/f7da34595dd50f04eeba397baf7e12f4" alt="Your photo" style="position: absolute; inset: 9px; width: 94px; height: 94px; border-radius: 999px; object-fit: cover">
+        </span>
+        <strong style="font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; font-size: 25px; line-height: 1.15; color: #1a1a1a; text-align: center">Painting Teddy as The Admiral</strong>
+        <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; width: 100%; max-width: 280px">
+          <li style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #4d4d4d">
+            <span style="flex: none; width: 22px; height: 22px; border-radius: 999px; background: #1a1a1a; display: flex; align-items: center; justify-content: center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+            Uploading your photo</li>
+          <li aria-current="step" style="display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 800; color: #1a1a1a">
+            <span style="flex: none; width: 22px; height: 22px; border-radius: 999px; border: 2px solid #DD07C4; box-sizing: border-box; display: flex; align-items: center; justify-content: center"><span style="width: 8px; height: 8px; border-radius: 999px; background: #DD07C4"></span></span>
+            Painting Teddy as The Admiral</li>
+          <li style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #6b6b6b">
+            <span style="flex: none; width: 22px; height: 22px; border-radius: 999px; border: 2px solid #C9C4B8; box-sizing: border-box"></span>
+            Putting it on your pillow</li>
+        </ol>
+        <span role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="55" style="display: block; width: 100%; max-width: 280px; height: 6px; border-radius: 999px; background: #E2DDD0; overflow: hidden"><span style="display: block; width: 55%; height: 100%; border-radius: 999px; background: linear-gradient(89deg, #FF8F3F -4.82%, #F24BDF 52.24%, #DD07C4 102.1%)"></span></span>
+        <span style="font-size: 13px; color: #4d4d4d; text-align: center">About a minute. You can keep looking around.</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; padding: 0 16px; opacity: 0.45">
+      <span style="width: 64px; height: 64px; border-radius: 10px; border: 1px solid #E7E3D8; overflow: hidden; background: #F3F1E7"><img src="/_blob/7eba1c8470d14fa450b252b26d99fc66" alt="" style="display: block; width: 100%; height: 100%; object-fit: cover"></span>
+      <span style="width: 64px; height: 64px; border-radius: 10px; border: 1px solid #E7E3D8; overflow: hidden; background: #F3F1E7"><img src="/_blob/96b974a71f1a8224b406b702bcc777a1" alt="" style="display: block; width: 100%; height: 100%; object-fit: cover"></span>
+      <span style="width: 64px; height: 64px; border-radius: 10px; border: 1px solid #E7E3D8; overflow: hidden; background: #F3F1E7"><img src="/_blob/ee5d7daf0ea42fd840120ace2d3a4c35" alt="" style="display: block; width: 100%; height: 100%; object-fit: cover"></span>
+    </div>
+  </section>
+
+  <section aria-labelledby="email-ask" style="margin: 16px 16px 0; padding: 16px; border-radius: 16px; border: 1.5px solid #F2C6EA; background: #FFF8FD; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+      <h2 id="email-ask" style="margin: 0; padding-top: 2px; font-size: 16px; line-height: 1.3; font-weight: 800; color: #1a1a1a">While we paint: want Teddy's picture by email?</h2>
+      <button type="button" aria-label="No thanks, hide this" style="flex: none; width: 32px; height: 32px; margin: -4px -6px 0 0; border: 0; border-radius: 8px; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4d4d4d" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    </div>
+    <p style="margin: 0; font-size: 13px; line-height: 1.45; color: #4d4d4d">We'll send it the moment it's ready, so you can come back to it on any device. Optional.</p>
+    <div style="display: flex; gap: 8px">
+      <label for="store-email" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Your email</label>
+      <input id="store-email" type="email" autocomplete="email" inputmode="email" placeholder="Your email" style="flex: 1; min-width: 0; height: 48px; padding: 0 14px; border-radius: 12px; border: 1.5px solid #D9D5CA; font-family: inherit; font-size: 16px; color: #1a1a1a; background: #ffffff; box-sizing: border-box">
+      <button type="button" style="flex: none; height: 48px; padding: 0 16px; border: 0; border-radius: 12px; background: #1a1a1a; color: #ffffff; font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer">Email it to me</button>
+    </div>
+    <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: #4d4d4d; cursor: pointer">
+      <input type="checkbox" style="flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: #B8059F">Send me offers and new designs too. Unsubscribe any time.</label>
+  </section>
+
+  <section style="padding: 20px 16px 0; display: flex; flex-direction: column; gap: 8px">
+    <h1 style="margin: 0; font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; font-size: 30px; line-height: 1.12; color: #1a1a1a">Magic Pillow · The Admiral</h1>
+    <span style="display: flex; align-items: baseline; gap: 10px; padding-top: 2px">
+      <span style="font-size: 24px; font-weight: 800; color: #1a1a1a">$24.00</span>
+      <span style="font-size: 16px; color: #6b6b6b; text-decoration: line-through">$59.99</span>
+      <span style="font-size: 13px; font-weight: 800; color: #8E047B">You save $35.99</span>
+    </span>
+  </section>
+
+  <fieldset style="margin: 20px 16px 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 10px">
+    <legend style="padding: 0 0 10px; font-size: 15px; font-weight: 800; color: #1a1a1a">Size: <span style="font-weight: 500">16 × 16″</span></legend>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <label style="position: relative; height: 52px; border-radius: 12px; border: 1.5px solid #D9D5CA; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #2b2b2b; cursor: pointer">
+        <input type="radio" name="size" value="12" style="position: absolute; opacity: 0; width: 1px; height: 1px">12 × 12″</label>
+      <label style="position: relative; height: 52px; border-radius: 12px; border: 2px solid #DD07C4; background: #FDE7FA; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: #8E047B; cursor: pointer">
+        <input type="radio" name="size" value="16" checked style="position: absolute; opacity: 0; width: 1px; height: 1px">16 × 16″
+        <span style="position: absolute; top: -9px; left: 50%; transform: translateX(-50%); padding: 2px 8px; border-radius: 999px; background: #1a1a1a; color: #ffffff; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; white-space: nowrap">BESTSELLER</span></label>
+      <label style="position: relative; height: 52px; border-radius: 12px; border: 1.5px solid #D9D5CA; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #2b2b2b; cursor: pointer">
+        <input type="radio" name="size" value="18" style="position: absolute; opacity: 0; width: 1px; height: 1px">18 × 18″</label>
+    </div>
+  </fieldset>
+
+  <section style="margin: 22px 16px 0; display: flex; flex-direction: column; gap: 10px">
+    <span style="font-size: 15px; font-weight: 800; color: #1a1a1a">Their photo</span>
+    <div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 14px; border: 1.5px solid #D9D5CA">
+      <img src="/_blob/f7da34595dd50f04eeba397baf7e12f4" alt="Your photo" style="width: 56px; height: 56px; border-radius: 10px; object-fit: cover; flex: none">
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+        <strong style="font-size: 14px; color: #1a1a1a">Photo added</strong>
+        <span style="font-size: 13px; color: #616161">Looks good: one pet, clear face</span>
+      </span>
+      <button type="button" style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1.5px solid #1f1f1f; background: #ffffff; font-family: inherit; font-size: 14px; font-weight: 800; color: #1f1f1f; cursor: pointer">Change</button>
+    </div>
+  </section>
+
+  <section style="margin: 20px 16px 0; display: flex; flex-direction: column; gap: 8px">
+    <label for="pet-name-2" style="font-size: 15px; font-weight: 800; color: #1a1a1a">Their name <span style="font-weight: 500; color: #616161">(optional, shown on the picture)</span></label>
+    <input id="pet-name-2" type="text" maxlength="14" value="Teddy" style="height: 52px; padding: 0 14px; border-radius: 12px; border: 1.5px solid #D9D5CA; font-family: inherit; font-size: 16px; color: #1a1a1a; background: #ffffff; box-sizing: border-box">
+  </section>
+
+  <section style="margin: 18px 16px 0; display: flex; flex-direction: column; gap: 10px">
+    <button type="button" disabled aria-disabled="true" style="height: 56px; border: 0; border-radius: 12px; background: #EDEAE2; color: #4d4d4d; font-family: inherit; font-size: 17px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 10px">
+      <span class="mmp-spin" aria-hidden="true" style="width: 18px; height: 18px; border-radius: 999px; border: 2.5px solid #C9C4B8; border-top-color: #4d4d4d; box-sizing: border-box; animation: mmp-spin 0.9s linear infinite"></span>Creating their picture…</button>
+    <span style="font-size: 13px; text-align: center; color: #616161">Changing the size now won't start again.</span>
+  </section>
+
+  <section style="margin: 24px 16px 0; padding: 16px; border-radius: 16px; background: #F3F1E7; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; gap: 12px; align-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f1f1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"></path><circle cx="7" cy="17.5" r="1.6"></circle><circle cx="17" cy="17.5" r="1.6"></circle></svg>
+      <span style="font-size: 14px; line-height: 1.4"><strong>Free shipping</strong> until 1 Dec · arrives approx. 1 – 4 Dec</span>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f1f1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M12 3l2.4 5 5.6.6-4.2 3.8 1.2 5.5L12 15.2 7 17.9l1.2-5.5L4 8.6 9.6 8z"></path></svg>
+      <span style="font-size: 14px; line-height: 1.4"><strong>Printed to order</strong>, just for you</span>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

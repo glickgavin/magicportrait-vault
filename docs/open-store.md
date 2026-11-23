@@ -392,6 +392,21 @@ Product pages sit under `/store/` rather than at `/product/<id>` so that one swi
 
 Needed from people: Imagen's API docs (the key is in Vercel); the Shopify navigation menu and category collections (the Magic Store collection and the product fields exist since 23 Nov); each product's theme; the Storefront token's sales channel publishing the products, for carts.
 
+## Running the build
+
+Like the rest of the app (`BUILD.md` › The prompt): start a Claude Code cloud session on this repo in the `magic-vault` environment, on the branch `claude/shop`, and paste:
+
+> Read `CLAUDE.md`, then `docs/open-store.md` (the source of truth for this build), `SPEC.md` §23, `docs/shop.md`, `docs/analytics.md`, `docs/schema.md`, `docs/design.md` and `designs/README.md` › Magic Store. The mockups are the "Open store mockups" design canvas, https://claude.ai/artifact/8U6PKdW5mnnn64Zq5UA4CH (read it with the Artifact tool); copies of its boards are in `designs/screens/open-store/`. Build the open store through Open store 1–5 of `docs/open-store.md` › Build parts, in order, on a new branch `claude/open-store` made from `claude/shop`.
+>
+> - For each part: build it, write its tests, run `pnpm typecheck && pnpm lint && pnpm test` (and the e2e suite at 390 and 1280 when it adds screens), fix until green, commit `feat(open-store-N): <name>`, push, and update `BUILD_LOG.md` under "Open store".
+> - After Open store 1, open a draft pull request into `claude/shop` and keep pushing to it. Don't merge anything.
+> - Keep `open_store.enabled` and `open_store.super_user_preview` off. With them off, every existing screen and test must stay as it is, including the Gifts and Products pages after Settings › Shop is reorganised.
+> - Don't stop to ask questions. Shopify and Imagen run on fixtures (`DATA_SOURCE=fixtures`). Don't call Imagen's live API, send email, or write to Shopify or Klaviyo from this session. If something is missing or unclear, take the most reasonable reading, write it in `BUILD_LOG.md` under "Blocked" or "Decisions", and carry on.
+> - Tests and e2e run against the local Supabase stack. The live project (`magic-vault`) only gets the new migrations, through `scripts/db-apply-remote.ts`; never test data.
+> - If `BUILD_LOG.md` already has an "Open store" section, you are resuming: read it and continue from the first unfinished part.
+
+When it's done: open the pull request's Vercel preview, sign in as a super user, turn on **Magic Store preview** in Settings › Shop › Magic Store, set a theme on a product, and try the store at `/store`. On the preview, pictures come from the live Imagen API with the key in Vercel.
+
 ## Open questions
 
 Answered 23 Nov:
