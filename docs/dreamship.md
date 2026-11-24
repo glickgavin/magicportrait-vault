@@ -33,6 +33,14 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
   - **No template yet**, so the Magic Store hides it, although it's on the Storefront channel. Adding a template puts it on sale: wait for Part B, or take it off the channel first.
   - Dreamship's minimum for blankets is 150 dpi, with 600 px of safe margin and 300 px of bleed per side.
   - Cost $14.09 / $29.39 / $38.59 against $59.99 / $79.99 / $99.99.
+- **Museum Quality "Mona Lisa" Poster** (Shopify 8916356464836, Dreamship product 9974634, catalog item 287 Standard Poster, theme `mona-lisa`). Print rules and text filled in on 24 Nov:
+  - 8x10: item variant 12915, print area 2400x3000, product variant 45380612, cost $2.89, price $29.99.
+  - 12x18: item variant 4324, print area 3600x5400, product variant 45380613, cost $6.69, price $39.99.
+  - 16x24: item variant 4329, print area 4800x7200, product variant 45380610, cost $7.99, price $45.99.
+  - 20x30: item variant 12917, print area 6000x9000, product variant 45380611, cost $6.29, price $69.99.
+  - `extra` with `item_id` 287, `lead_days` 1-3.
+  - `max_crop_pct` 40 on the three 2:3 sizes, because Mona Lisa paints 1024 × 1024 squares and those sizes cut a third.
+  - Minimum 250 dpi. No template yet, and not on the Storefront channel, so it's hidden.
 - **Dreamship's print rules:** every area is printed at 300 dpi with a minimum of 250 dpi. The safe area is about 2% in from each edge, and the art must run to the edges (`get_print_areas`, item 958).
 
 ## Part A: Link and sync (reads Dreamship; writes only `mmp_shop`)
