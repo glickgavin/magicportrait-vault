@@ -6,6 +6,7 @@ import { target } from "@/lib/shop/fit";
 import { parseVariantRules } from "@/lib/shop/rules";
 import { parseTemplate } from "@/lib/shop/template";
 import { uploadedTemplateMedia } from "@/lib/shop/template-media";
+import { layerArtByIds, listLayerArt } from "@/lib/shop/layer-art";
 import { getSettings } from "@/lib/settings";
 import { LIBRARY_ROOMS } from "@/lib/shop/photo-library";
 import { ShopTemplateEditor } from "@/components/admin/shop/ShopTemplateEditor";
@@ -43,11 +44,13 @@ export default async function ShopTemplatePage({ params, searchParams }: { param
   });
   // The product's photos, photos uploaded here for it, and any studio photo the saved template uses from Shopify Files.
   const published = parseTemplate(p.template?.value);
-  const [uploads, s] = await Promise.all([uploadedTemplateMedia(p.legacyId), getSettings(["shop.template_sample_pictures", "shop.template_upload_max_mb", "shop.template_upload_max_px"] as const)]);
+  const [uploads, live, kept, s] = await Promise.all([uploadedTemplateMedia(p.legacyId), listLayerArt().catch(() => []), layerArtByIds(published?.layer?.art?.choices ?? []).catch(() => []), getSettings(["shop.template_sample_pictures", "shop.template_upload_max_mb", "shop.template_upload_max_px"] as const)]);
   const media = [...p.media.map((m) => ({ id: m.id, url: m.url, alt: m.alt, width: m.width ?? 1000, height: m.height ?? 1000 })), ...uploads];
   for (const [m, alt] of [[published?.background, "Studio photo"], [published?.overlay, "Studio overlay"]] as const) {
     if (m && !media.some((x) => x.id === m.media_id)) media.push({ id: m.media_id, url: m.url, alt, width: m.w, height: m.h });
   }
+  // The art library, plus archived pictures this product still offers.
+  const art = [...live, ...kept.filter((a) => !live.some((l) => l.id === a.id))];
   return (
     <div>
       <TrackPageView event="settings_viewed" props={{ section: "shop_template" }} />
@@ -66,6 +69,7 @@ export default async function ShopTemplatePage({ params, searchParams }: { param
           upload={{ maxMb: s["shop.template_upload_max_mb"], maxPx: s["shop.template_upload_max_px"] }}
           rooms={LIBRARY_ROOMS.filter((r) => r.product === p.handle)}
           focusRoom={typeof room === "string" ? room : null}
+          art={art}
         />
       </div>
     </div>
