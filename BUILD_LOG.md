@@ -621,4 +621,5 @@ Still open:
 - **Held:** the product isn't on the Storefront channel (Headless 03), so it stays hidden. Its variants are stocked at Shopify's Dreamship location, and Dreamship's app imports and auto-submits orders with the sample art.
 - **Proposed:** `docs/dreamship.md`. Part A syncs the rules from the linked Dreamship product and shows cost, margin and dpi (no new write). Part B sends the customer's picture to Dreamship and needs allowed write 7.
 - **Decided (24 Nov, Gavin):** merge the maker change; keep the poster hidden until Part B works; B1 (swap the artwork on Dreamship's imported order), so allowed write 7 is now in `CLAUDE.md`; a 2:3 2K Royal Flush for posters.
-- **Blocked:** `DREAMSHIP_API_KEY`; the 2:3 2K theme active in Imagen; the Royal Flush resolution (1024 × 1024) against Dreamship's 250 dpi minimum; 24x36 priced below cost.
+- **Decided later on 24 Nov (Gavin):** `DREAMSHIP_API_KEY` added in Vercel. Orders aren't printed automatically: the app sets the picture and leaves a draft (`dreamship.auto_submit`, default off; write 7 narrowed to match). New page Settings › Printers (`docs/dreamship.md` › Part C).
+- **Blocked:** Dreamship still auto-submits imported orders (its own setting, Gavin to turn off); the 2:3 2K theme active in Imagen; the Royal Flush resolution (1024 × 1024) against Dreamship's 250 dpi minimum; 24x36 priced below cost.

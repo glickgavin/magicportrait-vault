@@ -1,6 +1,6 @@
 # Dreamship
 
-Dreamship is a new printer (24 Nov). Products are designed in Dreamship's designer and published to Shopify by Dreamship's Shopify app, which also stocks them at Shopify's **Dreamship** fulfilment location. Status: Part A and Part B below are **approved, not built** (24 Nov). Gavin chose B1 (swap the artwork on Dreamship's imported order), approved allowed write 7 (now in `CLAUDE.md`), and asked for a 2:3 2K version of Royal Flush for the poster.
+Dreamship is a new printer (24 Nov). Products are designed in Dreamship's designer and published to Shopify by Dreamship's Shopify app, which also stocks them at Shopify's **Dreamship** fulfilment location. Status: Part A and Part B below are **approved, not built** (24 Nov). Gavin chose B1 (swap the artwork on Dreamship's imported order), approved allowed write 7 (now in `CLAUDE.md`), and asked for a 2:3 2K version of Royal Flush for the poster. Later on 24 Nov he added the app's Dreamship API key and asked that orders are **not printed automatically**: the app sets the picture and leaves the order as a draft, behind a setting that can change later (Part B), and that printers get their own Settings page (Part C).
 
 ## The two problems this solves
 
@@ -49,19 +49,23 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
 - **Source:** `lib/sources/dreamship.ts`, with an interface, `live` and `fixtures` as for every source.
   - Dreamship REST API (`https://api.dreamship.com/v1`, schema at `/v1/schema/`) with `DREAMSHIP_API_KEY` (Vercel only, never `NEXT_PUBLIC_`).
   - Confirm the field names against the schema when building. The schema couldn't be read from the design session.
-- **Settings:** `dreamship.api_url`, `dreamship.sync_enabled` (default off), `dreamship.sale_pct` (60), `dreamship.min_margin_pct` (warning threshold, default 30).
+- **Settings:** listed under Part C; they're edited on Settings › Printers.
 - **Analytics:** new business events `admin_dreamship_linked` and `admin_dreamship_synced`, props `product_id` and `fields_changed` (added to `docs/analytics.md` when built).
 
 ## Part B: Send the customer's picture to Dreamship (allowed write 7)
 
 **Chosen (B1): keep Dreamship's own import and swap the artwork.**
-1. In Dreamship, turn **off** auto-submit for order-import orders. Gavin does this in the Dreamship app; the MCP and API can't change it. Imported orders then wait as drafts instead of printing the sample.
+1. In Dreamship, turn **off** auto-submit for order-import orders. Gavin does this in the Dreamship app; the app's write 7 never changes Dreamship settings, and the MCP can't either. Imported orders then wait as drafts instead of printing the sample. **Still on at 13:30 on 24 Nov** (Dreamship reports `auto_submit_order_import_orders: true` and `auto_submit_api_orders: true`).
 2. On Shopify `orders/paid` (the existing verified webhook), for each line with `_shop` = true whose variant has maker `dreamship`, the app queues an outbox job `dreamship_artwork`.
 3. The job finds the Dreamship order imported for that Shopify order, by its reference id. It retries with backoff while Dreamship hasn't imported it yet, for up to `dreamship.import_wait_hours` (default 6), then alerts.
-4. For each personalised line, it uploads the print file as artwork and sets it as the line's artwork for the size's print area. Then it submits the order.
+4. For each personalised line, it uploads the print file as artwork and sets it as the line's artwork for the size's print area. Then:
+   - **`dreamship.auto_submit` off (the default):** the order stays a **draft** in Dreamship with the customer's picture on it. A person checks it and submits it in Dreamship. Settings › Printers lists the drafts waiting (Part C).
+   - **`dreamship.auto_submit` on:** the app submits the order once every personalised line has its picture.
+   - The app never submits an order with a line it couldn't set. That order stays a draft and is flagged on Settings › Printers.
    - The print file is the chosen picture cropped by `_shop_crop` and resized to `print_px`, from the private bucket through a short-lived signed link.
    - Lines without a picture keep Dreamship's artwork.
-5. It records the Dreamship order id and the result on the order's activity (`activity_log`, new event `shop_order_sent_to_maker`, added to `docs/analytics.md` when built). Dreamship's app keeps syncing tracking to Shopify, as today.
+5. It records the Dreamship order id and the result on the order's activity (`activity_log`, new event `shop_order_sent_to_maker`, props `maker`, `status` = `draft` | `submitted` | `failed`, `lines`; added to `docs/analytics.md` when built). Dreamship's app keeps syncing tracking to Shopify, as today.
+6. The job is idempotent: keyed by Shopify order id and line id. A line whose artwork is already the customer's picture is skipped, and a submitted order is never touched again.
 
 **Not chosen (B2): the app places the order itself.**
 - Take Magic Store Dreamship products off the Dreamship location, so Dreamship's app ignores them.
@@ -73,8 +77,62 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
 - (b) turn on Dreamship's AI upscale for the print area ($0.20 per print area);
 - (c) or both.
 
-**`CLAUDE.md` allowed write 7** (approved and added 24 Nov):
-> 7. Dreamship orders: for a paid Shopify order line whose variant's maker is `dreamship`, upload the customer's picture as artwork, set it on that line of the Dreamship order imported for it, and submit that order, through Dreamship's API with this app's key (`docs/dreamship.md`). Never change any other Dreamship product, order or setting.
+**`CLAUDE.md` allowed write 7** (approved and added 24 Nov; narrowed the same day to drafts unless `dreamship.auto_submit` is on):
+> 7. Dreamship orders: for a paid Shopify order line whose variant's maker is `dreamship`, upload the customer's picture as artwork and set it on that line of the Dreamship order imported for it, through Dreamship's API with this app's key (`docs/dreamship.md`). Submit that order only when `dreamship.auto_submit` is on (default off: it stays a draft). Never change any other Dreamship product, order or setting.
+
+## Part C: Settings › Printers
+
+A new Settings page, `/settings/printers` (404 unless super user, like every Settings page), with one card per maker in `MAKERS`. It's where printer behaviour is set, so changing "draft" to "print automatically" later is one switch, not a code change.
+
+**Dreamship card**
+- **Connection:** whether `DREAMSHIP_API_KEY` is set (never shown), and **Check connection**, which reads Dreamship's account. It shows the business name, the plan, and when it was last checked. Settings › Data sources gets the same check as a row.
+- **Dreamship's own order settings**, read live and shown read-only:
+  - auto-import orders with Dreamship products;
+  - auto-submit imported orders;
+  - auto-submit API orders.
+- **Warning:** when Dreamship auto-submits imported orders while the app would leave drafts, the card says:
+  > Dreamship prints imported orders straight away, before the customer's picture is set. Turn off auto-submit for imported orders in Dreamship › Settings › Order preferences.
+
+  The Magic Store also refuses to put a Dreamship product on sale while this is so: Settings › Shop › Products shows it as hidden, with this reason.
+- **This app's settings** (in `lib/settings/registry.ts`, group `printers`):
+
+| Key | Default | What |
+|---|---|---|
+| `dreamship.auto_submit` | `false` | After setting the customer's picture, submit the order (on) or leave it as a draft for a person to check (off) |
+| `dreamship.sync_enabled` | `false` | Daily check of linked products against Dreamship (Part A); it only reports |
+| `dreamship.import_wait_hours` | `6` | How long to wait for Dreamship to import a paid order before flagging it |
+| `dreamship.sale_pct` | `60` | The sale used for the margin check |
+| `dreamship.min_margin_pct` | `30` | Margins below this are flagged |
+| `dreamship.api_url` | `https://api.dreamship.com/v1` | The API base |
+
+- **Products:** every Shopify product with a `dreamship` size, each showing:
+  - its linked Dreamship product (link to the designer);
+  - when it was last synced;
+  - its warning count, linking to its Dreamship card in Settings › Shop.
+- **Orders:** the latest 50 Shopify orders with Dreamship lines, each showing:
+  - the Shopify order name;
+  - the Dreamship order (link);
+  - the status: waiting for Dreamship to import it, picture set (draft, waiting for someone to submit), submitted, or needs attention (with the reason);
+  - when that happened.
+
+  Read from `activity_log` (`shop_order_sent_to_maker`), plus a live status read from Dreamship for drafts. **Retry** re-queues a failed job. There is no submit button: drafts are submitted in Dreamship.
+- Event: `admin_printer_settings_updated`, props `maker` and `keys` (new, added to `docs/analytics.md` when built).
+
+**Prodigi, Gelato and In house cards**
+- How many products and sizes use each maker.
+- "Orders go to the existing print system straight from Shopify." No settings yet. The cards are there so a printer's settings have one home when they're added.
+
+## Build parts
+
+Build in this order, one commit per part (`feat(dreamship-N): …`), each leaving every existing screen and test unchanged.
+
+| Part | What | Done when |
+|---|---|---|
+| Dreamship 1: source and Settings › Printers | `lib/sources/dreamship.ts` (interface, live, fixtures: account and its order settings, product design, catalog item print areas and production days, find an order by reference, upload artwork, set a line's artwork, submit). The `printers` settings group. `/settings/printers` with all four maker cards, Check connection, Dreamship's own order settings and the auto-submit warning. A Data sources row. | Unit tests on the fixtures and the settings. e2e at 390 and 1280: super user sees the page and the warning, others get 404, the switch saves. Axe clean. |
+| Dreamship 2: link and sync (Part A) | `mmp_shop.dreamship_product_id` (definition created by Settings › Shop like the others), the Dreamship card on a Settings › Shop product (suggest, link, Sync from Dreamship with a diff, Save to Shopify), cost, margin and dpi, the flags on Products, the daily report-only cron, and the Magic Store hiding a Dreamship product while Dreamship auto-submits imported orders. | Unit tests for matching by SKU, the proposed fields, margins and dpi, and the hiding reason. e2e: link the fixture Flush poster, sync, see the diff and save. |
+| Dreamship 3: the customer's picture on the order (Part B) | The `dreamship_artwork` outbox job from `orders/paid`: wait for the import, make the print file (crop and size), upload, set each personalised line, leave a draft or submit per `dreamship.auto_submit`, record `shop_order_sent_to_maker`. The Orders list and Retry on Settings › Printers. | Unit tests: draft by default; submit only when on; never submit with a line unset; idempotent re-runs; import not there yet then there; a non-Dreamship line untouched. e2e: a fixture paid order shows on Settings › Printers as a draft, then as submitted with the switch on. |
+
+The Dreamship API's exact paths and fields aren't confirmed yet (the schema at `https://api.dreamship.com/v1/schema/` couldn't be read from the design session). Read it first. If the build session can't reach it either, build against the fixture interface, and list the paths to confirm under "Blocked" in `BUILD_LOG.md`.
 
 ## Until Part B exists
 
@@ -88,4 +146,6 @@ A Magic Store order for a Dreamship product would print the sample art. So Dream
 - [x] Picture quality: a 2:3 2K version of Royal Flush (24 Nov). Waiting on Imagen: activate `royal-flush-2k-test` or make a production copy, then set the product's `imagen_theme` to it (the theme must be active to appear in the field's choices). Then `max_crop_pct` 40 on 16x24 and 24x36 can go back to the default.
 - [ ] 24x36 costs $135.69 against a $129.99 price (16x24 leaves $25.20 at full price). At 60% off, 12x16 and up lose money on cost alone, and 8x10 clears about $1 before shipping. Raise the 24x36 price, drop the size, or move to Dreamship Plus (24x36 $108.49)?
 - [ ] Add square sizes for square themes? Framed Poster comes in 8x8 ($20.69), 12x12 ($24.29), 16x16 and 20x20, which fit Royal Flush's 1024 × 1024 squares with no crop.
-- [ ] Dreamship API key for this app (`DREAMSHIP_API_KEY` in Vercel).
+- [x] Dreamship API key for this app: Gavin added `DREAMSHIP_API_KEY` in Vercel (24 Nov). Check connection on Settings › Printers confirms it after deploy.
+- [x] Print automatically or not: drafts (`dreamship.auto_submit` off), changeable later on Settings › Printers (24 Nov).
+- [ ] Turn off "auto-submit imported orders" in Dreamship. Until then Dreamship prints imported orders with the sample art whatever the app does.
