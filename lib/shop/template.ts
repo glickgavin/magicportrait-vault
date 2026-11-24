@@ -10,7 +10,25 @@ const frac = z.number().min(-0.25).max(1.25);
 const point = z.tuple([frac, frac]);
 const media = z.object({ media_id: z.string().max(200), url: z.string().max(2000), w: z.number().int().positive().max(20000), h: z.number().int().positive().max(20000) });
 
-export const cornersZone = z.object({ kind: z.literal("corners"), points: z.tuple([point, point, point, point]) });
+export const BEND_RANGE = { min: -0.1, max: 0.2 } as const;
+/**
+ * One edge's curve: how far it has moved in at evenly spaced points along it (3 points sit at a
+ * quarter, half and three quarters), as a fraction of the photo's height (top, bottom) or width
+ * (left, right). Negative bulges out. Top and bottom run left to right, left and right top to bottom.
+ */
+const edgeBend = z.array(z.number().min(BEND_RANGE.min).max(BEND_RANGE.max)).min(1).max(9);
+export const cornersZone = z.object({
+  kind: z.literal("corners"),
+  points: z.tuple([point, point, point, point]),
+  /**
+   * Curved edges, for soft products such as a filled cushion, whose edges pull in: the corners stay
+   * put and each edge passes through its curve points. Left out = straight edges.
+   */
+  bend: z.object({ top: edgeBend, right: edgeBend, bottom: edgeBend, left: edgeBend }).optional(),
+});
+export type Bend = NonNullable<z.infer<typeof cornersZone>["bend"]>;
+export type BendEdge = keyof Bend;
+export const NO_BEND: Bend = { top: [0, 0, 0], right: [0, 0, 0], bottom: [0, 0, 0], left: [0, 0, 0] };
 export const wrapZone = z.object({
   kind: z.literal("wrap"),
   left: frac,
@@ -47,6 +65,32 @@ export function parseTemplate(value: string | null | undefined): Template | null
   }
 }
 
+/** Where an edge's curve points sit along it (0–1 from its first corner). */
+export function bendStops(edge: readonly number[]): number[] {
+  return edge.map((_, i) => (i + 1) / (edge.length + 1));
+}
+
+/** True when a corners zone has any curved edge. */
+export function isBent(zone: Template["zone"]): boolean {
+  return zone.kind === "corners" && Boolean(zone.bend && Object.values(zone.bend).some((e) => e.some((n) => n !== 0)));
+}
+
+/**
+ * How far an edge has moved in at t (0–1 along it): a smooth curve through 0 at both corners and
+ * each curve point, level at the corners (a cushion's edge leaves its corner tip almost straight).
+ */
+export function bendAt(edge: readonly number[], t: number): number {
+  const n = edge.length + 1;
+  const h = 1 / n;
+  const p = [0, ...edge, 0];
+  const slope = (i: number) => (i === 0 || i === n ? 0 : (p[i + 1] - p[i - 1]) / (2 * h));
+  const i = Math.min(n - 1, Math.max(0, Math.floor(t * n)));
+  const s = t * n - i;
+  const s2 = s * s;
+  const s3 = s2 * s;
+  return (2 * s3 - 3 * s2 + 1) * p[i] + (s3 - 2 * s2 + s) * h * slope(i) + (-2 * s3 + 3 * s2) * p[i + 1] + (s3 - s2) * h * slope(i + 1);
+}
+
 /** Projective map of the unit square onto a quad (TL, TR, BR, BL). */
 export function homography(q: [Point, Point, Point, Point]) {
   const [p0, p1, p2, p3] = q;
@@ -70,7 +114,21 @@ export function homography(q: [Point, Point, Point, Point]) {
 export function zoneMapper(zone: Template["zone"], bgW: number, bgH: number): (u: number, v: number) => Point {
   if (zone.kind === "corners") {
     const [a, b, c, d] = zone.points.map(([x, y]) => ({ x: x * bgW, y: y * bgH })) as [Point, Point, Point, Point];
-    return homography([a, b, c, d]);
+    const flat = homography([a, b, c, d]);
+    const bend = zone.bend;
+    if (!bend || !isBent(zone)) return flat;
+    // Each edge moves in along its curve, and the shift fades out towards the opposite edge, faster
+    // than in a straight line: like the print on a filled cushion, the picture is squeezed where the
+    // fabric turns away near the edges and left alone in the middle.
+    return (u: number, v: number) => {
+      const p = flat(u, v);
+      const fu = 1 - u;
+      const fv = 1 - v;
+      return {
+        x: p.x + (bendAt(bend.left, v) * fu * fu - bendAt(bend.right, v) * u * u) * bgW,
+        y: p.y + (bendAt(bend.top, u) * fv * fv - bendAt(bend.bottom, u) * v * v) * bgH,
+      };
+    };
   }
   const half = (Math.PI / 2) * zone.spread;
   const sinE = Math.sin(half);
@@ -111,6 +169,13 @@ export function zoneAspect(zone: Template["zone"], bgW: number, bgH: number): nu
       prev = p;
     }
     return w / dist(m(0.5, 0), m(0.5, 1));
+  }
+  if (isBent(zone)) {
+    // Curved edges pull in between the corners, so measure across the picture, not along its edges.
+    const at = [0.25, 0.5, 0.75];
+    const w = at.reduce((s, t) => s + dist(m(0, t), m(1, t)), 0);
+    const h = at.reduce((s, t) => s + dist(m(t, 0), m(t, 1)), 0);
+    return w / h;
   }
   const w = (dist(m(0, 0), m(1, 0)) + dist(m(0, 1), m(1, 1))) / 2;
   const h = (dist(m(0, 0), m(0, 1)) + dist(m(1, 0), m(1, 1))) / 2;

@@ -2,7 +2,7 @@ import "server-only";
 import { opName, timed } from "@/lib/perf";
 import type { ShopifyTokenProvider } from "@/lib/sources/shopify-auth";
 import { parseList } from "../fields";
-import type { DiscountInfo, FieldDefinitionSpec, ProductFieldChanges, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopListKey, ShopProduct, VariantRuleChange, WriteResult } from "./types";
+import type { DiscountInfo, FieldDefinitionSpec, ProductFieldChanges, ProductMetafieldChange, RawMetafield, ShopCatalogSource, ShopFieldDefinition, ShopListKey, ShopProduct, VariantRuleChange, WriteResult } from "./types";
 
 /**
  * The shop's Shopify Admin reads and its two kinds of write (CLAUDE.md, allowed writes 4–5).
@@ -174,6 +174,33 @@ export class ShopCatalogLive implements ShopCatalogSource {
       throw new Error(`shopify_graphql: ${body.errors.map((e) => e.message).join("; ").slice(0, 300)}`);
     }
     return body.data as T;
+  }
+
+  /** Read-only Admin API queries for the open store's own source (lib/open-store/sources/live.ts). */
+  async adminQuery<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+    if (/^\s*mutation\b/i.test(query)) throw new Error("adminQuery is read-only");
+    return this.gql<T>(query, variables);
+  }
+
+  async setProductMetafields(productId: string, namespace: string, change: ProductMetafieldChange): Promise<WriteResult> {
+    if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId)) return { ok: false, reason: "bad_product_id" };
+    if (change.set.length) {
+      const d = await this.gql<{ metafieldsSet: { userErrors: { message: string; code?: string }[] } }>(M_SET, { metafields: change.set.map((f) => ({ ownerId: productId, namespace, key: f.key, type: f.type, value: f.value })) });
+      if (d.metafieldsSet.userErrors.length) return { ok: false, reason: d.metafieldsSet.userErrors.map((e) => e.code || e.message).join(",").slice(0, 200) };
+    }
+    if (change.clear.length) {
+      const d = await this.gql<{ metafieldsDelete: { userErrors: { message: string }[] } }>(M_DELETE, { metafields: change.clear.map((key) => ({ ownerId: productId, namespace, key })) });
+      if (d.metafieldsDelete.userErrors.length) return { ok: false, reason: d.metafieldsDelete.userErrors.map((e) => e.message).join(",").slice(0, 200) };
+    }
+    return { ok: true };
+  }
+
+  async setThemeChoices(namespace: string, choices: string[]): Promise<WriteResult> {
+    const d = await this.gql<{ metafieldDefinitionUpdate: { userErrors: { message: string; code?: string }[] } }>(M_DEF_UPDATE, {
+      definition: { namespace, key: "imagen_theme", ownerType: "PRODUCT", validations: [{ name: "choices", value: JSON.stringify(choices) }] },
+    });
+    const errs = d.metafieldDefinitionUpdate.userErrors;
+    return errs.length ? { ok: false, reason: errs.map((e) => e.code || e.message).join(",").slice(0, 200) } : { ok: true };
   }
 
   async storeProducts(collectionId: string, namespace: string): Promise<ShopProduct[]> {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperUser } from "@/lib/auth/session";
-import { getCatalog } from "@/lib/shop";
+import { adminProducts } from "@/lib/shop";
 import { rulesFor } from "@/lib/shop/admin";
 import { parseVariantRules } from "@/lib/shop/rules";
 import { getSettings } from "@/lib/settings";
@@ -17,7 +17,7 @@ export default async function ShopRulesPage({ params }: { params: Promise<{ prod
   if (!/^\d{1,20}$/.test(productId)) notFound();
   let entries;
   try {
-    entries = await getCatalog({ fresh: true });
+    entries = await adminProducts();
   } catch {
     return (
       <div>
@@ -28,9 +28,8 @@ export default async function ShopRulesPage({ params }: { params: Promise<{ prod
       </div>
     );
   }
-  const entry = entries.find((e) => e.product.legacyId === productId);
-  if (!entry) notFound();
-  const p = entry.product;
+  const p = entries.find((e) => e.legacyId === productId);
+  if (!p) notFound();
   const s = await getSettings(["shop.default_min_short_side_px", "shop.default_max_crop_pct"] as const);
   const defaults = { minShortSidePx: s["shop.default_min_short_side_px"], maxCropPct: s["shop.default_max_crop_pct"] };
   const sizes = p.variants.map((v) => {

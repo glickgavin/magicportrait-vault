@@ -43,3 +43,17 @@ These are the approved mockups. File names still say "Vault" (the internal code 
 | `Blueprint` | Flow, data model, rules | — (reference) |
 | `ThemeSpec` | Artwork spec for designers | — (reference; also show it as help text in the template editor) |
 | `ThemePack` (screenshot only) | The 12 finished theme versions (New Year, Christmas, Birthday; 2 general + 2 pet each) | Files in `assets/themes/`, loaded by Settings › Theme library › Import theme pack |
+
+## Magic Store (open store, `docs/open-store.md`)
+
+The approved mockups are the "Open store mockups" design canvas, https://claude.ai/artifact/8U6PKdW5mnnn64Zq5UA4CH (read it with the Artifact tool; its pictures are in the canvas's asset store). Copies of its boards are in `screens/open-store/`; their `/_blob/…` pictures only load inside the canvas. Sample data: Teddy stands in for a visitor's pet; prices are the Store collection's with 60% off; sizes, theme names and review placeholders are illustrations.
+
+| Design | What it is | Route in the app |
+|---|---|---|
+| `store-page` | Store page on a phone: promo bar, category circles, Bestsellers, filter and sort, 2-column grid | `/store`, `/store/c/[collection]` |
+| `product-start` | Product page before a photo: sample picture, sizes, Add their photo, name, Create their picture, shopping info, details, Also made from one photo | `/store/product/[productId]` |
+| `product-creating` | Creating: their photo in a spinning ring, three steps, progress, the optional email box | `/store/product/[productId]` (creating state) |
+| `product-ready` | Ready: their picture on the product, "Teddy is ready", Add to cart, How it works, Teddy on more gifts, reviews placeholder | `/store/product/[productId]` (ready state) |
+| `cart` | Cart drawer: line with their picture, more gifts, subtotal, Check out | Cart drawer on every store page |
+| `store-desktop` | Store page at 1280 px: 4-column grid | `/store` (≥ 1024 px) |
+| `product-desktop` | Product page, ready, at 1280 px: gallery left, buy box right, more gifts in 3 columns | `/store/product/[productId]` (≥ 1024 px) |

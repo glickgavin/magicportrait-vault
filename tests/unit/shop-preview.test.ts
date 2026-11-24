@@ -6,7 +6,7 @@ import { defaultCrop } from "@/lib/shop/fit";
 import { FIXTURE_SCENES, fixtureTemplate } from "@/lib/shop/fixture-scenes";
 import { grow } from "@/lib/shop/preview";
 import { renderPreview } from "@/lib/shop/render";
-import { homography, parseTemplate, templateSchema, zoneAspect, zoneMapper, type Template } from "@/lib/shop/template";
+import { bendAt, bendStops, homography, NO_BEND, parseTemplate, templateSchema, zoneAspect, zoneMapper, type Bend, type Template } from "@/lib/shop/template";
 
 const GOLDEN = "tests/fixtures/golden/shop";
 
@@ -116,10 +116,80 @@ describe("template maths", () => {
     // Compressed towards the sides, as on a cylinder.
     expect(m(0.6, 0.5).x - m(0.5, 0.5).x).toBeGreaterThan(m(1, 0.5).x - m(0.9, 0.5).x);
   });
+  it("curved edges keep the corners and pass through each edge's curve points", () => {
+    const points = [[0.1, 0.2], [0.9, 0.2], [0.9, 0.8], [0.1, 0.8]] as [number, number][];
+    const flat = zoneMapper({ kind: "corners", points: points as never }, 1000, 500);
+    const bend = { top: [0.03, 0.05, 0.04], right: [0, 0.02, 0], bottom: [0, -0.01, 0], left: [0.01, 0.03, 0.02] } as Bend;
+    const bent = zoneMapper({ kind: "corners", points: points as never, bend }, 1000, 500);
+    for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]] as const) {
+      expect(bent(u, v).x).toBeCloseTo(flat(u, v).x, 6);
+      expect(bent(u, v).y).toBeCloseTo(flat(u, v).y, 6);
+    }
+    bendStops(bend.top).forEach((s, i) => {
+      expect(bent(s, 0).y - flat(s, 0).y).toBeCloseTo(bend.top[i] * 500, 6); // top dips down
+      expect(bent(0, s).x - flat(0, s).x).toBeCloseTo(bend.left[i] * 1000, 6); // left moves right
+      expect(bent(s, 0).x).toBeCloseTo(flat(s, 0).x, 6); // the top only moves up or down
+    });
+    // Any number of points from 1 to 9, evenly spaced.
+    const five = [0.01, 0.02, 0.03, 0.02, 0.01];
+    expect(bendStops(five)).toEqual([1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6]);
+    bendStops(five).forEach((s, i) => expect(bendAt(five, s)).toBeCloseTo(five[i], 9));
+    expect(bendAt([0.04], 0.5)).toBeCloseTo(0.04, 9);
+    expect(bent(0.5, 1).y - flat(0.5, 1).y).toBeCloseTo(0.01 * 500, 6); // bottom bulges out (down)
+    expect(bent(1, 0.5).x - flat(1, 0.5).x).toBeCloseTo(-0.02 * 1000, 6); // right moves left
+    // Smooth and level at the corners; the middle of the picture moves less than its edges.
+    expect(bendAt([0.03, 0.05, 0.04], 0.01)).toBeLessThan(0.002);
+    // Halfway across, each edge's shift is down to a quarter: (0.05 + 0.01) × 500 × ¼.
+    expect(bent(0.5, 0.5).y - flat(0.5, 0.5).y).toBeCloseTo(7.5, 6);
+    // No bends is the same as straight edges, and templates without bends still parse.
+    expect(zoneMapper({ kind: "corners", points: points as never, bend: NO_BEND }, 1000, 500)(0.3, 0.4)).toEqual(flat(0.3, 0.4));
+    expect(templateSchema.parse(fixtureTemplate("poster")).zone).not.toHaveProperty("bend");
+    const t = JSON.parse(JSON.stringify(fixtureTemplate("poster"))) as Template;
+    if (t.zone.kind !== "corners") throw new Error("poster has corners");
+    expect(parseTemplate(JSON.stringify({ ...t, zone: { ...t.zone, bend } }))?.zone).toMatchObject({ bend });
+    expect(parseTemplate(JSON.stringify({ ...t, zone: { ...t.zone, bend: { ...bend, top: [0, 0.5, 0] } } }))).toBeNull();
+    expect(parseTemplate(JSON.stringify({ ...t, zone: { ...t.zone, bend: { top: [0, 0.05, 0] } } }))).toBeNull();
+    expect(parseTemplate(JSON.stringify({ ...t, zone: { ...t.zone, bend: { ...bend, top: [] } } }))).toBeNull();
+  });
+  it("draws curved edges with the picture filling the curve", async () => {
+    const base = fixtureTemplate("poster") as Template;
+    if (base.zone.kind !== "corners") throw new Error("poster has corners");
+    const t = templateSchema.parse({ ...base, overlay: null, blend: "normal", zone: { ...base.zone, bend: { ...NO_BEND, top: [0.06, 0.08, 0.06] } } });
+    const flat = templateSchema.parse({ ...base, overlay: null, blend: "normal" });
+    const picture = await testPicture(600, 600);
+    const draw = async (tt: Template) => {
+      const bg = createCanvas(tt.background.w, tt.background.h);
+      const g = bg.getContext("2d");
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, tt.background.w, tt.background.h);
+      const background = await loadImage(bg.toBuffer("image/png"));
+      const out = await renderPreview({ template: tt, picture, crop: { x: 0, y: 0, w: 600, h: 600 }, placement: "cover", backgroundColour: null, targetAspect: 1, width: 400, images: { background, overlay: null } }, "png");
+      if (!out) throw new Error("no preview");
+      return out;
+    };
+    const [a, b] = [await draw(flat), await draw(t)];
+    const px = async (buf: Buffer, x: number, y: number) => {
+      const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true });
+      const i = (Math.round(y * info.height) * info.width + Math.round(x * info.width)) * info.channels;
+      return [data[i], data[i + 1], data[i + 2]];
+    };
+    const z = flat.zone.kind === "corners" ? flat.zone.points : [];
+    const topMid = { x: (z[0][0] + z[1][0]) / 2, y: (z[0][1] + z[1][1]) / 2 + 0.02 };
+    // Just below the middle of the top edge: picture on the flat zone, plain background once the edge dips.
+    expect(await px(a, topMid.x, topMid.y)).not.toEqual([255, 255, 255]);
+    expect(await px(b, topMid.x, topMid.y)).toEqual([255, 255, 255]);
+  });
   it("measures the zone's shape to warn about a mismatch", () => {
     const t = templateSchema.parse(fixtureTemplate("acrylic"));
     expect(zoneAspect(t.zone, 1000, 1000)).toBeCloseTo(0.72, 2);
     expect(zoneAspect(templateSchema.parse(fixtureTemplate("ornament")).zone, 1000, 1000)).toBeCloseTo(1, 6);
+    // Curved edges: measured across the middle. Sides pulled in by 10% of the width each make a
+    // 0.8 × 0.6 zone 0.6 × 0.6 halfway down.
+    const points = [[0.1, 0.2], [0.9, 0.2], [0.9, 0.8], [0.1, 0.8]] as never;
+    expect(zoneAspect({ kind: "corners", points }, 1000, 1000)).toBeCloseTo(0.8 / 0.6, 6);
+    const bent = zoneAspect({ kind: "corners", points, bend: { ...NO_BEND, left: [0.1], right: [0.1] } }, 1000, 1000);
+    expect(bent).toBeLessThan(0.8 / 0.6);
+    expect(bent).toBeGreaterThan(0.6 / 0.6);
   });
   it("refuses templates without a background or with a broken zone", () => {
     const good = JSON.stringify(fixtureTemplate("poster"));

@@ -114,3 +114,22 @@ StoryBoards
 
 Chat with us https://magicportraits.ai · Privacy Policy https://magicportraits.ai/privacy"
 `;
+
+exports[`email templates > store-picture renders (snapshot) 1`] = `"Teddy's picture is ready"`;
+
+exports[`email templates > store-picture renders (snapshot) 2`] = `
+"✨  MAGIC STORE
+
+
+TEDDY'S PICTURE IS READY
+
+Here it is, as promised. Open it on any device to see it on your pillow, pick your favourite and order it.
+
+See it on your pillow https://my.magicportraits.ai/g/example
+
+The link works for 30 days and signs you in, so please don't forward this email.
+
+StoryBoards
+
+Chat with us https://magicportraits.ai · Privacy Policy https://magicportraits.ai/privacy"
+`;

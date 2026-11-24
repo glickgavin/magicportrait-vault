@@ -27,7 +27,8 @@ export class CartSourceError extends Error {
 
 export interface ShopCartSource {
   readonly kind: "live" | "fixtures";
-  create(input: { lines: CartLineInput[]; email: string; discountCodes: string[]; attributes: Attr[] }): Promise<RemoteCart>;
+  /** `email: null` for an open-store visitor who isn't signed in (no buyer). */
+  create(input: { lines: CartLineInput[]; email: string | null; discountCodes: string[]; attributes: Attr[] }): Promise<RemoteCart>;
   get(cartId: string): Promise<RemoteCart | null>;
   addLines(cartId: string, lines: CartLineInput[]): Promise<RemoteCart>;
   updateLines(cartId: string, lines: { id: string; quantity: number; attributes?: Attr[] }[]): Promise<RemoteCart>;
@@ -39,7 +40,7 @@ export interface ShopCartSource {
 /** In-memory Shopify carts: prices from a lookup, a percentage code, made-up checkout links. */
 export class ShopCartFixtures implements ShopCartSource {
   readonly kind = "fixtures" as const;
-  private carts = new Map<string, RemoteCart & { email: string }>();
+  private carts = new Map<string, RemoteCart & { email: string | null }>();
   private n = 0;
   readonly calls: { op: string; cartId: string | null; payload: unknown }[] = [];
   constructor(
@@ -83,7 +84,7 @@ export class ShopCartFixtures implements ShopCartSource {
     return c;
   }
 
-  async create(input: { lines: CartLineInput[]; email: string; discountCodes: string[]; attributes: Attr[] }) {
+  async create(input: { lines: CartLineInput[]; email: string | null; discountCodes: string[]; attributes: Attr[] }) {
     const id = `gid://shopify/Cart/fx${++this.n}`;
     this.calls.push({ op: "cartCreate", cartId: null, payload: structuredClone(input) });
     const c = {

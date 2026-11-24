@@ -5,7 +5,7 @@ import { getSettings, setSetting } from "@/lib/settings";
 import { canSeeShop } from "./access";
 import { evaluateCatalog, type CatalogEntry } from "./catalog";
 import { getShopCatalogSource } from "./sources";
-import type { DiscountInfo } from "./sources/types";
+import type { DiscountInfo, ShopProduct } from "./sources/types";
 
 /** Can this person see the shop? Customers only once shop.enabled is on; super users with the preview switch. */
 export async function shopVisibleTo(user: SessionUser | null): Promise<boolean> {
@@ -38,6 +38,9 @@ const g = globalThis as unknown as { __shopCatalog?: Cached | null };
  */
 export async function invalidateCatalog(): Promise<void> {
   g.__shopCatalog = null;
+  // The open store caches the same products (lib/open-store/index.ts): drop its copy too.
+  (globalThis as { __openStoreCatalog?: unknown }).__openStoreCatalog = null;
+  (globalThis as { __openStoreReads?: Map<string, unknown> }).__openStoreReads?.clear();
   try {
     await setSetting("shop.catalog_changed_at", Date.now(), "system", { system: true });
   } catch {
@@ -58,6 +61,18 @@ export async function getCatalog(opts: { fresh?: boolean } = {}): Promise<Catalo
     g.__shopCatalog = { at: Date.now(), entries };
     return entries;
   });
+}
+
+/**
+ * Settings lookups (print rules, the template editor and its uploads): every product in the Store or the
+ * Magic Store collection, since both stores share a product's template and print rules. Fresh reads.
+ */
+export async function adminProducts(): Promise<ShopProduct[]> {
+  const { getStoreCatalog } = await import("@/lib/open-store");
+  const [shop, store] = await Promise.all([getCatalog({ fresh: true }), getStoreCatalog({ fresh: true })]);
+  const byId = new Map(shop.map((e) => [e.product.id, e.product]));
+  for (const e of store.entries) byId.set(e.product.id, e.product);
+  return [...byId.values()];
 }
 
 export type CustomerType = "normal" | "vip";

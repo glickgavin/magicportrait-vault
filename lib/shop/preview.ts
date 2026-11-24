@@ -5,7 +5,7 @@
  * as a mesh of small triangles, which both canvases can draw with plain affine transforms.
  */
 import type { Rect } from "./fit";
-import { mesh, zoneAspect, zoneMapper, type Point, type Template } from "./template";
+import { isBent, mesh, zoneAspect, zoneMapper, type Point, type Template } from "./template";
 
 export type PreviewImage = { width: number; height: number };
 
@@ -177,7 +177,8 @@ export function drawPreview(ctx: PreviewCtx, input: PreviewInput) {
 
   const flat = flatPicture(input);
   const map = zoneMapper(t.zone, t.background.w, t.background.h);
-  const [cols, rows] = t.zone.kind === "wrap" ? [32, 12] : [8, 8];
+  // Curved edges need more, smaller triangles to look smooth; flat quads are fine with 8 × 8.
+  const [cols, rows] = t.zone.kind === "wrap" ? [32, 12] : isBent(t.zone) ? [12, 12] : [8, 8];
   // The pink zone on the product photo may not be exactly the print shape: the flat picture is
   // cropped to the zone's own shape (top kept) so the warp never stretches it.
   const src = coverTop(flat.w, flat.h, zoneAspect(t.zone, t.background.w, t.background.h));

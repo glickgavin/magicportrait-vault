@@ -34,7 +34,7 @@ Shopify stays the source of truth for products, variants, prices and stock. That
 
 ## The customer flow
 
-Two pages, Gifts and Products, lead into the same four screens. Both are for signed-in customers only, because they need their images. Ways in: **Gifts and Products** in the menu, a "Give it as a gift" and "Put it on a product" on Home and on each portrait in My portraits, and a link from each order.
+Two pages, Gifts and Products, lead into the same four screens. Both are for signed-in customers only, because they need their images. For people who aren't signed in, see the open store (`docs/open-store.md`). Ways in: **Gifts and Products** in the menu, a "Give it as a gift" and "Put it on a product" on Home and on each portrait in My portraits, and a link from each order.
 
 |  | Gifts page | Products page |
 |---|---|---|
@@ -95,7 +95,7 @@ Everything about a product lives in Shopify, including its sizes and the rules f
 | Where the picture sits on the blank photo | Product metafield `mmp_shop.template` | Saved by the template editor in Settings |
 | Discounts | Two discounts limited to the Store collection | See Discounts |
 
-**Settings › Shop › Products** lists every product in the Store collection with its page, occasions and categories, and lets super users change them there. **Occasions** and **Categories** are two lists managed the same way (add, rename, reorder, remove; one still on a product can't be removed), saved as the choices of `mmp_shop.occasions` and `mmp_shop.categories`. When the categories field is first created it starts with the product types products use, so the Products page doesn't regroup. Settings writes each change straight to the product in Shopify, so Shopify admin and Settings always show the same thing.
+**Settings › Shop › Products** lists every product in the Store collection with its page, occasions and categories, and lets super users change them there. **Occasions** and **Categories** are two lists managed the same way (add, rename, reorder, remove; one still on a product can't be removed), saved as the choices of `mmp_shop.occasions` and `mmp_shop.categories`. When the categories field is first created it starts with the product types products use, so the Products page doesn't regroup. Since 23 Nov it also lists the Magic Store collection's products, each product once, with one page per product for both stores (`docs/open-store.md` › Settings: one area for both stores); the shop's own settings (switches, discounts, VIP tag, occasions, categories) move to Settings › Shop › Gifts & Products pages. Settings writes each change straight to the product in Shopify, so Shopify admin and Settings always show the same thing.
 
 **Occasions** are one list, kept in Shopify as the allowed values of the `mmp_shop.occasions` metafield definition. Settings › Shop › Occasions adds, renames, orders and retires them, and the Gifts page shows them in that order.
 
@@ -139,7 +139,7 @@ Each product has a template: a photo of the blank product with the print zone ma
 A template has:
 
 - **Background**: a photo of the blank product, picked from the product's images in Shopify, e.g. a white mug on a table.
-- **Print zone**: where the image goes on that photo. Either four corners (a flat product seen at an angle, like a poster or tile) or a curved wrap (a mug), set by dragging handles in the editor and saved to the product's mmp_shop.template metafield.
+- **Print zone**: where the image goes on that photo. Either four corners (a flat product seen at an angle, like a poster or tile, with optional curved edges for a soft product like a cushion) or a curved wrap (a mug), set by dragging handles in the editor and saved to the product's mmp_shop.template metafield.
 - **Overlay** (optional): a transparent PNG drawn on top, for gloss, a handle or a frame edge.
 - **Mask** (optional): the visible shape, e.g. rounded corners or a circle.
 
@@ -150,7 +150,11 @@ How it's drawn:
 - The browser draws previews with that module, so changing the image or the crop redraws the 4 or 5 previews without a round trip.
 - The server draws the same thing with `@napi-rs/canvas` for cart thumbnails and for a preview image on the order line.
 
-The template is one JSON value (`lib/shop/template.ts`): `background` and `overlay` (a product photo's media id, URL and size), `zone` (`corners` with four points, or `wrap` with left, right, top, bottom, curve and spread), `mask` (none, rounded with a radius, circle) and `blend` (normal, or multiply to let the product's shading show through). Coordinates are fractions of the background photo.
+The template is one JSON value (`lib/shop/template.ts`): `background` and `overlay` (a product photo's media id, URL and size), `zone` (`corners` with four points and optional `bend`, or `wrap` with left, right, top, bottom, curve and spread), `mask` (none, rounded with a radius, circle) and `blend` (normal, or multiply to let the product's shading show through). Coordinates are fractions of the background photo.
+
+**Curved edges** (`bend`): a filled cushion's edges pull in, so a picture warped to four straight corners loses its top (heads) and sides to the overlay. `bend` gives each edge (`top`, `right`, `bottom`, `left`) 1–9 curve points, evenly spaced along it, each how far the edge has moved in there as a fraction of the photo's height (top, bottom) or width (sides); negative bulges out. The edge is a smooth curve through 0 at both corners and its points, level at the corners. Inside, each edge's shift fades out with the square of the distance to the opposite edge, so the picture is squeezed near the edges, where the fabric turns away, and left alone in the middle. Curved zones are drawn with a 12 × 12 mesh instead of 8 × 8. In the editor, **Curved edges, for a cushion or other soft product** adds 3 small dots per edge to drag onto the product's edges; templates made from a blank photo can carry more.
+
+**From a photo of a blank product** (`scripts/mockups/blank_template.py`, tuned on the Prodigi linen cushion): finds the product's outline from the fabric's texture (the floor shadow beside it is the same grey but smooth) and the contact shadow under it; evens the fabric toward white, keeping its weave and folds, so multiply doesn't dull pictures; makes the overlay (the photo, see-through exactly inside the outline); sets the corners just outside the outline; and fits each edge's curve points as far in as they go while the picture still covers the whole product (a small linear programme), so the top of the picture is the top of the cushion.
 
 The template editor in Settings works like the card template editor. A draft stays in the browser until Publish writes it to Shopify; Publish refuses any background or overlay that isn't one of the product's own Shopify photos or one its saved template already uses (the studio photos below). Every uploaded photo has a × (16 Nov): one the draft uses is taken out of the draft first (the overlay goes back to None; the blank photo moves to another photo), and one the published template uses leaves the draft and the lists at once and is deleted when Publish has replaced it (so live previews never point at a missing file); a note beside the photos says so. Uploaded photos show only in their own list (blank photos under the photo, see-through overlays under the overlay); Shopify's own product photos show in both and have no ×. It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
 
@@ -197,7 +201,7 @@ Lifestyle versions of the studio templates (`scripts/mockups/rooms.py`): the pro
 
 ### Photo library (Settings › Shop › Photo library)
 
-Every room and studio photo, for building products: the furnished rooms (each with its empty template and the 12 sample pictures on it) and the studio photos, filterable by product, with Download and Copy link. `scripts/mockups/export_library.py` copies them into `public/shop-library/` and writes `lib/shop/photo-library.ts`, which the page and the template editor read; rooms match Store products by Shopify handle.
+Every room, blank product and studio photo, for building products: the furnished rooms and blank-product templates (each with its empty template and the 12 sample pictures on it) and the studio photos, filterable by product, with Download and Copy link. `scripts/mockups/export_library.py` copies them into `public/shop-library/` and writes `lib/shop/photo-library.ts`, which the page and the template editor read; rooms match Store products by Shopify handle.
 
 - **Use a room as a product's template:** the room's "Use as the … template" link opens the product's template editor with the room highlighted. **Use this room** uploads its photo and overlay through the normal template upload (so they're kept in `theme-assets` like any upload) and sets the zone, shape and shading. It stays a draft until **Publish to Shopify**.
 - **Photos with sample pictures** are for product pages, emails and ads. The app doesn't write product photos to Shopify, so they're added there by hand.

@@ -2,37 +2,68 @@ import { expect, test } from "@playwright/test";
 import { signInWithLink } from "./auth";
 import { setSetting } from "./db";
 import { expectNoAxeViolations } from "./helpers";
+import type { Page } from "@playwright/test";
+
+/** Settings › Shop › one product, opened from the Products list. */
+async function openProduct(page: Page, title: string) {
+  await page.goto("/settings/shop");
+  const row = page.getByTestId("shop-product").filter({ hasText: title }).first();
+  const href = await row.getByRole("link", { name: `Open ${title} →` }).getAttribute("href");
+  await page.goto(href!);
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+}
 
 // Settings › Shop against the fixtures Store collection (lib/shop/sources/fixtures.ts). Writes go to the
 // in-memory fixtures in the dev server, so the test puts back what it changes.
 test.describe.configure({ mode: "serial" });
 
 test.describe("Settings › Shop", () => {
-  test("lists the Store collection and says why products are hidden", async ({ page }) => {
+  test("lists every product in both collections once and says why each store hides it", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
     await page.goto("/settings/shop");
-    await expect(page.getByRole("heading", { name: "Shop: products & discounts" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Shop: products" })).toBeVisible();
     const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
-    await expect(tile.getByText("HIDDEN")).toBeVisible();
+    await expect(tile.getByText("GIFTS & PRODUCTS: HIDDEN")).toBeVisible();
     await expect(tile.getByText("No size has its print rules (maker, maker's code, print area)")).toBeVisible();
+    await expect(tile.getByText("MAGIC STORE: HIDDEN")).toBeVisible();
+    await expect(tile.getByText("Magic Store: No Imagen theme (or mark it Related only)")).toBeVisible();
     const ornaments = page.getByTestId("shop-product").filter({ hasText: "Magic Xmas Ornaments" });
-    await expect(ornaments.getByText("SHOWN")).toBeVisible();
+    await expect(ornaments.getByText("GIFTS & PRODUCTS: SHOWN")).toBeVisible();
+    await expect(ornaments.getByText("MAGIC STORE: RELATED ONLY")).toBeVisible();
+    // Only in the Magic Store, and only in the Store, each listed once.
+    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Canvas" })).toHaveCount(1);
+    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Canvas" }).getByText("Not in Gifts & Products")).toBeVisible();
+    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Pillow with Photo" })).toHaveCount(1);
+    await expectNoAxeViolations(page, { exclude: ["iframe"] });
+    // Filters.
+    await page.getByRole("link", { name: /^Magic Store · \d+$/ }).click();
+    await expect(page).toHaveURL(/filter=magic/);
+    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Tee" })).toHaveCount(0);
+    await page.getByRole("link", { name: /^Hidden · \d+$/ }).click();
+    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" })).toHaveCount(1);
+    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Pillow with Photo" })).toHaveCount(0);
+    // The shop's own settings moved to Gifts & Products pages.
+    await page.getByRole("link", { name: "Gifts & Products pages" }).first().click();
+    await expect(page.getByRole("heading", { name: "Gifts & Products pages" })).toBeVisible();
     await expect(page.getByText("SITEWIDE OFF").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save occasions" })).toBeVisible();
     await expectNoAxeViolations(page, { exclude: ["iframe"] });
   });
 
   test("a product's page and occasions save to Shopify and show again", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
-    await page.goto("/settings/shop");
-    const poster = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
+    await openProduct(page, "Magic Poster");
+    const poster = page.getByRole("region", { name: "Gifts & Products pages" });
     await poster.getByLabel("Page", { exact: true }).selectOption("all");
     await poster.getByText("Birthday", { exact: true }).click();
     await poster.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
     await expect(poster.getByRole("status")).toHaveText("Saved to Shopify.");
     await page.reload();
-    const again = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
+    const again = page.getByRole("region", { name: "Gifts & Products pages" });
     await expect(again.getByLabel("Page", { exact: true })).toHaveValue("all");
-    await expect(again.getByText("GIFTS + PRODUCTS")).toBeVisible();
+    await page.goto("/settings/shop");
+    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Poster" }).getByText("Gifts + Products · Birthday")).toBeVisible();
+    await page.goBack();
     // Put it back.
     await again.getByLabel("Page", { exact: true }).selectOption("products");
     await again.getByText("Birthday", { exact: true }).click();
@@ -42,7 +73,7 @@ test.describe("Settings › Shop", () => {
 
   test("an occasion still on a product can't be removed", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
-    await page.goto("/settings/shop");
+    await page.goto("/settings/shop/pages");
     await page.getByRole("button", { name: "Remove Christmas" }).click();
     await page.getByRole("button", { name: "Save occasions" }).click();
     await expect(page.getByText(/Still used by a product: Christmas/)).toBeVisible();
@@ -58,17 +89,16 @@ test.describe("Settings › Shop", () => {
 
   test("the template editor publishes to Shopify, and only with the product's own photos", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
-    await page.goto("/settings/shop");
-    const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
-    await tile.getByRole("link", { name: /^(Make|Edit) the preview template$/ }).click();
+    await openProduct(page, "Magic Portrait Tile");
+    await page.getByRole("link", { name: "Open template editor →" }).click();
     await expect(page.getByRole("heading", { name: /Preview template: Magic Portrait Tile/ })).toBeVisible();
-    const handle = page.getByRole("button", { name: "Top left: move with the arrow keys" });
+    const handle = page.getByRole("button", { name: "Top left corner: move with the arrow keys" });
     await handle.focus();
     await page.keyboard.press("Shift+ArrowRight");
     await page.getByRole("button", { name: "Publish to Shopify" }).click();
     await expect(page.getByText("Published to Shopify.")).toBeVisible();
     await page.goto("/settings/shop");
-    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" }).getByText("No preview template yet")).toHaveCount(0);
+    await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" }).getByText("Gifts & Products: No preview template yet")).toHaveCount(0);
 
     const r = await page.request.post("/api/admin/shop/template", {
       data: {
@@ -81,11 +111,8 @@ test.describe("Settings › Shop", () => {
 
   test("print rules: a size gets its maker, code and print area and the product shows", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
-    await page.goto("/settings/shop");
-    const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
-    const href = await tile.getByRole("link", { name: /print rules/ }).getAttribute("href");
-    await page.goto(href!);
-    await expect(page.getByRole("heading", { name: "Print rules: Magic Portrait Tile" })).toBeVisible();
+    await openProduct(page, "Magic Portrait Tile");
+    await expect(page.getByRole("heading", { name: "Print rules" })).toBeVisible();
     await expectNoAxeViolations(page);
     const size = page.getByTestId("rules-size").first();
     await size.getByLabel("Maker", { exact: true }).selectOption("prodigi");
@@ -115,13 +142,14 @@ test.describe("Settings › Shop", () => {
     await signInWithLink(page, "super@example.com", "/");
     await page.goto("/settings/shop");
     // A category still on a product can't be removed.
+    await page.goto("/settings/shop/pages");
     await page.getByRole("button", { name: "Remove Mugs" }).click();
     await page.getByRole("button", { name: "Save categories" }).click();
     await expect(page.getByText(/Still used by a product: Mugs/)).toBeVisible();
-    await page.reload();
 
     // Put the Poster in Acrylic as well as Wall art.
-    const poster = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
+    await openProduct(page, "Magic Poster");
+    const poster = page.getByRole("region", { name: "Gifts & Products pages" });
     await poster.getByRole("group", { name: "Categories (Products page)" }).getByText("Acrylic", { exact: true }).click();
     await poster.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
     await expect(poster.getByRole("status")).toHaveText("Saved to Shopify.");
@@ -137,11 +165,75 @@ test.describe("Settings › Shop", () => {
     }
 
     // Put it back.
-    await page.goto("/settings/shop");
-    const again = page.getByTestId("shop-product").filter({ hasText: "Magic Poster" });
+    await openProduct(page, "Magic Poster");
+    const again = page.getByRole("region", { name: "Gifts & Products pages" });
     await again.getByRole("group", { name: "Categories (Products page)" }).getByText("Acrylic", { exact: true }).click();
     await again.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
     await expect(again.getByRole("status")).toHaveText("Saved to Shopify.");
+  });
+
+  test("one product page: Magic Store fields save to Shopify, empty ones show the store default", async ({ page }) => {
+    await signInWithLink(page, "super@example.com", "/");
+    await openProduct(page, "Magic Pillow with Photo");
+    await expect(page.getByRole("region", { name: "Where it's sold" }).getByText("IN", { exact: true })).toHaveCount(2);
+    const magic = page.getByRole("region", { name: "Magic Store" });
+    await expect(magic.getByLabel("Imagen theme")).toHaveValue("admiral-01");
+    // Empty fields show the store default in grey.
+    await expect(magic.getByLabel("Photo tips")).toHaveValue("");
+    await expect(magic.getByLabel("Photo tips")).toHaveAttribute("placeholder", /Best results/);
+    await expectNoAxeViolations(page);
+    await magic.getByLabel("Imagen theme").selectOption("journal-02");
+    await magic.getByLabel("Photo tips").fill("One pet, facing the camera.");
+    await magic.getByLabel("Making time, working days (Default Title)").fill("3-4");
+    await magic.getByRole("button", { name: "Save Magic Store fields" }).press("Enter");
+    await expect(magic.getByRole("status")).toHaveText("Saved to Shopify.");
+    await page.reload();
+    const again = page.getByRole("region", { name: "Magic Store" });
+    await expect(again.getByLabel("Imagen theme")).toHaveValue("journal-02");
+    await expect(again.getByLabel("Photo tips")).toHaveValue("One pet, facing the camera.");
+    await expect(page.getByTestId("status-store").getByText("SHOWN")).toBeVisible();
+    // Put it back.
+    await again.getByLabel("Imagen theme").selectOption("admiral-01");
+    await again.getByLabel("Photo tips").fill("");
+    await again.getByLabel("Making time, working days (Default Title)").fill("4-6");
+    await again.getByRole("button", { name: "Save Magic Store fields" }).press("Enter");
+    await expect(again.getByRole("status")).toHaveText("Saved to Shopify.");
+  });
+
+  test("one product page: a store the product isn't in stays folded; the theme's photo count sets the slots", async ({ page }) => {
+    await signInWithLink(page, "super@example.com", "/");
+    await openProduct(page, "Magic Canvas");
+    await expect(page.getByRole("region", { name: "Gifts & Products pages" }).getByText("Not in the Store collection. Add it in Shopify to sell it there.")).toBeVisible();
+    await openProduct(page, "Magic Tee");
+    await expect(page.getByRole("region", { name: "Magic Store" }).getByText("Not in the Magic Store collection. Add it in Shopify to sell it there.")).toBeVisible();
+    await openProduct(page, "Acrylic Block");
+    const magic = page.getByRole("region", { name: "Magic Store" });
+    await expect(magic.getByText("The theme takes 2 photos, so the page shows 2 slots.")).toBeVisible();
+    await expect(magic.getByLabel("Photo 2: label")).toHaveValue("Second pet's photo");
+    // The API refuses Magic Store fields for a product that isn't in the Magic Store.
+    const tee = await page.request.post("/api/admin/shop/store-fields", { data: { productId: "gid://shopify/Product/8708000000", fields: { imagen_theme: "admiral-01" } } });
+    expect([400, 404]).toContain(tee.status());
+    const bad = await page.request.post("/api/admin/shop/store-fields", { data: { productId: "nope", fields: {} } });
+    expect(bad.status()).toBe(400);
+  });
+
+  test("Magic Store settings: switches off, collection and menu found, themes refreshed from Imagen", async ({ page }) => {
+    await signInWithLink(page, "super@example.com", "/");
+    await page.goto("/settings/shop/magic-store");
+    await expect(page.getByRole("heading", { level: 1, name: "Magic Store" })).toBeVisible();
+    const who = page.getByRole("region", { name: "Who sees the Magic Store" });
+    await expect(who.getByRole("switch").first()).not.toBeChecked();
+    await expect(page.getByRole("region", { name: "In Shopify now" }).getByText(/Collection magic-store: \d+ products/)).toBeVisible();
+    await expect(page.getByRole("region", { name: "In Shopify now" }).getByText(/4 categories/)).toBeVisible();
+    await expect(page.getByTestId("imagen-themes").getByText("Best friends")).toBeVisible();
+    await expectNoAxeViolations(page);
+    await page.getByRole("button", { name: "Refresh themes from Imagen" }).press("Enter");
+    await expect(page.getByText(/The theme dropdown in Shopify now has \d+ themes/)).toBeVisible();
+    // The settings menu lists the SHOP group's pages.
+    for (const name of ["Products", "Gifts & Products pages", "Magic Store", "Photo library", "AI room photos"]) await expect(page.getByRole("navigation", { name: "Settings" }).getByRole("link", { name, exact: true })).toBeVisible();
+    // Hidden for people who aren't super users.
+    const r = await page.request.post("/api/admin/shop/themes");
+    expect(r.status()).toBe(200);
   });
 });
 

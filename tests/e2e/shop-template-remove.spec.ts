@@ -8,7 +8,9 @@ test("an uploaded template photo can be removed with its ×", async ({ page }, i
   await signInWithLink(page, "super@example.com", "/");
   await page.goto("/settings/shop");
   const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
-  const href = await tile.getByRole("link", { name: /preview template/i }).getAttribute("href");
+  const product = await tile.getByRole("link", { name: "Open Magic Portrait Tile →" }).getAttribute("href");
+  await page.goto(product!);
+  const href = await page.getByRole("link", { name: "Open template editor →" }).getAttribute("href");
   await page.goto(href!);
   const photo = async (colour: string) => ({ name: `${colour.slice(1)}.png`, mimeType: "image/png", buffer: await sharp({ create: { width: 600, height: 600, channels: 3, background: colour } }).png().toBuffer() });
   const input = page.getByLabel("Upload a photo of the blank product").first();
@@ -33,7 +35,9 @@ test("a photo the live template uses is removed at once and deleted when you pub
   await signInWithLink(page, "super@example.com", "/");
   await page.goto("/settings/shop");
   const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
-  const href = await tile.getByRole("link", { name: /preview template/i }).getAttribute("href");
+  const product = await tile.getByRole("link", { name: "Open Magic Portrait Tile →" }).getAttribute("href");
+  await page.goto(product!);
+  const href = await page.getByRole("link", { name: "Open template editor →" }).getAttribute("href");
   await page.goto(href!);
   const x = page.getByRole("button", { name: "Remove this uploaded photo" });
   await expect(page.getByRole("button", { name: "Publish to Shopify" })).toBeVisible();
