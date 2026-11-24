@@ -13,6 +13,7 @@ const PRODUCT_FIELDS = `
   occasions: metafield(namespace: $ns, key: "occasions") { value }
   categories: metafield(namespace: $ns, key: "categories") { value }
   shortDescription: metafield(namespace: $ns, key: "short_description") { value }
+  dreamshipProductId: metafield(namespace: $ns, key: "dreamship_product_id") { value }
   template: metafield(namespace: $ns, key: "template") { value updatedAt }
   imagenTheme: metafield(namespace: $ns, key: "imagen_theme") { value }
   generation: metafield(namespace: $ns, key: "generation") { value }
@@ -69,6 +70,7 @@ type RawProduct = {
   occasions: { value: string } | null;
   categories: { value: string } | null;
   shortDescription: { value: string } | null;
+  dreamshipProductId?: { value: string } | null;
   template: { value: string; updatedAt: string | null } | null;
   imagenTheme: { value: string } | null;
   generation: { value: string } | null;
@@ -114,6 +116,7 @@ export function mapProduct(p: RawProduct, position: number): ShopProduct {
     occasions: parseList(p.occasions?.value),
     categories: parseList(p.categories?.value),
     shortDescription: p.shortDescription?.value?.trim() || null,
+    dreamshipProductId: p.dreamshipProductId?.value?.trim() || null,
     template: p.template ? { value: p.template.value, updatedAt: p.template.updatedAt } : null,
     variants: p.variants.nodes.map((v) => ({
       id: v.id,

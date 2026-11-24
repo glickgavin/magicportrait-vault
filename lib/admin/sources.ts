@@ -11,12 +11,13 @@ const LABELS: Record<string, [string, string]> = {
   klaviyo: ["Klaviyo", "Events and profile properties (outbox)"],
   agentmail: ["Email sender", "AgentMail · cards@magicportraitspartners.com"],
   posthog: ["PostHog", "Project 540098"],
+  dreamship: ["Dreamship", "The printer · account, products, picture on imported orders"],
 };
 
 export async function sourceStatuses(): Promise<SourceStatus[]> {
   const checks = new Map((await lastChecks()).map((c) => [c.source, c]));
   return SOURCE_NAMES.map((s) => {
     const c = checks.get(s);
-    return { source: s, label: LABELS[s][0], sub: `${LABELS[s][1]}${env.dataSource === "fixtures" && ["shopify", "imagen", "mirror", "lookup"].includes(s) ? " · fixtures" : ""}`, ok: c ? c.ok : null, checkedAt: c?.checked_at ?? null, lastOkAt: c?.last_ok_at ?? null, ms: c?.ms ?? null, detail: c?.detail ?? null };
+    return { source: s, label: LABELS[s][0], sub: `${LABELS[s][1]}${env.dataSource === "fixtures" && ["shopify", "imagen", "mirror", "lookup", "dreamship"].includes(s) ? " · fixtures" : ""}`, ok: c ? c.ok : null, checkedAt: c?.checked_at ?? null, lastOkAt: c?.last_ok_at ?? null, ms: c?.ms ?? null, detail: c?.detail ?? null };
   });
 }

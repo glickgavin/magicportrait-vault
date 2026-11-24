@@ -28,6 +28,8 @@ export async function POST(req: Request) {
   }
   const r = await setSetting(key, value, u.email, { type: p.data.type, section: p.data.section ?? (key.split(".")[0] as (typeof SECTIONS)[number]), label: p.data.label });
   if (!r.ok) return json({ error: r.error }, 400);
+  // Settings › Printers (docs/dreamship.md › Part C): also recorded per printer.
+  if (r.changed && key.startsWith("dreamship.")) await track("admin_printer_settings_updated", { maker: "dreamship", keys: [key] }, { email: u.email, actor: actorOf(u), ref: { type: "setting", id: key } });
   if (r.changed) await track("setting_changed", { key, section: isSettingKey(key) ? getDef(key).section : key.split(".")[0] }, { email: u.email, actor: actorOf(u), ref: { type: "setting", id: key } });
   return json({ ok: true, changed: r.changed });
 }

@@ -17,6 +17,8 @@ import { ShortDescriptionEditor, StoreFieldsEditor, type StoreFieldsValues } fro
 import { TrackPageView } from "@/components/TrackPageView";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
+import { dreamshipCard } from "@/lib/dreamship/link";
+import { DreamshipCard } from "@/components/admin/shop/DreamshipCard";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Shop: product" };
@@ -47,6 +49,9 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
   const row = found.row;
   if (!row) notFound();
   const p = row.product;
+  // The Dreamship card: for products linked to Dreamship, with Dreamship sizes, or whose SKUs suggest one.
+  const ds = await dreamshipCard(p.legacyId).catch(() => null);
+  const showDreamship = Boolean(ds && (ds.linkedId || ds.suggestion || p.variants.some((v) => v.metafields.some((f) => f.key === "maker" && f.value === "dreamship"))));
   const domain = env.optional("SHOPIFY_STORE_DOMAIN");
   const admin = (path: string) => (domain ? `https://${domain}/admin/${path}` : null);
   const ruleDefaults = { minShortSidePx: s["shop.default_min_short_side_px"], maxCropPct: s["shop.default_max_crop_pct"] };
@@ -145,7 +150,19 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
         </div>
       </section>
 
-      <section className={cn(CARD, !row.shop && "opacity-80")} aria-labelledby="pages">
+      {showDreamship && ds && (
+        <section className={CARD} aria-labelledby="dreamship">
+          <h2 id="dreamship" className="text-[19px] font-extrabold">
+            Dreamship
+          </h2>
+          <p className="mt-1 text-[14px] text-ink-2">The printer&apos;s numbers for each size. Sync reads Dreamship; Save to Shopify writes only the print rules that differ. Cost and margin are shown, never written.</p>
+          <div className="mt-3">
+            <DreamshipCard initial={ds} productId={p.legacyId} />
+          </div>
+        </section>
+      )}
+
+      <section className={cn(CARD, !row.shop && "bg-[#FBFAF7]")} aria-labelledby="pages">
         <h2 id="pages" className="text-[19px] font-extrabold">
           Gifts &amp; Products pages
         </h2>
@@ -158,7 +175,7 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
         )}
       </section>
 
-      <section className={cn(CARD, !row.store && "opacity-80")} aria-labelledby="magic">
+      <section className={cn(CARD, !row.store && "bg-[#FBFAF7]")} aria-labelledby="magic">
         <h2 id="magic" className="text-[19px] font-extrabold">
           Magic Store
         </h2>

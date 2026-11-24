@@ -292,6 +292,27 @@ function buildProducts(): ShopProduct[] {
       ],
     }),
   );
+  // The Framed Dog Poster "Flush" (docs/dreamship.md): made by Dreamship, SKU = Dreamship product variant id. Only the
+  // first two sizes carry rules so a sync has something to propose; its theme isn't in the fixture theme list, so
+  // the Magic Store hides it (as the real one is hidden today).
+  list.push(
+    product({
+      handle: "fx-flush-poster",
+      title: 'Framed Dog Poster "Flush"',
+      productType: "Wall art",
+      status: "ACTIVE",
+      page: null,
+      occasions: [],
+      template: { value: TEMPLATE("poster"), updatedAt: T },
+      description: "Archival paper under clear acrylic, ready to hang.",
+      variants: [
+        variant('8x10"', "59.99", { maker: "dreamship", maker_sku: "17383", print_px: "1800x2400", lead_days: "1-3" }, { sku: "45378125" }),
+        variant('12x16"', "69.99", { maker: "dreamship", maker_sku: "17398", print_px: "3000x4000" }, { sku: "45378127" }),
+        variant('16x24"', "89.99", null, { sku: "45378126" }),
+        variant('24x36"', "129.99", null, { sku: "45378124" }),
+      ],
+    }),
+  );
   applyStoreFields(list);
   list.forEach((p, i) => {
     p.position = i;
@@ -412,6 +433,8 @@ function applyStoreFields(list: ShopProduct[]) {
     createdAt: "2026-10-04T10:00:00Z",
   });
   set("fx-tile", { createdAt: "2026-10-06T10:00:00Z" });
+  // Its theme (a 2K Royal Flush) isn't in Imagen's fixture list, so the Magic Store hides it.
+  set("fx-flush-poster", { imagenTheme: "royal-flush", createdAt: "2026-11-24T10:00:00Z" });
   // Lead times and a badge on some sizes.
   for (const v of by("fx-pillow").variants)
     v.metafields.push(...mf({ lead_days: "4-6" }));
@@ -639,6 +662,7 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
         st.related = value ? (JSON.parse(value) as string[]) : [];
       else if (key === "open_store_related") st.relatedOnly = value;
       else if (key === "details") st.details = value;
+      else if (key === "dreamship_product_id") p.dreamshipProductId = value;
     };
     for (const f of change.set) put(f.key, f.value);
     for (const k of change.clear) put(k, null);

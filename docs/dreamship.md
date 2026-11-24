@@ -2,6 +2,8 @@
 
 Dreamship is a new printer (24 Nov). Products are designed in Dreamship's designer and published to Shopify by Dreamship's Shopify app, which also stocks them at Shopify's **Dreamship** fulfilment location. Status: Part A and Part B below are **approved, not built** (24 Nov). Gavin chose B1 (swap the artwork on Dreamship's imported order), approved allowed write 7 (now in `CLAUDE.md`), and asked for a 2:3 2K version of Royal Flush for the poster. Later on 24 Nov he added the app's Dreamship API key, asked that printers get their own Settings page (Part C), and decided that **the app doesn't control order status**: whether an order waits as a draft or goes to print is set in Shopify and Dreamship (Dreamship's own auto-submit setting). The app only puts the customer's picture on the order and never submits it.
 
+**Build status (24 Nov):** Parts A, B and C are built (`feat(dreamship-1…3)`, BUILD_LOG › Dreamship) against Dreamship fixtures that use this account's real field names. The REST paths and the two write bodies are still to confirm against the schema (BUILD_LOG › Blocked), so until then keep the manual step below (Until Part B exists) and the Flush poster off the Storefront channel.
+
 ## The two problems this solves
 
 1. **Typing Dreamship's numbers by hand.** Each size's print rules (`docs/shop.md` › Product rules) come from Dreamship: the item variant, the print area in pixels, the print area key, the making time. Today they're copied by hand, and they go stale when the product changes in Dreamship. Cost and margin aren't visible anywhere in the app.

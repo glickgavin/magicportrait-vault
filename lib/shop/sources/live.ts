@@ -20,6 +20,7 @@ const Q_PRODUCTS = `query ShopStoreProducts($id: ID!, $after: String, $ns: Strin
         occasions: metafield(namespace: $ns, key: "occasions") { value }
         categories: metafield(namespace: $ns, key: "categories") { value }
         shortDescription: metafield(namespace: $ns, key: "short_description") { value }
+        dreamshipProductId: metafield(namespace: $ns, key: "dreamship_product_id") { value }
         template: metafield(namespace: $ns, key: "template") { value updatedAt }
         variants(first: 100) {
           nodes {
@@ -124,6 +125,7 @@ type Raw = {
         occasions: { value: string } | null;
         categories: { value: string } | null;
         shortDescription: { value: string } | null;
+        dreamshipProductId?: { value: string } | null;
         template: { value: string; updatedAt: string | null } | null;
         variants: {
           nodes: {
@@ -227,6 +229,7 @@ export class ShopCatalogLive implements ShopCatalogSource {
           occasions: parseList(p.occasions?.value),
           categories: parseList(p.categories?.value),
           shortDescription: p.shortDescription?.value?.trim() || null,
+          dreamshipProductId: p.dreamshipProductId?.value?.trim() || null,
           template: p.template ? { value: p.template.value, updatedAt: p.template.updatedAt } : null,
           variants: p.variants.nodes.map((v) => ({
             id: v.id,

@@ -191,6 +191,11 @@ export const EVENTS = {
   admin_shop_template_published: biz,
   admin_shop_rules_updated: biz,
   admin_open_store_themes_refreshed: biz,
+  admin_printer_settings_updated: biz,
+  admin_dreamship_linked: biz,
+  admin_dreamship_synced: biz,
+  shop_order_sent_to_maker: biz,
+  admin_printer_job_retried: biz,
   admin_shop_template_uploaded: biz,
   admin_shop_scene_made: biz,
 

@@ -43,6 +43,8 @@ export type ShopProduct = {
   categories: string[];
   /** `mmp_shop.short_description`: the shop's own short text (lines starting "- " are bullets); null when unset. */
   shortDescription?: string | null;
+  /** `mmp_shop.dreamship_product_id` (docs/dreamship.md › Part A): the Dreamship product it was published from. */
+  dreamshipProductId?: string | null;
   /** `mmp_shop.template` JSON text; null when unset. */
   template: { value: string; updatedAt: string | null } | null;
   variants: ShopVariant[];

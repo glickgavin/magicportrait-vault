@@ -5,7 +5,7 @@ import { track } from "@/lib/track";
 import { getVaultProfile } from "@/lib/vault/profile";
 import { shopifyAuthFromEnv } from "@/lib/sources/shopify-auth";
 
-export const SOURCE_NAMES = ["shopify", "imagen", "mirror", "lookup", "klaviyo", "agentmail", "posthog"] as const;
+export const SOURCE_NAMES = ["shopify", "imagen", "mirror", "lookup", "klaviyo", "agentmail", "posthog", "dreamship"] as const;
 export type SourceName = (typeof SOURCE_NAMES)[number];
 
 export type CheckResult = { source: SourceName; ok: boolean; ms: number; detail: Record<string, string | number | boolean | string[]> };

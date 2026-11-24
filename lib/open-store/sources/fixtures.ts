@@ -8,7 +8,7 @@ import type { OpenStoreSource, StoreCollection, StoreMenu, StorePolicies } from 
  */
 export const FX_MAGIC_HANDLE = "magic-store";
 /** The Magic Store collection's order: the store's grid order. fx-tee (draft) and fx-poster's sizes are in the Store only. */
-const MAGIC_ORDER = ["fx-pillow", "fx-mug", "fx-canvas", "fx-puzzle", "fx-acrylic-block", "fx-poster", "fx-ornaments", "fx-tile"];
+const MAGIC_ORDER = ["fx-pillow", "fx-mug", "fx-canvas", "fx-puzzle", "fx-acrylic-block", "fx-poster", "fx-ornaments", "fx-tile", "fx-flush-poster"];
 const CATEGORIES: Record<string, { title: string; description: string; image: string; handles: string[] }> = {
   [FX_MAGIC_HANDLE]: { title: "Bestsellers", description: "Your pet, painted in about a minute and printed on gifts they'll love.", image: "/fixtures/shop/pillow.jpg", handles: MAGIC_ORDER },
   "pet-gifts": { title: "Pet gifts", description: "Cosy things with your pet on them.", image: "/fixtures/shop/pillow.jpg", handles: ["fx-pillow", "fx-mug", "fx-ornaments", "fx-canvas"] },

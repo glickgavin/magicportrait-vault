@@ -1242,3 +1242,13 @@ All behind `lib/open-store/sources/` (Shopify reads) and `lib/sources/imagen-api
 **AgentMail:** the one "Your picture is ready" email per picture (`emails/store-picture.tsx`), with a `store_picture` sign-in link that opens `/store/product/<id>?g=<picture>&from=email_link`.
 
 **Klaviyo** (allowed write 2, outbox only): when the visitor ticked "Send me offers", a `subscription` row (`profile-subscription-bulk-create-jobs`, consent `SUBSCRIBED`, source `open_store.klaviyo_source`, list `open_store.klaviyo_list_id` when set) and the `Store Picture Ready` event (product, theme, product page link). Nothing goes to Klaviyo without the tick.
+
+## 13. Source 8: Dreamship (`docs/dreamship.md`)
+
+Behind `lib/sources/dreamship.ts` (interface, live, fixtures), with this app's own key (`DREAMSHIP_API_KEY`, Vercel only) and `dreamship.api_url` (default `https://api.dreamship.com/v1`). The REST paths are in `PATHS` there and are still to confirm against Dreamship's schema (BUILD_LOG › Blocked); the field names match what Dreamship returns for this account.
+
+**Reads:** the business and its order settings (`auto_submit_order_import_orders`, `auto_submit_api_orders`; shown on Settings › Printers, never changed), a product's design (variants: `product_variant_id`, `item_variant_id`, `retail_price`, `cost`; print areas: `key`, `width_px`, `height_px`, `min_dpi`, `ai_upscale`, `artwork_id`), the product a variant belongs to (the link suggestion), a catalog item's print areas and `production_days_min`/`_max`, and an order by reference id with its status and lines.
+
+**Writes (allowed write 7, nothing else):** upload the print file as artwork (from a one-day signed link), and set that artwork on one line's print area of the order Dreamship's Shopify app imported for a paid Shopify order. No submit, cancel or status change exists in the source; a test fails if one is added.
+
+**orders/paid** (§5.6): after the gift offer, the shop and the open store, lines with `_shop` = true and `_shop_maker` = `dreamship` that carry a picture we hold (an open-store picture by `_shop_session_id`/`_shop_image_id`, or a shop line by `_vault_line_id`) queue one `printer_jobs` row; it's tried after the reply and then every 5 minutes (`/api/cron/printer-jobs`) until Dreamship has imported the order, for up to `dreamship.import_wait_hours`. The print area comes from `_shop_extra.print_area`, the size from `_shop_print_px`, the crop from `_shop_crop`; Dreamship's line is matched by product variant id. Writes to Shopify for linking and syncing go through the shop's `metafieldsSet` (allowed write 5).

@@ -35,5 +35,18 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error(`[webhook] open store match failed: ${(e as Error).message}`);
   }
+  // Dreamship (docs/dreamship.md › Part B): queue the customer's picture for the order Dreamship imports, and try it
+  // after the reply. It only sets artwork; it never submits or cancels. Never changes the reply.
+  try {
+    const { queueFromPaidOrder, runJob } = await import("@/lib/dreamship/artwork");
+    const q = await queueFromPaidOrder(JSON.parse(raw));
+    if (q.jobId) {
+      const { afterResponse } = await import("@/lib/perf");
+      const jobId = q.jobId;
+      await afterResponse(() => runJob(jobId));
+    }
+  } catch (e) {
+    console.error(`[webhook] dreamship job failed: ${(e as Error).message}`);
+  }
   return Response.json({ ok: true, created: r.created, status: r.status });
 }

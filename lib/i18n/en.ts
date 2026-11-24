@@ -373,6 +373,7 @@ export const en = {
       shop: "Products",
       shopPages: "Gifts & Products pages",
       magicStore: "Magic Store",
+      printers: "Printers",
       shopLibrary: "Photo library",
       shopScenes: "AI room photos",
       emails: "Emails",
