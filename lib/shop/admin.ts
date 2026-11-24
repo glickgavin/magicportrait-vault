@@ -254,11 +254,19 @@ export async function publishTemplate(actor: { email: string }, input: { product
     if (!m) continue;
     if (allowed.get(m.media_id) !== m.url) return { ok: false, status: 400, error: `The ${what} must be one of this product's photos in Shopify, one uploaded for it here, or the one its template already uses.` };
   }
+  // The layer's pictures must be in the art library: live ones, or archived ones this product already offered.
+  const choices = input.template.layer?.art?.choices ?? [];
+  if (choices.length) {
+    const { layerArtByIds } = await import("./layer-art");
+    const found = await layerArtByIds(choices);
+    const kept = new Set(saved?.layer?.art?.choices ?? []);
+    if (found.length !== choices.length || found.some((a) => a.archived && !kept.has(a.id))) return { ok: false, status: 400, error: "The layer's pictures must be in the art library (and not archived)." };
+  }
   const t: Template = { ...input.template, updated_at: new Date().toISOString() };
   const r = await (await getShopCatalogSource()).setProductTemplate(input.productId, ns, JSON.stringify(t));
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the template (${r.reason}).` };
   await invalidateCatalog();
-  await track("admin_shop_template_published", { product_id: entry.product.legacyId, zone: t.zone.kind }, { email: actor.email, actor: `super_user:${actor.email}` });
+  await track("admin_shop_template_published", { product_id: entry.product.legacyId, zone: t.zone.kind, layer: Boolean(t.layer?.enabled), layer_texts: t.layer?.texts.length ?? 0, layer_art: t.layer?.art?.choices.length ?? 0 }, { email: actor.email, actor: `super_user:${actor.email}` });
   return { ok: true };
 }
 

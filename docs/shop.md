@@ -299,6 +299,9 @@ Every shop line carries everything the fulfilment system needs to make the print
 | `_shop_extra` | The product's free-form JSON | Passed through untouched |
 | `_shop_rules_version` | When the variant's rules last changed in Shopify | So a later change to the rules can't change an order |
 | `_shop_preview_url` | The preview the customer saw | For customer service and checking print files |
+| `_shop_layer_t1`, `_shop_layer_t2` | What the customer typed in the personalisation layer's text boxes (Magic Store only; only when filled in) | Drawn into the print file; private: never in analytics or logs |
+| `_shop_layer_art` | The art library picture the customer chose (its id) | Drawn into the print file |
+| `_shop_layer_v` | When the template the words were checked against was published | So a later change to the template can be spotted |
 | `_vault_line_id` | Our cart line id |  |
 
 The Shopify cart also carries `_vault_cart_id` and `_source` = `shop`.
@@ -369,6 +372,22 @@ A product made by duplicating another (same printing, a new theme and photos) ta
 | Gifts & Products pages (off by default) | Page, occasions and categories; only when this product is in the Store collection. |
 
 Never copied: the Imagen theme, the Dreamship link and the print rules (maker, SKU, print size, extra); Dreamship's Sync fills those. Code: `planCopy` in `lib/shop/copy-settings.ts` (pure, unit-tested), `copySettings` in `lib/shop/copy.ts`, `POST /api/admin/shop/copy`.
+
+### Personalisation layer (25 Nov)
+
+A product's template can carry a layer the Magic Store customer fills in: **up to two text boxes and one picture slot**, drawn over their portrait in the print area. It's set up in the template editor (Settings › Shop › Preview template › **Personalisation layer**), shown on every preview as they type, and printed: the print file is the picture with the layer on top, made by the app for every printer.
+
+**Set up in the editor.** Tick **Let customers personalise this product**, then for each text box: what to ask the customer, example words (shown as the placeholder and used for the editor's preview), font (the 14 card fonts), size (a share of the print area's height; text shrinks to 60% of it before it wraps, and never overflows), colour, line-up, most characters (1–120), most lines (1–6) and whether it's required. The picture slot has its question, whether it's required (otherwise the customer sees **None**), and up to 3 pictures from the **art library**. Each box is placed on a flat view of the print area by dragging it (its corner dot resizes it), with the arrow keys, or as numbers (% from the left and top, width and height). Publish refuses a layer with nothing in it, a picture slot with no pictures, or pictures that aren't in the library.
+
+**The art library** is shared by every product (`layer_art`, `docs/schema.md`): PNGs with a see-through background (300 px or more on the long side), or SVGs. An SVG with a DTD or entities is refused; otherwise scripts, event handlers, embedded HTML and outside links are removed, and it's drawn once as a 2400 px PNG, which is what every canvas uses, so the browser and the print file match. Upload from the editor's picture slot (`POST /api/admin/layer-art`); archive with `PATCH`.
+
+**What's stored.** The template's JSON gains an optional `layer`: `{ enabled, texts: [{ id: "t1"|"t2", label, placeholder, required, maxChars, box: {x,y,w,h}, font, weight?, size, minSize?, color, align, maxLines }], art: { label, required, box, choices: [layer_art ids] } | null }`. Boxes are fractions of the print area; sizes are fractions of its height, so the layer looks the same at any size. A template without `layer` is unchanged. Code: `lib/shop/layer.ts` (schema, checks and `drawLayer`, pure), `flatPicture` in `lib/shop/preview.ts` draws it over the picture, before the mask.
+
+**In the Magic Store** (`docs/open-store.md` › Personalise): once their picture is ready, a **Personalise it** step shows the text boxes and the picture choice; the preview redraws a moment after they type, with no new picture made. Add to cart sends what they filled in; the server checks it again against the live template (required boxes, lengths, a picture from the product's choices, control and direction characters removed) and puts it on the line as `_shop_layer_*` (What goes on the order). The signed-in Gifts & Products pages don't show the layer.
+
+**Printed.** The print file is composed by the app at the size's print pixels: the picture cropped as the customer saw it, then the layer drawn by the same `drawLayer` (`lib/shop/print-file.ts`). For Dreamship lines it's the artwork set on Dreamship's imported order; for every other printer it's stored and linked from the order (`docs/data.md` › Print files).
+
+**Privacy.** The words are the customer's own: never in PostHog, Klaviyo, `activity_log` or logs, masked in session replay. Events carry only whether something was filled in (`store_layer_filled`, `personalised` on `store_added_to_cart`).
 
 ## Routes (as built)
 

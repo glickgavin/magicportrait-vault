@@ -203,6 +203,9 @@ The customer's picture on Dreamship's imported order (`docs/dreamship.md` › Pa
 
 Migrations `20261124000001_printers.sql` (settings section `printers`), `…0002_dreamship_sync.sql` and `…0003_printer_jobs.sql`.
 
+### layer_art
+The personalisation layer's art library (`docs/shop.md` › Personalisation layer): pictures a super user uploads once and offers on any product (each offers at most 3). `id uuid pk`, `name`, `kind` (`png` · `svg`), `storage_path` (the PNG every canvas draws, in `theme-assets` under `layer-art/`; an SVG is cleaned and drawn as a 2400 px PNG when it's uploaded), `svg` (the cleaned SVG text, at most 1 MB; the bucket serves only raster pictures), `width`, `height`, `created_by`, `created_at`, `archived_at` (archived pictures leave the library; products already offering one keep it until their template changes). RLS on, no policies. Migration `20261125000001_layer_art.sql`.
+
 ## Storage buckets
 
 | bucket | public | contents |

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { layerSchema } from "./layer";
 
 /**
  * A product's preview template, kept in its `mmp_shop.template` metafield (docs/shop.md › Previews):
@@ -48,6 +49,8 @@ export const templateSchema = z.object({
   overlay: media.nullable().default(null),
   mask: z.object({ kind: z.enum(["none", "rounded", "circle"]), radius: z.number().min(0).max(0.5).default(0) }).default({ kind: "none", radius: 0 }),
   blend: z.enum(["normal", "multiply"]).default("normal"),
+  /** The personalisation layer: text and a picture the Magic Store customer adds on top (lib/shop/layer.ts). */
+  layer: layerSchema.optional(),
   updated_at: z.string().max(40).optional(),
 });
 export type Template = z.infer<typeof templateSchema>;

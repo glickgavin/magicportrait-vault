@@ -6,6 +6,7 @@ import { getSettings } from "@/lib/settings";
 import type { Rect } from "./fit";
 import { drawPreview, previewSize, type MakeCanvas, type PreviewCtx } from "./preview";
 import type { Template } from "./template";
+import type { LayerValues } from "./layer";
 
 /** Server drawing of a shop preview (cart thumbnails, the order line's preview), with the shared routine. */
 export const makeServerCanvas: MakeCanvas = (w, h) => {
@@ -56,6 +57,8 @@ export type RenderInput = {
   backgroundColour: string | null;
   targetAspect: number;
   width: number;
+  /** What the customer filled in on the template's personalisation layer, if it has one. */
+  layerValues?: LayerValues | null;
   /** Already-loaded template photos (tests pass their own). */
   images?: { background: Image; overlay: Image | null };
 };
@@ -66,9 +69,11 @@ export async function renderPreview(input: RenderInput, format: "jpeg" | "png" =
   if (!background) return null;
   const overlay = input.images ? input.images.overlay : input.template.overlay ? await loadTemplateImage(input.template.overlay.url) : null;
   const picture = await loadImage(input.picture);
+  const { serverLayer } = await import("./layer-server");
+  const layer = await serverLayer(input.template.layer, input.layerValues);
   const size = previewSize(input.template, input.width);
   const { canvas, ctx } = makeServerCanvas(size.w, size.h);
-  drawPreview(ctx, { template: input.template, background, overlay, picture, crop: input.crop, placement: input.placement, backgroundColour: input.backgroundColour, targetAspect: input.targetAspect, size, makeCanvas: makeServerCanvas });
+  drawPreview(ctx, { template: input.template, background, overlay, picture, crop: input.crop, placement: input.placement, backgroundColour: input.backgroundColour, targetAspect: input.targetAspect, size, makeCanvas: makeServerCanvas, layer });
   const c = canvas as Canvas;
   return format === "png" ? c.encode("png") : c.encode("jpeg", 88);
 }

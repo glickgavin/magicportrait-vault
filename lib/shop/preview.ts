@@ -5,6 +5,7 @@
  * as a mesh of small triangles, which both canvases can draw with plain affine transforms.
  */
 import type { Rect } from "./fit";
+import { drawLayer, type LayerDraw } from "./layer";
 import { isBent, mesh, zoneAspect, zoneMapper, type Point, type Template } from "./template";
 
 export type PreviewImage = { width: number; height: number };
@@ -37,7 +38,12 @@ export interface PreviewCtx {
   fillRect(x: number, y: number, w: number, h: number): void;
   drawImage(img: PreviewImage, ...args: number[]): void;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  fillText(text: string, x: number, y: number): void;
+  measureText(text: string): { width: number };
   fillStyle: unknown;
+  font: string;
+  textAlign: string;
+  textBaseline: string;
   globalCompositeOperation: string;
   imageSmoothingEnabled: boolean;
 }
@@ -61,6 +67,8 @@ export type PreviewInput = {
   makeCanvas: MakeCanvas;
   /** Longest side of the flat picture before warping (quality vs speed). */
   flatMax?: number;
+  /** The personalisation layer and what the customer filled in; drawn over the picture, under the mask. */
+  layer?: LayerDraw | null;
 };
 
 /** Output size for a given width, in the background photo's shape. */
@@ -127,7 +135,7 @@ function triangle(ctx: PreviewCtx, img: PreviewImage, s: [Point, Point, Point], 
 }
 
 /** The picture cropped (or fitted) to the print shape, with the template's mask, on its own canvas. */
-export function flatPicture(input: Pick<PreviewInput, "picture" | "crop" | "placement" | "backgroundColour" | "targetAspect" | "makeCanvas" | "flatMax" | "template">) {
+export function flatPicture(input: Pick<PreviewInput, "picture" | "crop" | "placement" | "backgroundColour" | "targetAspect" | "makeCanvas" | "flatMax" | "template" | "layer">) {
   const max = input.flatMax ?? 1200;
   const aspect = input.targetAspect > 0 ? input.targetAspect : 1;
   const fw = aspect >= 1 ? max : Math.round(max * aspect);
@@ -147,6 +155,7 @@ export function flatPicture(input: Pick<PreviewInput, "picture" | "crop" | "plac
     const k = coverTop(c.w, c.h, fw / fh);
     ctx.drawImage(input.picture, c.x + k.x, c.y + k.y, k.w, k.h, 0, 0, fw, fh);
   }
+  if (input.layer) drawLayer(ctx, fw, fh, input.layer);
   const mask = input.template.mask;
   if (mask.kind !== "none") {
     ctx.globalCompositeOperation = "destination-in";
