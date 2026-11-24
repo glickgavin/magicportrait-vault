@@ -13,7 +13,7 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 | `docs/design.md` | Brand tokens, header, menu, footer, components |
 | `docs/shop.md` | The shop (Gifts and Products pages, cart, Shopify checkout): its spec, switches and build parts |
 | `docs/open-store.md` | The open store ("Magic Store", `/store`): shopping without signing in, pictures made with Imagen's API, visitors and their saved data |
-| `docs/dreamship.md` | Dreamship, the printer: linking and syncing products, sending the customer's picture to Dreamship orders (drafts by default), and Settings › Printers |
+| `docs/dreamship.md` | Dreamship, the printer: linking and syncing products, putting the customer's picture on Dreamship orders, and Settings › Printers |
 | `designs/README.md` | Screen mockups → routes |
 | `reference/live-site/` | The live site's header, menu, footer and tokens, copied from its code |
 
@@ -63,7 +63,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
   4. Shop carts: Storefront `cartCreate` and the cart update mutations, for a signed-in customer's own cart (`docs/shop.md`) or an open-store visitor's own cart, held against their visitor id (`docs/open-store.md`).
   5. Shop product fields: `metafieldsSet` on the `mmp_shop` namespace of products in the Store or Magic Store collection, and the `mmp_shop` metafield definitions, from Settings › Shop by a super user. Never any other product field.
   6. Open-store pictures: new Imagen sessions through Imagen's public API with this app's own key (`docs/open-store.md`).
-  7. Dreamship orders: for a paid Shopify order line whose variant's maker is `dreamship`, upload the customer's picture as artwork and set it on that line of the Dreamship order imported for it, through Dreamship's API with this app's key (`docs/dreamship.md`). Submit that order only when `dreamship.auto_submit` is on (default off: it stays a draft). Never change any other Dreamship product, order or setting.
+  7. Dreamship orders: for a paid Shopify order line whose variant's maker is `dreamship`, upload the customer's picture as artwork and set it on that line of the Dreamship order imported for it, through Dreamship's API with this app's key (`docs/dreamship.md`). Never submit or cancel a Dreamship order, and never change any other Dreamship product, order or setting; order status is Shopify's and Dreamship's.
   
   Never write to Imagen's database, the events mirror or the live site's databases.
 - The shop is hidden unless `shop.enabled` (customers) or `shop.super_user_preview` (super users) is on; hidden shop routes return 404 and shop UI doesn't render. Shop changes must leave every existing screen and test unchanged with both off.
