@@ -385,6 +385,7 @@ export const REGISTRY = {
   "dreamship.import_wait_hours": num("printers", 6, { label: "Wait for Dreamship to import a paid order (hours)", description: "After this, the order is flagged on this page.", min: 1, max: 72 }),
   "dreamship.sale_pct": num("printers", 60, { label: "Sale for the margin check (% off)", min: 0, max: 95 }),
   "dreamship.min_margin_pct": num("printers", 30, { label: "Flag margins below (%)", min: 0, max: 95 }),
+  "printers.print_files_to_order": bool("printers", false, { label: "Link personalised print files from the order", description: "Off: the app still makes the print files for personalised lines and lists them here, but doesn't write their links on the Shopify order (mmp_shop.print_files). Turn on once the print system reads them and CLAUDE.md allows the write." }),
   "dreamship.api_url": text("printers", "https://api.dreamship.com/v1", { label: "Dreamship API address", pattern: /^https:\/\/[a-z0-9.-]+(\/[A-Za-z0-9._-]+)*$/, max: 200 }),
   "open_store.posthog_dashboard_url": text("open_store", "", { label: "PostHog dashboard link", description: "The “Magic Store” dashboard, linked from this page.", pattern: /^(https:\/\/[^\s]+)?$/, max: 300 }),
   // Store defaults for the product fields (PRODUCT_FIELDS below): a product's own value wins.

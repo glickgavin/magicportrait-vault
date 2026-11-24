@@ -192,6 +192,7 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `admin_open_store_themes_refreshed` | server, business | Imagen themes copied into the Shopify dropdown | `themes`, `added`, `removed` |
 | `admin_dreamship_linked` | server, business | A Shopify product linked to its Dreamship product (`docs/dreamship.md` › Part A) | `product_id`, `fields_changed` |
 | `admin_dreamship_synced` | server, business | Dreamship's numbers saved to a product's sizes with Save to Shopify | `product_id`, `fields_changed` |
+| `shop_print_file_made` | server, business | The print file with the personalisation layer made for an order's lines (printers other than Dreamship) and linked from the order, or it couldn't be | `maker`, `status` (`picture_set` · `failed`), `lines`, `of`, `reason` (when failed); never the words |
 | `shop_order_sent_to_maker` | server, business | The customer's picture set on the printer's order (`docs/dreamship.md` › Part B), or it couldn't be | `maker`, `status` (`picture_set` · `failed`), `lines`, `reason` (when failed) |
 | `admin_printer_job_retried` | server, business | Retry on Settings › Printers re-queued a picture job | `maker`, `order_id` |
 | `admin_printer_settings_updated` | server, business | A printer setting changed on Settings › Printers (`docs/dreamship.md` › Part C) | `maker`, `keys` |

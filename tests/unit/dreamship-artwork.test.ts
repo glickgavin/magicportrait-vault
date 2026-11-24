@@ -61,6 +61,21 @@ describe("which lines get the customer's picture", () => {
   });
 });
 
+describe("a personalised Dreamship line", () => {
+  it("carries what the customer filled in, and its print file has the layer drawn on", async () => {
+    const line = { ...dreamshipLine(71, 45378125, "8x10", "1800x2400", { ...openStorePicture, _shop_layer_t1: "Biscuit" }), product_id: 8710000000 };
+    const found = dreamshipLines(paidOrder("2", [line]))!;
+    expect(found.lines[0]).toMatchObject({ layerValues: { t1: "Biscuit" }, productId: "gid://shopify/Product/8710000000" });
+    const { defaultLayerText, layerSchema } = await import("@/lib/shop/layer");
+    const layer = layerSchema.parse({ enabled: true, texts: [{ ...defaultLayerText("t1"), size: 0.15 }], art: null });
+    const pic = await sharp({ create: { width: 1536, height: 2048, channels: 3, background: "#123456" } }).png().toBuffer();
+    const base = { crop: { x: 0, y: 0, w: 1536, h: 2048 }, printPx: { w: 1800, h: 2400 } };
+    const [plain, layered] = await Promise.all([printFile(pic, base), printFile(pic, { ...base, layer, layerValues: { t1: "Biscuit" } })]);
+    expect((await sharp(layered).metadata()).width).toBe(1800);
+    expect(layered.equals(plain)).toBe(false);
+  });
+});
+
 describe("the job", () => {
   it("waits for Dreamship's import, then sets the picture on each personalised line and records it", async () => {
     const id = orderId();
