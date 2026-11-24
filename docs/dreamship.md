@@ -23,6 +23,14 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
 - **16x24 and 24x36:** `max_crop_pct` is 40. Royal Flush paints 1024 × 1024 squares, and these sizes cut about 36% of a square (the default limit of 30 would hide them).
 - **Product fields:** `imagen_theme` `royal-flush`, `short_description`, `details`, and `template`.
   - **Template:** the first Dreamship mockup (the 8x10, straight on, 2048 × 2048) as the background, with the zone on the art inside the frame. Measured from the photo's pixels: inner frame x 544–1514, y 418–1627. Blend is normal with no overlay, so the picture covers the sample art.
+- **Fleece Blanket** (Shopify 8914933874884, Dreamship product 9967304, catalog item 18, also the Flush art). Print rules and text filled in on 24 Nov:
+  - 30x40: item variant 746, print area 5100x6600, product variant 45370843.
+  - 50x60: item variant 747, print area 8100x9600, product variant 45370844.
+  - 60x80: item variant 748, print area 9600x12600, product variant 45370842.
+  - `extra` with `item_id` 18, `lead_days` 1-3, theme `royal-flush` (set by Gavin).
+  - **No template yet**, so the Magic Store hides it, although it's on the Storefront channel. Adding a template puts it on sale: wait for Part B, or take it off the channel first.
+  - Dreamship's minimum for blankets is 150 dpi, with 600 px of safe margin and 300 px of bleed per side.
+  - Cost $14.09 / $29.39 / $38.59 against $59.99 / $79.99 / $99.99.
 - **Dreamship's print rules:** every area is printed at 300 dpi with a minimum of 250 dpi. The safe area is about 2% in from each edge, and the art must run to the edges (`get_print_areas`, item 958).
 
 ## Part A: Link and sync (reads Dreamship; writes only `mmp_shop`)
