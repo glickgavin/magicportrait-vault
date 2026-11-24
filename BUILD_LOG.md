@@ -623,3 +623,8 @@ Still open:
 - **Decided (24 Nov, Gavin):** merge the maker change; keep the poster hidden until Part B works; B1 (swap the artwork on Dreamship's imported order), so allowed write 7 is now in `CLAUDE.md`; a 2:3 2K Royal Flush for posters.
 - **Decided later on 24 Nov (Gavin):** `DREAMSHIP_API_KEY` added in Vercel. The app doesn't control order status (Shopify and Dreamship do): it only puts the customer's picture on the imported order and never submits or cancels (write 7 narrowed to match). New page Settings › Printers (`docs/dreamship.md` › Part C).
 - **Blocked:** Dreamship still auto-submits imported orders (its own setting; Gavin sets imported orders to wait as drafts before the poster goes on sale); the 2:3 2K theme active in Imagen; the Royal Flush resolution (1024 × 1024) against Dreamship's 250 dpi minimum; 24x36 priced below cost.
+
+## 24 Nov: Magic Store category menu
+- Settings › Shop › Magic Store said "Menu magic-store wasn't found", but the menu exists in Shopify. The app can't read it: Shopify's `menus` needs `read_online_store_navigation`, and the r_orders app doesn't have it. The read failed and was shown as "not found".
+- `read_online_store_navigation` is now in the Shopify access checks (Gifts & Products pages). The Magic Store page tells "couldn't be read" (missing access) apart from "wasn't found".
+- **Blocked:** add `read_online_store_navigation` to the r_orders app in Shopify's Dev Dashboard, release the version, then redeploy so the app gets a token with it (the token is cached up to 24 h).

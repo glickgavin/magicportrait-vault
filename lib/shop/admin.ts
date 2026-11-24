@@ -88,7 +88,8 @@ export async function shopOverview(): Promise<ShopOverview> {
   }
 }
 
-export const SHOP_SCOPES = ["read_products", "write_products", "read_discounts", "read_customers"] as const;
+/** read_online_store_navigation: the Magic Store's category menu (`open_store.menu_handle`). */
+export const SHOP_SCOPES = ["read_products", "write_products", "read_discounts", "read_customers", "read_online_store_navigation"] as const;
 
 /** What the shop needs from Shopify, and what this environment has (Settings › Shop › Shopify access). */
 export async function shopAccess(): Promise<{ scopes: { scope: string; ok: boolean }[] | null; storefront: boolean; fulfilmentSecret: boolean }> {
