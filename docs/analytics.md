@@ -189,6 +189,8 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_visitor_linked` | server, business | A visitor linked to a proven email | `via` (`sign_in` · `order` · `email_link`), `visitors_linked` |
 | `error_store_cart` | server | A Shopify cart call failed | `stage`, `status_code` |
 | `admin_open_store_themes_refreshed` | server, business | Imagen themes copied into the Shopify dropdown | `themes`, `added`, `removed` |
+| `admin_dreamship_linked` | server, business | A Shopify product linked to its Dreamship product (`docs/dreamship.md` › Part A) | `product_id`, `fields_changed` |
+| `admin_dreamship_synced` | server, business | Dreamship's numbers saved to a product's sizes with Save to Shopify | `product_id`, `fields_changed` |
 | `admin_printer_settings_updated` | server, business | A printer setting changed on Settings › Printers (`docs/dreamship.md` › Part C) | `maker`, `keys` |
 
 Every store event carries the super properties `area: "open_store"`, `signed_in`, `returning` (the visitor has been before) and `preview` (true for a super user's preview). `store_added_to_cart` and `store_checkout_started` reach Klaviyo only once they're in `klaviyo.events` and the visitor has a proven email or ticked for offers.

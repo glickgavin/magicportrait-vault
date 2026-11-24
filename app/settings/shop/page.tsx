@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireSuperUser } from "@/lib/auth/session";
 import { productRows, type ProductRow } from "@/lib/open-store/admin";
+import { syncSummaries } from "@/lib/dreamship/link";
 import { STORE_HIDDEN_TEXT } from "@/lib/open-store/catalog";
 import { shopOverview } from "@/lib/shop/admin";
 import { HIDDEN_REASON_TEXT } from "@/lib/shop/catalog";
@@ -29,7 +30,7 @@ export default async function ShopProducts({ searchParams }: { searchParams: Pro
   await requireSuperUser();
   const sp = await searchParams;
   const filter: Filter = FILTERS.some(([k]) => k === sp.filter) ? (sp.filter as Filter) : "all";
-  const [list, overview] = await Promise.all([productRows(), shopOverview()]);
+  const [list, overview, dreamship] = await Promise.all([productRows(), shopOverview(), syncSummaries().catch(() => new Map() as Awaited<ReturnType<typeof syncSummaries>>)]);
 
   return (
     <div>
@@ -95,7 +96,7 @@ export default async function ShopProducts({ searchParams }: { searchParams: Pro
               {list.rows
                 .filter((r) => matches(r, filter))
                 .map((r) => (
-                  <ProductItem key={r.product.id} row={r} />
+                  <ProductItem key={r.product.id} row={r} dreamship={dreamship.get(r.product.id) ?? null} />
                 ))}
               {!list.rows.filter((r) => matches(r, filter)).length && <li className="text-[15px] text-ink-2">No products here.</li>}
             </ul>
@@ -106,7 +107,9 @@ export default async function ShopProducts({ searchParams }: { searchParams: Pro
   );
 }
 
-function ProductItem({ row }: { row: ProductRow }) {
+type DreamshipSummary = Awaited<ReturnType<typeof syncSummaries>> extends Map<string, infer V> ? V : never;
+
+function ProductItem({ row, dreamship }: { row: ProductRow; dreamship: DreamshipSummary | null }) {
   const p = row.product;
   const thumb = p.media[0]?.url;
   const href = `/settings/shop/products/${p.legacyId}`;
@@ -125,6 +128,19 @@ function ProductItem({ row }: { row: ProductRow }) {
               {row.shop && <Badge tone={row.shop.hidden.length ? "amber" : "green"}>{`GIFTS & PRODUCTS: ${row.shop.hidden.length ? "HIDDEN" : "SHOWN"}`}</Badge>}
               {row.store && <Badge tone={row.store.hidden.length ? "amber" : "green"}>{`MAGIC STORE: ${row.store.hidden.length ? "HIDDEN" : row.store.relatedOnly ? "RELATED ONLY" : "SHOWN"}`}</Badge>}
             </div>
+            {dreamship && (dreamship.warnings > 0 || dreamship.differs > 0) && (
+              <div className="mt-2 text-[13px]" data-testid="dreamship-warnings">
+                <Link href={`${href}#dreamship`} className="font-bold text-[#7a4b00] hover:underline">
+                  Dreamship: {dreamship.warnings} {dreamship.warnings === 1 ? "warning" : "warnings"}
+                  {dreamship.differs ? ` · ${dreamship.differs} ${dreamship.differs === 1 ? "field differs" : "fields differ"}` : ""}
+                </Link>
+                <ul className="mt-1 list-disc pl-5 text-ink-2">
+                  {dreamship.flags.slice(0, 3).map((f, i) => (
+                    <li key={i}>{f}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {((row.shop?.hidden.length ?? 0) > 0 || (row.store?.hidden.length ?? 0) > 0) && (
               <ul className="mt-2 list-disc pl-5 text-[13px] text-ink-2">
                 {row.shop?.hidden.map((h) => (

@@ -1,6 +1,8 @@
 import { requireSuperUser } from "@/lib/auth/session";
 import { settingRows } from "@/lib/admin/data";
-import { dreamshipConnection, makerUse, type Maker } from "@/lib/printers";
+import Link from "next/link";
+import { dreamshipConnection, dreamshipProducts, makerUse, type Maker } from "@/lib/printers";
+import { designerUrl } from "@/lib/sources/dreamship";
 import { fmtBiz } from "@/lib/biztime";
 import { getSettings } from "@/lib/settings";
 import { SettingField } from "@/components/admin/SettingField";
@@ -27,7 +29,7 @@ const onOff = (v: boolean | null) => (v == null ? "Not reported" : v ? "On" : "O
  */
 export default async function PrintersPage() {
   await requireSuperUser();
-  const [rows, use, conn, s] = await Promise.all([settingRows(), makerUse().catch(() => null), dreamshipConnection(), getSettings(["brand.timezone"] as const)]);
+  const [rows, use, conn, s, products] = await Promise.all([settingRows(), makerUse().catch(() => null), dreamshipConnection(), getSettings(["brand.timezone"] as const), dreamshipProducts().catch(() => null)]);
   const tz = s["brand.timezone"];
   const dsRows = DREAMSHIP_KEYS.map((k) => rows.find((r) => r.key === k)).filter((r) => r !== undefined);
   const autoSubmit = conn.account?.settings.autoSubmitImportOrders === true;
@@ -93,6 +95,34 @@ export default async function PrintersPage() {
               </div>
             ))}
           </div>
+
+          <h3 className="mt-5 text-[16px] font-extrabold">Products</h3>
+          {products === null ? (
+            <p className="text-[14px] text-ink-2">Couldn&apos;t read the products.</p>
+          ) : products.length === 0 ? (
+            <p className="text-[14px] text-ink-2">No product has a Dreamship size yet.</p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-2" data-testid="dreamship-products">
+              {products.map((p) => (
+                <li key={p.legacyId} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[14px] bg-black/[0.03] p-3 text-[14px]">
+                  <span className="min-w-[200px] flex-1 font-semibold">{p.title}</span>
+                  <span>
+                    {p.dreamshipProductId ? (
+                      <a href={designerUrl(p.dreamshipProductId)} target="_blank" rel="noreferrer" className="link">
+                        Dreamship {p.dreamshipProductId}
+                      </a>
+                    ) : (
+                      "Not linked"
+                    )}
+                  </span>
+                  <span className="text-ink-2">{p.lastSyncedAt ? `Synced ${fmtBiz(p.lastSyncedAt, tz)}` : "Never synced"}</span>
+                  <Link href={`/settings/shop/products/${p.legacyId}#dreamship`} className={p.warnings ? "font-bold text-[#7a4b00] hover:underline" : "link"}>
+                    {p.warnings} {p.warnings === 1 ? "warning" : "warnings"}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <div className="flex flex-col gap-5">

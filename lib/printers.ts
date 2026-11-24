@@ -47,3 +47,25 @@ export async function dreamshipConnection(): Promise<DreamshipConnection> {
     return { configured, account: null, error: (e as Error).message.slice(0, 120), lastCheck };
   }
 }
+
+export type PrinterProduct = { legacyId: string; title: string; sizes: number; dreamshipProductId: number | null; lastSyncedAt: string | null; warnings: number; differs: number };
+
+/** Every Shopify product with a `dreamship` size: its link, last sync and warning count (Settings › Printers › Products). */
+export async function dreamshipProducts(): Promise<PrinterProduct[]> {
+  const { syncSummaries } = await import("@/lib/dreamship/link");
+  const [products, sync] = await Promise.all([adminProducts(), syncSummaries().catch(() => new Map())]);
+  return products
+    .filter((p) => p.variants.some((v) => v.metafields.some((f) => f.key === "maker" && f.value.trim() === "dreamship")) || p.dreamshipProductId)
+    .map((p) => {
+      const s = sync.get(p.id);
+      return {
+        legacyId: p.legacyId,
+        title: p.title,
+        sizes: p.variants.filter((v) => v.metafields.some((f) => f.key === "maker" && f.value.trim() === "dreamship")).length,
+        dreamshipProductId: p.dreamshipProductId ? Number(p.dreamshipProductId) || null : null,
+        lastSyncedAt: s?.at ?? null,
+        warnings: s?.warnings ?? 0,
+        differs: s?.differs ?? 0,
+      };
+    });
+}

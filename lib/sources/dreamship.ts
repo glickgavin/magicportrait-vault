@@ -62,6 +62,8 @@ export interface DreamshipSource {
   account(): Promise<DreamshipAccount>;
   product(productId: number): Promise<DreamshipProduct | null>;
   catalogItem(itemId: number): Promise<DreamshipCatalogItem | null>;
+  /** The product a product variant belongs to (Dreamship's Shopify app sets a size's SKU to that variant's id). */
+  productForVariant(productVariantId: number): Promise<number | null>;
   /** The order Dreamship imported for a Shopify order, by its reference id (null until it's imported). */
   orderByReference(referenceId: string): Promise<DreamshipOrder | null>;
   order(orderId: number): Promise<DreamshipOrder | null>;
@@ -174,6 +176,9 @@ export class DreamshipFixtures implements DreamshipSource {
   async catalogItem(itemId: number) {
     return itemId === FX_ITEM.id ? structuredClone(FX_ITEM) : null;
   }
+  async productForVariant(productVariantId: number) {
+    return FX_PRODUCT.variants.some((v) => v.productVariantId === productVariantId) ? FX_PRODUCT.id : null;
+  }
   async orderByReference(referenceId: string) {
     const o = this.orders.get(referenceId);
     if (!o) return null;
@@ -221,6 +226,7 @@ export const PATHS = {
   business: "/business/",
   businessSettings: "/business/settings/",
   product: (id: number) => `/products/${id}/`,
+  productVariant: (id: number) => `/product-variants/${id}/`,
   item: (id: number) => `/items/${id}/`,
   itemPrintAreas: (id: number) => `/items/${id}/print-areas/`,
   ordersByReference: (ref: string) => `/orders/?reference_id=${encodeURIComponent(ref)}`,
@@ -360,6 +366,11 @@ export class DreamshipLive implements DreamshipSource {
       return r.success ? [{ key: r.data.key, widthPx: r.data.width_px, heightPx: r.data.height_px, dpi: r.data.dpi ?? null, minDpi: r.data.min_dpi ?? null }] : [];
     });
     return { id: itemId, name: String(i.name ?? ""), productionDaysMin: num(i.production_days_min), productionDaysMax: num(i.production_days_max), printAreas };
+  }
+  async productForVariant(productVariantId: number) {
+    const body = (await this.get(PATHS.productVariant(productVariantId))) as { product_id?: unknown; product?: unknown } | null;
+    const id = num(body?.product_id ?? (typeof body?.product === "object" && body?.product ? (body.product as { id?: unknown }).id : body?.product));
+    return id && id > 0 ? id : null;
   }
   async orderByReference(referenceId: string) {
     const body = (await this.get(PATHS.ordersByReference(referenceId))) as { data?: unknown[]; results?: unknown[] } | unknown[] | null;

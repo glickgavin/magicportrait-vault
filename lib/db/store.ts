@@ -225,3 +225,10 @@ export async function visitorFirstTouches(ids: string[]): Promise<Map<string, Re
   for (const row of (r.data ?? []) as { id: string; first_touch: Record<string, unknown> | null }[]) out.set(row.id, row.first_touch);
   return out;
 }
+
+/** The size of a recent picture made with this Imagen theme (for Dreamship's dpi check), or null when none was made. */
+export async function recentPictureSize(theme: string): Promise<{ width: number; height: number } | null> {
+  const r = await db().from("store_generations").select("images").eq("theme", theme).eq("status", "done").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const img = ((r.data as { images: { width: number; height: number }[] } | null)?.images ?? [])[0];
+  return img?.width && img?.height ? { width: img.width, height: img.height } : null;
+}

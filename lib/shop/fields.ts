@@ -24,6 +24,8 @@ export function fieldSpecs(occasionChoices: string[], categoryChoices: string[] 
     { ownerType: "PRODUCT", key: "related", name: "Magic Store more gifts", type: "list.product_reference", description: `${MAGIC} The products under "On more gifts", in order.` },
     { ownerType: "PRODUCT", key: "open_store_related", name: "Magic Store related only", type: "boolean", description: `${MAGIC} Shown only under "On more gifts", never in the grid.` },
     { ownerType: "PRODUCT", key: "details", name: "Magic Store size and materials", type: "multi_line_text_field", description: `${MAGIC} Shown under Product details.` },
+    // Dreamship (docs/dreamship.md › Part A): set from the product's Dreamship card in Settings › Shop.
+    { ownerType: "PRODUCT", key: "dreamship_product_id", name: "Shop Dreamship product", type: "number_integer", description: "The Dreamship product this one was published from. Set from its Dreamship card in My Magic Portraits Settings." },
     { ownerType: "PRODUCTVARIANT", key: "maker", name: "Shop maker", type: "single_line_text_field", description: "Who makes it: gelato, prodigi, dreamship or in_house.", choices: [...MAKERS] },
     { ownerType: "PRODUCTVARIANT", key: "maker_sku", name: "Shop maker's product code", type: "single_line_text_field", description: "The maker's product code, e.g. a Gelato product uid, a Prodigi SKU or a Dreamship item variant id." },
     { ownerType: "PRODUCTVARIANT", key: "print_px", name: "Shop print area (px)", type: "single_line_text_field", description: "Width x height in pixels, e.g. 2400x3000." },
