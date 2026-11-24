@@ -20,3 +20,21 @@ registerSourceCheck("posthog", async () => {
   const res = await fetch(`${host}/decide/?v=3`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ api_key: key, distinct_id: "vault-health-check" }) }).catch(() => null);
   return { ok: Boolean(res?.ok), status: res?.status ?? 0 } as Record<string, string | number | boolean>;
 });
+
+/** Dreamship (docs/dreamship.md › Part C): reads the account; the key is never shown. */
+registerSourceCheck("dreamship", async () => {
+  const { dreamshipConfigured, getDreamship } = await import("./dreamship");
+  if (!dreamshipConfigured()) return { ok: false, mode: "not_configured", has_key: false } as Record<string, string | number | boolean>;
+  const ds = await getDreamship();
+  const a = await ds.account();
+  const flag = (v: boolean | null) => (v == null ? "unknown" : v ? "on" : "off");
+  return {
+    ok: Boolean(a.businessName),
+    mode: ds.kind,
+    business: a.businessName,
+    plan: a.plan ?? "unknown",
+    auto_import_orders: flag(a.settings.autoImportOrders),
+    auto_submit_import_orders: flag(a.settings.autoSubmitImportOrders),
+    auto_submit_api_orders: flag(a.settings.autoSubmitApiOrders),
+  } as Record<string, string | number | boolean>;
+});

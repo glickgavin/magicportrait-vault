@@ -16,7 +16,7 @@ const isTimeZone = (tz: string) => {
  * `supabase/seed.sql` is generated from this file (scripts/gen-seed.ts); a test keeps them in sync.
  * Secrets never go here (CLAUDE.md).
  */
-export const SECTIONS = ["cards", "gift", "redeem", "auth", "vault", "themes", "brand", "email", "links", "tracking", "klaviyo", "shop", "open_store", "site"] as const;
+export const SECTIONS = ["cards", "gift", "redeem", "auth", "vault", "themes", "brand", "email", "links", "tracking", "klaviyo", "shop", "open_store", "site", "printers"] as const;
 export type Section = (typeof SECTIONS)[number];
 export const SETTING_TYPES = ["text", "number", "boolean", "choice", "list", "json", "shopify_id", "date"] as const;
 export type SettingType = (typeof SETTING_TYPES)[number];
@@ -380,6 +380,12 @@ export const REGISTRY = {
   "open_store.klaviyo_list_id": text("open_store", "", { label: "Klaviyo list for store subscribers", description: "Optional. Visitors who tick “Send me offers” are subscribed with consent; with a list id they're added to that list too.", pattern: /^[A-Za-z0-9]*$/, max: 40 }),
   "open_store.klaviyo_source": text("open_store", "Magic Store: while painting", { label: "Klaviyo consent source", description: "Recorded with the subscription.", max: 80 }),
   "open_store.picture_email_subject": text("open_store", "{name}'s picture is ready", { label: "“Your picture is ready” email subject", description: "{name} is the pet's name, or “Your” without one.", max: 120 }),
+  // Printers (docs/dreamship.md › Part C). The app never changes a Dreamship order's status; these are only its own settings.
+  "dreamship.sync_enabled": bool("printers", false, { label: "Daily check of linked products", description: "Compares each linked product with Dreamship once a day. It only reports; it never writes." }),
+  "dreamship.import_wait_hours": num("printers", 6, { label: "Wait for Dreamship to import a paid order (hours)", description: "After this, the order is flagged on this page.", min: 1, max: 72 }),
+  "dreamship.sale_pct": num("printers", 60, { label: "Sale for the margin check (% off)", min: 0, max: 95 }),
+  "dreamship.min_margin_pct": num("printers", 30, { label: "Flag margins below (%)", min: 0, max: 95 }),
+  "dreamship.api_url": text("printers", "https://api.dreamship.com/v1", { label: "Dreamship API address", pattern: /^https:\/\/[a-z0-9.-]+(\/[A-Za-z0-9._-]+)*$/, max: 200 }),
   "open_store.posthog_dashboard_url": text("open_store", "", { label: "PostHog dashboard link", description: "The “Magic Store” dashboard, linked from this page.", pattern: /^(https:\/\/[^\s]+)?$/, max: 300 }),
   // Store defaults for the product fields (PRODUCT_FIELDS below): a product's own value wins.
   "open_store.photos": json("open_store", [{ label: "Add their photo", name_label: "Their name (optional, shown on the picture)", name_placeholder: "Teddy" }] as PhotoSlotWords[], photoSlotsSchema as unknown as z.ZodType<PhotoSlotWords[]>, {

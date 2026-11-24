@@ -19,6 +19,7 @@ const GROUPS: readonly (readonly [string, readonly NavItem[]])[] = [
       ["/settings/shop/magic-store", "admin.nav.magicStore"],
       ["/settings/shop/library", "admin.nav.shopLibrary"],
       ["/settings/shop/scenes", "admin.nav.shopScenes"],
+      ["/settings/printers", "admin.nav.printers"],
     ],
   ],
   ["admin.groups.system", [["/settings/emails", "admin.nav.emails"], ["/settings/tracking", "admin.nav.tracking"], ["/settings/data-sources", "admin.nav.dataSources"], ["/settings/super-users", "admin.nav.superUsers"], ["/settings/activity", "admin.nav.activity"]]],
