@@ -223,8 +223,9 @@ export function dreamshipFixtures(): DreamshipFixtures {
 
 /** The REST paths, in one place. To confirm against https://api.dreamship.com/v1/schema/ (BUILD_LOG › Blocked). */
 export const PATHS = {
-  business: "/business/",
-  businessSettings: "/business/settings/",
+  // Dreamship's public API has no account or settings endpoint (docs.dreamship.com/llms.txt, 24 Nov): the
+  // shop list proves the key works and names the account.
+  shops: "/shops/?limit=20",
   product: (id: number) => `/products/${id}/`,
   productVariant: (id: number) => `/product-variants/${id}/`,
   item: (id: number) => `/items/${id}/`,
@@ -301,6 +302,22 @@ export function parseOrder(body: unknown): DreamshipOrder | null {
   };
 }
 
+/**
+ * The account, from Dreamship's shop list (the public API's only account-level read). Dreamship's
+ * own order settings aren't in its API, so they stay null ("Not reported"): check them in Dreamship.
+ */
+export function parseShops(body: unknown): DreamshipAccount {
+  const list = Array.isArray(body) ? body : body && typeof body === "object" && Array.isArray((body as { results?: unknown }).results) ? (body as { results: unknown[] }).results : [];
+  const names = list.flatMap((x) => {
+    if (!x || typeof x !== "object") return [];
+    const o = x as Record<string, unknown>;
+    const name = [o.name, o.shop_name, o.title].find((v) => typeof v === "string" && v.trim()) as string | undefined;
+    const channel = [o.channel, o.platform, o.marketplace, o.type].find((v) => typeof v === "string" && v.trim()) as string | undefined;
+    return name ? [channel ? `${name.trim()} (${channel})` : name.trim()] : [];
+  });
+  return { businessName: names.length ? names.join(", ") : "Connected (no shops)", plan: null, settings: { autoImportOrders: null, autoSubmitImportOrders: null, autoSubmitApiOrders: null } };
+}
+
 export function parseAccount(business: unknown, settings: unknown): DreamshipAccount {
   const b = (business ?? {}) as Record<string, unknown>;
   const s = { ...((business ?? {}) as Record<string, unknown>), ...((settings ?? {}) as Record<string, unknown>) };
@@ -349,8 +366,7 @@ export class DreamshipLive implements DreamshipSource {
   }
 
   async account() {
-    const [b, s] = await Promise.all([this.get(PATHS.business), this.get(PATHS.businessSettings)]);
-    return parseAccount(b, s);
+    return parseShops(await this.req(PATHS.shops));
   }
   async product(productId: number) {
     const body = await this.get(PATHS.product(productId));

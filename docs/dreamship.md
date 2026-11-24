@@ -138,6 +138,32 @@ A new Settings page, `/settings/printers` (404 unless super user, like every Set
 - How many products and sizes use each maker.
 - "Orders go to the existing print system straight from Shopify." No settings yet. The cards are there so a printer's settings have one home when they're added.
 
+## Dreamship's public API (checked 24 Nov)
+
+From docs.dreamship.com (its `llms.txt` index) after the first live connection check failed. Base `https://api.dreamship.com/v1`, `Authorization: Bearer <key>`.
+
+- **What exists:**
+  - **Orders:**
+    - list, filtered by `reference_id`, `status`, `shop` and others;
+    - create;
+    - get, cancel, submit a draft, move to draft, update address or shipping, estimate.
+  - **Shops:** list, get, create and update.
+  - **Products:** list, get, create, update, delete and reprocess.
+  - **Categories, items (with ship zones), and mockup template groups.**
+  - **Line items:** create a ticket, and **match a line to a product variant** (`POST /orders/{order_id}/line-items/{id}/match/` with `product_variant` and `save_match`, for a draft order's line).
+  - **Creating an order or a product** takes artwork as print areas: `{key, url, resize, position, rotate, background_hex, ai_upscale}`.
+- **What doesn't exist:**
+  - an account or business endpoint, or Dreamship's order settings (auto-import and auto-submit);
+  - an artwork upload;
+  - any way to change an existing line's artwork;
+  - product-variant or item print-area endpoints.
+- **Fixed 24 Nov:** Check connection used `/business/` and `/business/settings/`, which return 404, so it always failed. It now lists the shops, which proves the key works and names the account. Dreamship's order settings show as "Not reported"; check them in Dreamship.
+- **Part B as built can't work:** it uploads to `/artworks/` and patches the line item, and neither exists.
+  - **Fix (needs a new approval):** for each personalised line, **create a Dreamship product** with the customer's picture (`POST /products/`: the item, that one item variant, the print area with the picture's URL, `resize` fill, `ai_upscale`). Then **match the imported line to it**.
+  - The order stays where Dreamship put it; a draft waits for a person.
+  - This creates one Dreamship product per personalised line, so allowed write 7 needs rewording first.
+- **Part A:** reading a product works (`/products/{id}/`). Print areas come from the product's design. The item print-areas and product-variant paths it also tries may 404, and it falls back without them.
+
 ## Build parts
 
 Build in this order, one commit per part (`feat(dreamship-N): …`), each leaving every existing screen and test unchanged.
