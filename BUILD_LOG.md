@@ -674,3 +674,11 @@ Built on `claude/cool-volta-69zljg` from `main` through `docs/dreamship.md` › 
 - `lib/dreamship/artwork.ts`: from `orders/paid`, one job per order with personalised Dreamship lines; it waits for Dreamship's import, makes the print file (crop and size), uploads it, sets it on each personalised line, and records `shop_order_sent_to_maker` (`maker`, `status`, `lines`, and `reason` when it fails). It never submits or cancels. Idempotent per order and per line. `/api/cron/printer-jobs` every 5 minutes.
 - Settings › Printers › Orders: the latest 50, with the Shopify order, the Dreamship order link, the picture's state (waiting, picture set, needs attention with the reason, lines done), Dreamship's own status read live, when, and **Retry**.
 - Tests: `tests/unit/dreamship-artwork.test.ts` (7: only personalised Dreamship lines; the print file's size; not imported then imported, the picture set on each line, only uploads and line updates, the event; idempotent re-runs and a repeated webhook; an order already sent to print flagged and untouched; never imported, flagged after the wait; nothing queued without a Dreamship line) and the source's no-submit/cancel test from Dreamship 1; `tests/e2e/dreamship-orders.spec.ts` (2 × 390 and 1280: a signed fixture paid order shows on Settings › Printers with its picture set, the Dreamship order link and Dreamship's status "draft", axe clean; an order already "accepted" is flagged with Retry and stays unchanged).
+
+## Copy settings and the personalisation layer (25 Nov)
+
+Plan approved 24 Nov: "Copy settings from…" first, then a personalisation layer (two text boxes and one picture slot) set up in the template editor, filled in on the Magic Store, and printed.
+
+### Copy settings from… (done)
+- **Done:** a "Copy settings from…" card on Settings › Shop › one product. It copies the template (onto this product's own first photo), the Magic Store fields, and badges and lead times matched by size name; it can also copy page, occasions and categories. It never copies the theme, the Dreamship link or the print rules. Writes go through `updateStoreFields`, `updateProductFields` and `setProductTemplate` only (allowed write 5). New event `admin_shop_settings_copied`.
+- **Tests:** unit `copy-settings.test.ts` (7); e2e `shop-copy.spec.ts` (2 × 2 widths).

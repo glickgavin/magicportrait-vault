@@ -190,6 +190,7 @@ export const EVENTS = {
   admin_shop_fields_created: biz,
   admin_shop_template_published: biz,
   admin_shop_rules_updated: biz,
+  admin_shop_settings_copied: biz,
   admin_open_store_themes_refreshed: biz,
   admin_printer_settings_updated: biz,
   admin_dreamship_linked: biz,

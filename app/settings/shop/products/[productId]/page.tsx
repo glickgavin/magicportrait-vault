@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { dreamshipCard } from "@/lib/dreamship/link";
 import { DreamshipCard } from "@/components/admin/shop/DreamshipCard";
+import { CopySettings } from "@/components/admin/shop/CopySettings";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Shop: product" };
@@ -100,6 +101,16 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
         </div>
       </div>
 
+      <section className={CARD} aria-labelledby="copy">
+        <h2 id="copy" className="text-[19px] font-extrabold">
+          Copy settings from…
+        </h2>
+        <p className="mt-1 text-[14px] text-ink-2">For a product made by duplicating another: take its settings in one go, then change the theme and photos.</p>
+        <div className="mt-3">
+          <CopySettings productId={p.id} products={found.rows.filter((r) => r.product.id !== p.id).map((r) => ({ id: r.product.id, title: r.product.title, store: Boolean(r.store) }))} />
+        </div>
+      </section>
+
       <section className={CARD} aria-labelledby="sold">
         <h2 id="sold" className="text-[19px] font-extrabold">
           Where it&apos;s sold
@@ -142,7 +153,7 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
               Open template editor →
             </Link>
           </div>
-          <ShortDescriptionEditor productId={p.id} initial={p.shortDescription ?? ""} />
+          <ShortDescriptionEditor key={p.shortDescription ?? ""} productId={p.id} initial={p.shortDescription ?? ""} />
           <div>
             <h3 className="mb-2 text-[16px] font-extrabold">Print rules</h3>
             <ShopRulesEditor productId={p.id} sizes={sizes} defaults={ruleDefaults} />
@@ -182,6 +193,7 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
         {row.store ? (
           <div className="mt-3">
             <StoreFieldsEditor
+              key={JSON.stringify(initial)}
               productId={p.id}
               initial={initial}
               defaults={{

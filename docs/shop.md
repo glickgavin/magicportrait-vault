@@ -357,6 +357,19 @@ The first three need answers before the build starts; the rest can be settled du
 - [ ] **Discount stacking.** SITEWIDE OFF combines with other discounts. Test that a second code entered at checkout, such as MAGIC DISCOUNT, can't take a Store product below the intended price.
 - [ ] **Main site.** Should the main site link into the shop, e.g. after a portrait is made?
 
+### Copy settings from… (25 Nov)
+
+A product made by duplicating another (same printing, a new theme and photos) takes the other's settings in one go: **Copy settings from…** at the top of Settings › Shop › one product. Pick any other product in either collection, tick what to copy, and confirm. Writes go through the product page's own writers (`mmp_shop` only, allowed write 5); a summary lists what couldn't be copied.
+
+| Part | What's copied |
+|---|---|
+| Preview template | Zone, mask, blend, overlay (unless it's one of the other product's own gallery photos) and the personalisation layer. The background becomes this product's own first photo. |
+| Magic Store fields | Picture settings (`generation`), details, short description, more gifts (never this product itself), related-only. |
+| Sizes | Badge and lead time, matched by size name ignoring spacing, `×`/`x` and inches (`12x16"` = `12 × 16 in`). Sizes with no match are listed. |
+| Gifts & Products pages (off by default) | Page, occasions and categories; only when this product is in the Store collection. |
+
+Never copied: the Imagen theme, the Dreamship link and the print rules (maker, SKU, print size, extra); Dreamship's Sync fills those. Code: `planCopy` in `lib/shop/copy-settings.ts` (pure, unit-tested), `copySettings` in `lib/shop/copy.ts`, `POST /api/admin/shop/copy`.
+
 ## Routes (as built)
 
 | Address | Screen |
