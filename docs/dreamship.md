@@ -1,6 +1,6 @@
 # Dreamship
 
-Dreamship is a new printer (24 Nov). Products are designed in Dreamship's designer and published to Shopify by Dreamship's Shopify app, which also stocks them at Shopify's **Dreamship** fulfilment location. Status: Part A and Part B below are **proposed, not built**. Part B needs a new allowed write in `CLAUDE.md`, so it waits for Gavin's approval.
+Dreamship is a new printer (24 Nov). Products are designed in Dreamship's designer and published to Shopify by Dreamship's Shopify app, which also stocks them at Shopify's **Dreamship** fulfilment location. Status: Part A and Part B below are **approved, not built** (24 Nov). Gavin chose B1 (swap the artwork on Dreamship's imported order), approved allowed write 7 (now in `CLAUDE.md`), and asked for a 2:3 2K version of Royal Flush for the poster.
 
 ## The two problems this solves
 
@@ -52,9 +52,9 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
 - **Settings:** `dreamship.api_url`, `dreamship.sync_enabled` (default off), `dreamship.sale_pct` (60), `dreamship.min_margin_pct` (warning threshold, default 30).
 - **Analytics:** new business events `admin_dreamship_linked` and `admin_dreamship_synced`, props `product_id` and `fields_changed` (added to `docs/analytics.md` when built).
 
-## Part B: Send the customer's picture to Dreamship (proposed new write)
+## Part B: Send the customer's picture to Dreamship (allowed write 7)
 
-**Recommended (B1): keep Dreamship's own import and swap the artwork.**
+**Chosen (B1): keep Dreamship's own import and swap the artwork.**
 1. In Dreamship, turn **off** auto-submit for order-import orders. Gavin does this in the Dreamship app; the MCP and API can't change it. Imported orders then wait as drafts instead of printing the sample.
 2. On Shopify `orders/paid` (the existing verified webhook), for each line with `_shop` = true whose variant has maker `dreamship`, the app queues an outbox job `dreamship_artwork`.
 3. The job finds the Dreamship order imported for that Shopify order, by its reference id. It retries with backoff while Dreamship hasn't imported it yet, for up to `dreamship.import_wait_hours` (default 6), then alerts.
@@ -63,7 +63,7 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
    - Lines without a picture keep Dreamship's artwork.
 5. It records the Dreamship order id and the result on the order's activity (`activity_log`, new event `shop_order_sent_to_maker`, added to `docs/analytics.md` when built). Dreamship's app keeps syncing tracking to Shopify, as today.
 
-**Alternative (B2): the app places the order itself.**
+**Not chosen (B2): the app places the order itself.**
 - Take Magic Store Dreamship products off the Dreamship location, so Dreamship's app ignores them.
 - The app creates the Dreamship order through the API from the Shopify order: item variant + print area + artwork URL, and the shipping address.
 - More control, but the app then owns tracking and fulfilment updates back to Shopify, which Dreamship's app does today.
@@ -73,7 +73,7 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
 - (b) turn on Dreamship's AI upscale for the print area ($0.20 per print area);
 - (c) or both.
 
-**Proposed `CLAUDE.md` allowed write 7** (not added until approved):
+**`CLAUDE.md` allowed write 7** (approved and added 24 Nov):
 > 7. Dreamship orders: for a paid Shopify order line whose variant's maker is `dreamship`, upload the customer's picture as artwork, set it on that line of the Dreamship order imported for it, and submit that order, through Dreamship's API with this app's key (`docs/dreamship.md`). Never change any other Dreamship product, order or setting.
 
 ## Until Part B exists
@@ -84,8 +84,8 @@ A Magic Store order for a Dreamship product would print the sample art. So Dream
 
 ## Open questions
 
-- [ ] Approve allowed write 7, and B1 or B2?
-- [ ] Royal Flush picture quality: switch the product to a 2:3 2K theme (activate `royal-flush-2k-test` or make a production copy), use AI upscale, or both?
+- [x] Allowed write 7 approved, B1 chosen (24 Nov).
+- [x] Picture quality: a 2:3 2K version of Royal Flush (24 Nov). Waiting on Imagen: activate `royal-flush-2k-test` or make a production copy, then set the product's `imagen_theme` to it (the theme must be active to appear in the field's choices). Then `max_crop_pct` 40 on 16x24 and 24x36 can go back to the default.
 - [ ] 24x36 costs $135.69 against a $129.99 price (16x24 leaves $25.20 at full price). At 60% off, 12x16 and up lose money on cost alone, and 8x10 clears about $1 before shipping. Raise the 24x36 price, drop the size, or move to Dreamship Plus (24x36 $108.49)?
 - [ ] Add square sizes for square themes? Framed Poster comes in 8x8 ($20.69), 12x12 ($24.29), 16x16 and 20x20, which fit Royal Flush's 1024 × 1024 squares with no crop.
 - [ ] Dreamship API key for this app (`DREAMSHIP_API_KEY` in Vercel).

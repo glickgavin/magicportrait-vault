@@ -13,6 +13,7 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 | `docs/design.md` | Brand tokens, header, menu, footer, components |
 | `docs/shop.md` | The shop (Gifts and Products pages, cart, Shopify checkout): its spec, switches and build parts |
 | `docs/open-store.md` | The open store ("Magic Store", `/store`): shopping without signing in, pictures made with Imagen's API, visitors and their saved data |
+| `docs/dreamship.md` | Dreamship, the printer: linking and syncing products, and sending the customer's picture to Dreamship orders |
 | `designs/README.md` | Screen mockups → routes |
 | `reference/live-site/` | The live site's header, menu, footer and tokens, copied from its code |
 
@@ -22,6 +23,7 @@ This repo is **My Magic Portraits** at **my.magicportraits.ai** (internal code n
 - **Supabase** (the app's own project, `magic-vault`, ref `koudexolfdvzmrglzhaz`; the only one, live): Postgres, Auth (email OTP), Storage. Use `@supabase/ssr` for auth cookies; the browser key is the publishable key.
 - **External reads:** Imagen and the events mirror through the read-only `vault_reader` Postgres role (`IMAGEGEN_DATABASE_URL`, `MIRROR_DATABASE_URL`; `postgres` driver via the Supabase pooler); Shopify Admin GraphQL with the r_orders app token.
 - **Imagen API** (open store only): Imagen's public API with this app's own key (`IMAGEN_API_URL`, `IMAGEN_API_KEY`), server-side, behind `lib/sources/imagen-api.ts`.
+- **Dreamship API** (printer): Dreamship's REST API with this app's own key (`DREAMSHIP_API_KEY`), server-side, behind `lib/sources/dreamship.ts` (`docs/dreamship.md`).
 - **Card render:** `@napi-rs/canvas` (fonts registered from `assets/fonts/`). Use `sharp` for upload checks and thumbnails.
 - **Email:** React Email + **AgentMail** (API, `agentmail` SDK) for everything that must arrive at once or goes to non-customers, sent from the inbox `cards@magicportraitspartners.com`. Supabase Auth sends its codes through AgentMail's SMTP relay (`smtp.agentmail.to`).
 - **Klaviyo:** events and profile properties, plus a marketing subscription when an open-store visitor ticks for one, server-side through the `outbound_events` outbox (`docs/data.md` §10). This app sends no offer, reminder or mug-photo emails; they'll be written later as Klaviyo flows (`SPEC.md` §14a).
@@ -54,13 +56,14 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 
 **Data**
 - Shopify and Imagen are the sources of truth. Read them live; never copy orders, products or portraits into our database, except the cached session-id list, the copy of a portrait used on a card, the shop's carts and new uploads (`docs/shop.md`), and the open store's visitors, photos and pictures (`docs/open-store.md`).
-- Writes outside our database are allowed in exactly six places:
+- Writes outside our database are allowed in exactly seven places:
   1. The mug choice on a Shopify order: `metafieldsSet` + `tagsAdd`, as in `docs/data.md`.
   2. Klaviyo events, profile properties and deletion jobs, and a marketing subscription that an open-store visitor ticked for, through the outbox only.
   3. The webhook-registration script, which a human runs.
   4. Shop carts: Storefront `cartCreate` and the cart update mutations, for a signed-in customer's own cart (`docs/shop.md`) or an open-store visitor's own cart, held against their visitor id (`docs/open-store.md`).
   5. Shop product fields: `metafieldsSet` on the `mmp_shop` namespace of products in the Store or Magic Store collection, and the `mmp_shop` metafield definitions, from Settings › Shop by a super user. Never any other product field.
   6. Open-store pictures: new Imagen sessions through Imagen's public API with this app's own key (`docs/open-store.md`).
+  7. Dreamship orders: for a paid Shopify order line whose variant's maker is `dreamship`, upload the customer's picture as artwork, set it on that line of the Dreamship order imported for it, and submit that order, through Dreamship's API with this app's key (`docs/dreamship.md`). Never change any other Dreamship product, order or setting.
   
   Never write to Imagen's database, the events mirror or the live site's databases.
 - The shop is hidden unless `shop.enabled` (customers) or `shop.super_user_preview` (super users) is on; hidden shop routes return 404 and shop UI doesn't render. Shop changes must leave every existing screen and test unchanged with both off.
