@@ -22,7 +22,7 @@ Shopify stays the source of truth for products, variants, prices and stock. That
 | Decided on 5 and 10 Nov | Choice |
 |---|---|
 | How items reach checkout | The base Shopify product, with the image and its rules on the order line. No copied product per item, so checkout shows the product's standard photo. |
-| Who makes the products | A mix of Gelato, Prodigi and in-house. Each product has its own rules. |
+| Who makes the products | A mix of Gelato, Prodigi, Dreamship (added 24 Nov) and in-house. Each product has its own rules. |
 | Print files and supplier orders | Not this app. It attaches the image and the product's rules to the order line; another system makes the print file and places the order. |
 | Previews | Product templates set up in Settings, drawn by the same renderer as greeting cards |
 | Cart | A simple cart in this app, then one Shopify checkout |
@@ -109,12 +109,12 @@ To start with, the existing Shopify products that could go in the shop include t
 
 Each Shopify variant carries its rules as metafields in the namespace mmp_shop. They decide whether the product suits an image, how the image sits on it, and what we tell the maker on the order line.
 
-**Editing them (16 Nov):** Settings › Shop › a product › **Add/Edit the print rules** (`/settings/shop/rules/[id]`) shows one card per size with maker, maker's product code, print area, placement, picture zone (wrap only), smallest picture, most crop, adjustable and which pictures, and a READY or "missing …" badge. **Save to Shopify** writes only the rules that changed (`metafieldsSet`, or `metafieldsDelete` for a cleared one) on that product's sizes, in mmp_shop only (allowed write 5); `background` and `extra` are left as they are. Prodigi products use Prodigi's own SKU as the maker's code (e.g. `JIGSAW-PUZZLE-252`), and the print area is Prodigi's `printAreaSizes` for the main print area. Event: `admin_shop_rules_updated`.
+**Editing them (16 Nov):** Settings › Shop › a product › **Add/Edit the print rules** (`/settings/shop/rules/[id]`) shows one card per size with maker, maker's product code, print area, placement, picture zone (wrap only), smallest picture, most crop, adjustable and which pictures, and a READY or "missing …" badge. **Save to Shopify** writes only the rules that changed (`metafieldsSet`, or `metafieldsDelete` for a cleared one) on that product's sizes, in mmp_shop only (allowed write 5); `background` and `extra` are left as they are. Prodigi products use Prodigi's own SKU as the maker's code (e.g. `JIGSAW-PUZZLE-252`), and the print area is Prodigi's `printAreaSizes` for the main print area. Dreamship products (24 Nov) use Dreamship's item variant id as the maker's code (e.g. `17383`, Framed Poster 8x10 black), the print area is that size's Dreamship print area (`get_print_areas`, e.g. `1800x2400`), and `extra` holds what a Dreamship order line needs besides the picture: `{"item_id":958,"print_area":"8x10","product_variant_id":45378125}` (`product_variant_id` is the Dreamship product the Shopify variant was published from). Event: `admin_shop_rules_updated`.
 
 | Rule | Example | Used for |
 |---|---|---|
-| Maker | Gelato, Prodigi or in-house | The order line, so the fulfilment system routes it |
-| Maker's product code | Gelato `mug_product_msz_11-oz_mmat_ceramic-black_cl_4-0`, a Prodigi SKU, or an in-house code | The order line |
+| Maker | Gelato, Prodigi, Dreamship or in-house | The order line, so the fulfilment system routes it |
+| Maker's product code | Gelato `mug_product_msz_11-oz_mmat_ceramic-black_cl_4-0`, a Prodigi SKU, a Dreamship item variant id (e.g. `17383`, the Framed Poster 8x10 black), or an in-house code | The order line |
 | Print area, in pixels | From the maker's spec, e.g. the mug's wrap | Cropping, the preview and the order line |
 | Placement | Fill and crop (default), fit whole on a background colour, or a zone inside a wrap | How the image sits in the print area |
 | Picture zone, in pixels (`zone_px`) | For a zone inside a wrap, e.g. 1155x1155 on one side of a mug | The shape the picture fills; crop and fit are measured against it instead of the whole wrap |

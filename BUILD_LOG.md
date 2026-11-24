@@ -611,3 +611,14 @@ Still open:
 - Settings › Shop › Magic Store: the numbers (today, 7 and 30 days; by product, theme and first-touch channel) from our own tables (`lib/open-store/numbers.ts`, `components/admin/shop/StoreNumbers.tsx`).
 - Migration `20261123000004_open_store_analytics.sql`. Docs: `docs/schema.md` (store tables, bucket, outbox kind), `docs/data.md` §12 (the open store's sources), `docs/analytics.md` (how store events are wired).
 - Tests: `tests/unit/open-store-analytics.test.ts` (6: first touch and its cookie, the channel, `/store` addresses in PostHog, `track()` rejecting an unknown store event, the numbers and their splits); `tests/e2e/open-store-analytics.spec.ts` (2 × 390 and 1280: first touch on the row, business events under the visitor with no email, replay masks, no name or typed email anywhere; the Settings numbers, axe clean).
+
+## Dreamship (24 Nov)
+- **Done in code** (branch `claude/dreamship-maker`): `dreamship` added to `MAKERS` (`lib/shop/fields.ts`), the rules editor's Maker list and `docs/shop.md`; unit test in `tests/unit/shop-catalog.test.ts`. The DB-backed unit tests still can't run in a cloud session without the local Supabase stack (same failures as main).
+- **Done in Shopify:**
+  - the `mmp_shop.maker` definition's choices now include `dreamship`;
+  - Framed Dog Poster "Flush" (8916063289540) has every `mmp_shop` field: rules on all four sizes, `imagen_theme` royal-flush, short description, details, and a template measured from the Dreamship 8x10 mockup;
+  - it's in Magic Store and Magic Store · Wall art. Values are in `docs/dreamship.md` › Live today.
+- **Held:** the product isn't on the Storefront channel (Headless 03), so it stays hidden. Its variants are stocked at Shopify's Dreamship location, and Dreamship's app imports and auto-submits orders with the sample art.
+- **Proposed:** `docs/dreamship.md`. Part A syncs the rules from the linked Dreamship product and shows cost, margin and dpi (no new write). Part B sends the customer's picture to Dreamship and needs allowed write 7.
+- **Decided (24 Nov, Gavin):** merge the maker change; keep the poster hidden until Part B works; B1 (swap the artwork on Dreamship's imported order), so allowed write 7 is now in `CLAUDE.md`; a 2:3 2K Royal Flush for posters.
+- **Blocked:** `DREAMSHIP_API_KEY`; the 2:3 2K theme active in Imagen; the Royal Flush resolution (1024 × 1024) against Dreamship's 250 dpi minimum; 24x36 priced below cost.

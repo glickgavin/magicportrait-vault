@@ -77,10 +77,11 @@ export function ShopRulesEditor({ productId, sizes, defaults }: { productId: str
                   <option value="">Not set</option>
                   <option value="prodigi">Prodigi</option>
                   <option value="gelato">Gelato</option>
+                  <option value="dreamship">Dreamship</option>
                   <option value="in_house">In house</option>
                 </select>,
               )}
-              {field("maker_sku", "Maker's product code", <input id={id("maker_sku")} value={r.maker_sku} onChange={(e) => set(s.id, "maker_sku", e.target.value)} className={input} spellCheck={false} autoComplete="off" />, "e.g. a Prodigi SKU or a Gelato product uid")}
+              {field("maker_sku", "Maker's product code", <input id={id("maker_sku")} value={r.maker_sku} onChange={(e) => set(s.id, "maker_sku", e.target.value)} className={input} spellCheck={false} autoComplete="off" />, "e.g. a Prodigi SKU, a Gelato product uid or a Dreamship item variant id")}
               {field("print_px", "Print area (px)", <input id={id("print_px")} value={r.print_px} onChange={(e) => set(s.id, "print_px", e.target.value)} className={input} placeholder="2400x3000" inputMode="text" spellCheck={false} />, "width x height")}
               {field(
                 "placement",
