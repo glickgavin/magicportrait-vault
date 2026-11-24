@@ -232,3 +232,9 @@ export async function recentPictureSize(theme: string): Promise<{ width: number;
   const img = ((r.data as { images: { width: number; height: number }[] } | null)?.images ?? [])[0];
   return img?.width && img?.height ? { width: img.width, height: img.height } : null;
 }
+
+/** An open-store picture by its Imagen session (for the Dreamship print file). */
+export async function generationBySession(sessionId: string): Promise<StoreGenerationRow | null> {
+  const r = await db().from("store_generations").select(G_COLS).eq("imagen_session_id", sessionId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  return (r.data as StoreGenerationRow | null) ?? null;
+}

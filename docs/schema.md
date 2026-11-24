@@ -195,6 +195,14 @@ One picture: `id uuid pk`, `visitor_id` → `store_visitors` (cascade), `product
 
 Migrations `20261123000001` to `…0003_open_store_*.sql` add these and: `open_store` as a settings section (and keys with an underscore before the dot), sign-in link purpose `store_picture`, member `created_via` `store_order`, outbox kind `subscription`, and `activity_log.ref_type` `store_visitor` (business events before the visitor has a proven email). RLS on all three tables, no policies.
 
+### dreamship_sync
+Dreamship link and sync (`docs/dreamship.md` › Part A). One row per linked Shopify product: `product_id` (gid, pk), `legacy_id`, `dreamship_product_id`, `report jsonb` (each size's Dreamship variant, proposed print rules and what differs, cost, margin, dpi, AI upscale, and the flags), `warnings`, `differs`, `synced_at`, `synced_by` (an email, or `cron`). Written by "Sync from Dreamship" and the daily report-only run; never sent to Shopify on its own.
+
+### printer_jobs
+The customer's picture on Dreamship's imported order (`docs/dreamship.md` › Part B, allowed write 7). One job per paid Shopify order with personalised Dreamship lines (unique `kind`, `shopify_order_id`): `kind` (`dreamship_artwork`), `shopify_order_name`, `lines jsonb` (per line: Shopify line id, Dreamship product variant, print area and pixels, crop, where our copy of the picture is, and its result: Dreamship line, artwork id, done or error), `status` (`waiting` · `picture_set` · `needs_attention` · `failed`), `reason`, `attempts`, `next_attempt_at`, `dreamship_order_id`, `dreamship_status`, `created_at`, `updated_at`. It only uploads artwork and sets it on lines; it never submits or cancels. Print files are kept in `shop-uploads` under `print/<order>/<line>.jpg` and reach Dreamship through a one-day signed link.
+
+Migrations `20261124000001_printers.sql` (settings section `printers`), `…0002_dreamship_sync.sql` and `…0003_printer_jobs.sql`.
+
 ## Storage buckets
 
 | bucket | public | contents |

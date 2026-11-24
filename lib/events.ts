@@ -194,6 +194,8 @@ export const EVENTS = {
   admin_printer_settings_updated: biz,
   admin_dreamship_linked: biz,
   admin_dreamship_synced: biz,
+  shop_order_sent_to_maker: biz,
+  admin_printer_job_retried: biz,
   admin_shop_template_uploaded: biz,
   admin_shop_scene_made: biz,
 

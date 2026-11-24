@@ -3,6 +3,8 @@ import { settingRows } from "@/lib/admin/data";
 import Link from "next/link";
 import { dreamshipConnection, dreamshipProducts, makerUse, type Maker } from "@/lib/printers";
 import { designerUrl } from "@/lib/sources/dreamship";
+import { printerOrders } from "@/lib/dreamship/artwork";
+import { RetryJob } from "@/components/admin/printers/RetryJob";
 import { fmtBiz } from "@/lib/biztime";
 import { getSettings } from "@/lib/settings";
 import { SettingField } from "@/components/admin/SettingField";
@@ -29,7 +31,7 @@ const onOff = (v: boolean | null) => (v == null ? "Not reported" : v ? "On" : "O
  */
 export default async function PrintersPage() {
   await requireSuperUser();
-  const [rows, use, conn, s, products] = await Promise.all([settingRows(), makerUse().catch(() => null), dreamshipConnection(), getSettings(["brand.timezone"] as const), dreamshipProducts().catch(() => null)]);
+  const [rows, use, conn, s, products, orders] = await Promise.all([settingRows(), makerUse().catch(() => null), dreamshipConnection(), getSettings(["brand.timezone"] as const), dreamshipProducts().catch(() => null), printerOrders().catch(() => null)]);
   const tz = s["brand.timezone"];
   const dsRows = DREAMSHIP_KEYS.map((k) => rows.find((r) => r.key === k)).filter((r) => r !== undefined);
   const autoSubmit = conn.account?.settings.autoSubmitImportOrders === true;
@@ -122,6 +124,58 @@ export default async function PrintersPage() {
                 </li>
               ))}
             </ul>
+          )}
+
+          <h3 className="mt-5 text-[16px] font-extrabold">Orders</h3>
+          <p className="text-[13px] text-ink-2">The latest 50 paid orders with personalised Dreamship lines: what the app did, and Dreamship&apos;s own status. Submitting or cancelling happens in Dreamship and Shopify, never here.</p>
+          {orders === null ? (
+            <p className="mt-2 text-[14px] text-ink-2">Couldn&apos;t read the orders.</p>
+          ) : orders.length === 0 ? (
+            <p className="mt-2 text-[14px] text-ink-2">No orders yet.</p>
+          ) : (
+            <div className="mt-2 overflow-x-auto" tabIndex={0} role="region" aria-label="Dreamship orders">
+              <table className="w-full min-w-[640px] text-[14px]" data-testid="dreamship-orders">
+                <thead>
+                  <tr className="text-left text-ink-2">
+                    <th className="py-1 font-semibold">Shopify order</th>
+                    <th className="py-1 font-semibold">Dreamship order</th>
+                    <th className="py-1 font-semibold">The customer&apos;s picture</th>
+                    <th className="py-1 font-semibold">Dreamship&apos;s status</th>
+                    <th className="py-1 font-semibold">When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o) => (
+                    <tr key={o.id} className="border-t border-black/[0.06] align-top">
+                      <td className="py-1.5 pr-2 font-semibold">{o.orderName}</td>
+                      <td className="py-1.5 pr-2">
+                        {o.dreamshipUrl ? (
+                          <a href={o.dreamshipUrl} target="_blank" rel="noreferrer" className="link">
+                            {o.dreamshipOrderId}
+                          </a>
+                        ) : (
+                          "Not imported yet"
+                        )}
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <Badge tone={o.status === "picture_set" ? "green" : o.status === "waiting" ? "grey" : "amber"}>{o.status === "picture_set" ? "PICTURE SET" : o.status === "waiting" ? "WAITING FOR DREAMSHIP" : "NEEDS ATTENTION"}</Badge>
+                        <span className="ml-1 text-[13px] text-ink-2">
+                          {o.linesDone}/{o.lines} {o.lines === 1 ? "line" : "lines"}
+                        </span>
+                        {o.reason && <p className="mt-1 text-[13px] text-ink-2">{o.reason}</p>}
+                        {(o.status === "needs_attention" || o.status === "failed") && (
+                          <div className="mt-1">
+                            <RetryJob jobId={o.id} order={o.orderName} />
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-1.5 pr-2">{o.dreamshipStatus ?? "–"}</td>
+                      <td className="py-1.5 text-ink-2">{fmtBiz(o.at, tz)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
