@@ -96,6 +96,10 @@ Mockups: the "Open store mockups" design canvas (store page, product page before
 
 Changing the variant redraws the picture at once (same picture, new template and crop); it never calls Imagen again. Changing the name or photo needs a new picture. A visitor's earlier photos are offered again ("Use a photo you've added before") so they don't have to upload twice on the next product.
 
+### Personalise (25 Nov)
+
+When the product's template has a personalisation layer (`docs/shop.md` › Personalisation layer), a **Personalise it** step shows once the picture is ready, above Add to cart: each text box with its question, "(required)" or "(optional)", the example words as a placeholder and a character count; and the picture choice as a row of up to 3 thumbnails (plus **None** unless it's required). The preview on the product redraws a moment after each change (and switches to their picture on the product), with no new picture made. Add to cart checks required boxes first and says which one; the server checks everything again against the live template and puts it on the line (`_shop_layer_t1`, `_shop_layer_t2`, `_shop_layer_art`, `_shop_layer_v`); the cart thumbnail is drawn with it. The words are masked in session replay and never tracked: `store_layer_filled` says only which parts were filled in, and `store_added_to_cart` carries `personalised`.
+
 ### Asking for their email while we paint
 
 While the picture is being made, a box under the picture area asks for their email. It's optional and on by default (`open_store.ask_email_while_painting`). The mockup is in the "Creating the picture" board.

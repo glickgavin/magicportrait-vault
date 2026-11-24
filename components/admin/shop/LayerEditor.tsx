@@ -403,7 +403,7 @@ function BoxInputs({ name, box, onChange }: { name: string; box: LayerBox; onCha
     ["h", "Height"],
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-4">
       {fields.map(([k, label]) => (
         <label key={k} htmlFor={`${uid}-${k}`} className="flex flex-col gap-1 text-[12px] font-bold">
           {label} % ({name})

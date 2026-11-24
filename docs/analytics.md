@@ -173,6 +173,7 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_generation_slow` | browser | "Still painting…" shown | `product_id`, `seconds` |
 | `store_generation_left` | browser | Page left while painting | `product_id`, `seconds` |
 | `store_result_picked` | browser | Another result chosen | `product_id`, `index`, `of` |
+| `store_layer_filled` | browser | Added to cart with the personalisation layer | `product_id`, `has_text1`, `has_text2`, `has_art` (never the words) |
 | `store_try_again_tapped` | browser | Try another photo | `product_id`, `after` (`ready` · `failed`) |
 | `store_email_ask_shown`, `store_email_ask_closed` | browser | The email box while painting | `product_id` |
 | `store_email_given` | server, business | Email given while painting | `product_id`, `marketing_consent` |
@@ -180,7 +181,7 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_email_link_opened` | server, business | The email's link used | `product_id`, `expired` |
 | `store_related_shown` | browser | "On more gifts" in view | `product_id`, `count`, `with_picture` |
 | `store_related_tapped` | browser | A product under "On more gifts" | `from_product_id`, `to_product_id`, `position`, `with_picture` |
-| `store_added_to_cart` | server, business, Klaviyo-able | Add to cart | `product_id`, `variant_id`, `theme_slug`, `price`, `quantity`, `from` (`product` · `related`), `lines_after` |
+| `store_added_to_cart` | server, business, Klaviyo-able | Add to cart | `product_id`, `variant_id`, `theme_slug`, `price`, `quantity`, `from` (`product` · `related`), `lines_after`, `personalised` (true when the customer added text or a picture on the personalisation layer; never the text) |
 | `store_cart_opened` | browser | Cart drawer opened | `lines`, `subtotal` |
 | `store_cart_changed` | server, business | Quantity changed or line removed | `change`, `lines` |
 | `store_checkout_started` | server, business, Klaviyo-able | Shopify checkout link handed out | `lines`, `subtotal`, `signed_in` |
