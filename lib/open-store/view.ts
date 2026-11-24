@@ -121,11 +121,16 @@ export function relatedEntries(current: ShopProduct, entries: StoreEntry[], coun
 }
 
 /** The words for each photo slot: the theme says how many; Shopify words them; a slot without words is "Photo n". */
-export function photoSlots(count: number, words: { label: string; name_label?: string; name_placeholder?: string }[]): { label: string; nameLabel: string | null; namePlaceholder: string | null }[] {
+export function photoSlots(
+  count: number,
+  words: { label: string; name_label?: string; name_placeholder?: string }[],
+  /** Imagen's own label for each slot (ImagenTheme.inputs), used when Shopify's words have none. */
+  imagenLabels: (string | null)[] = [],
+): { label: string; nameLabel: string | null; namePlaceholder: string | null }[] {
   const n = Math.max(1, count);
   return Array.from({ length: n }, (_, i) => {
     const w = words[i];
-    return { label: w?.label || `Photo ${i + 1}`, nameLabel: w?.name_label || null, namePlaceholder: w?.name_placeholder || null };
+    return { label: w?.label || imagenLabels[i] || `Photo ${i + 1}`, nameLabel: w?.name_label || null, namePlaceholder: w?.name_placeholder || null };
   });
 }
 

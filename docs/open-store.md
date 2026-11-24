@@ -154,7 +154,7 @@ Product fields are declared in `lib/settings/registry.ts` next to the store's se
 
 #### Photos and names
 
-**How many photos a product needs is set on the Imagen theme, not in Shopify.** The theme already knows what it paints (one pet, two pets, a person and a pet), so Imagen's theme list is the one place that says how many photos it takes and which are required (the field name is in Imagen's API docs). The product page shows that many photo slots. Shopify's `generation.photos` only words them: slot 1 uses the first entry's label and name label, slot 2 the second, and so on; a slot without an entry is "Photo 2", "Photo 3". If Imagen's theme list turns out not to say, `generation.photos` sets the count instead (one entry per photo), and Settings › Shop › Products warns when Shopify and Imagen disagree.
+**How many photos a product needs is set on the Imagen theme, not in Shopify.** The theme already knows what it paints (one pet, two pets, a person and a pet), so Imagen's theme list is the one place that says how many photos it takes and which are required (`input_count`, with the named roles in `inputs`). The product page shows that many photo slots. Shopify's `generation.photos` only words them: slot 1 uses the first entry's label and name label, slot 2 the second, and so on; a slot without an entry is "Photo 2", "Photo 3". If Imagen's theme list turns out not to say, `generation.photos` sets the count instead (one entry per photo), and Settings › Shop › Products warns when Shopify and Imagen disagree.
 
 Names go one per photo, when the theme prints names; `name_max` applies to each.
 
@@ -162,9 +162,9 @@ Names go one per photo, when the theme prints names; `name_max` applies to each.
 
 The server, never the browser, calls Imagen's public API, the same one the main site uses (`/functions/v1/api-generate`, `/api-sessions/<id>`, `/api-themes`):
 
-- **Generate** (confirmed by Imagen, 23 Nov): `POST {IMAGEN_API_URL}/api-generate` with `Authorization: Bearer <IMAGEN_API_KEY>` and multipart fields `theme_id` (the theme slug, e.g. `bathroom-01`), `name` (the pet's name; left out when empty) and `source_image` (the photo file). The field for extra photos, for themes that take more than one, is still to confirm. We also send `X-Client-User-Id: open-store:<visitor id>`, as the main site sends its own user id. Returns `session_id` and `status`.
+- **Generate** (checked against Imagen's api-generate code, 24 Nov): `POST {IMAGEN_API_URL}/api-generate` with `Authorization: Bearer <IMAGEN_API_KEY>`, multipart. Fields: `theme_id` (the slug, e.g. `bathroom-01`) and `name` (left out when empty). A one-photo theme takes the photo as `source_image` and the name as a string. A multi-photo theme takes one file field per declared role (its `inputs[].role`), refuses `source_image` and unknown fields, and takes the names as a JSON object keyed by role (`{"pet_1":"Teddy","pet_2":"Bella"}`). We also send `X-Client-User-Id: open-store:<visitor id>`, as the main site sends its own user id. Returns `session_id`, `status`, `poll_url` and `sources`.
 - **Status:** `GET /api-sessions/<session_id>`: `status`, `expected_image_count`, `images` (id, url, width, height), `total_cost_usd`.
-- **Themes:** `GET /api-themes` (and `?category=`): the theme list, including how many photos each theme takes.
+- **Themes:** `GET /api-themes` (and `?category=`) returns `{ themes: [{ id, slug, name, is_active, category: { id, slug, name } | null, input_count, inputs?: [{ role, label, required }], images, … }] }`. `input_count` (always at least 1) is how many photos a theme takes; `inputs` is only there for multi-photo themes, and its labels are Imagen's own wording for each slot.
 - **Key:** `IMAGEN_API_KEY` (an `ik_live_…` key Imagen issued for this app), in Vercel env only, Sensitive. Base URL `IMAGEN_API_URL` = `https://ngyunrirwrjudbgaijek.supabase.co/functions/v1`. Neither reaches the browser, and the key is never written in the repo, logs or docs.
 - **Fixtures:** `DATA_SOURCE=fixtures` returns sample pictures from `public/shop-samples/scenes/` after a short delay, with a two-photo theme and `failed` and slow cases for tests.
 
@@ -411,7 +411,7 @@ When it's done: open the pull request's Vercel preview, sign in as a super user,
 
 Answered 23 Nov:
 
-- [x] **Imagen API.** This app has its own key (issued 23 Nov, kept in Vercel only). Confirmed: the endpoint, Bearer auth, and the `theme_id`, `name` and `source_image` fields (Imagen API, above). Still to confirm: the field for extra photos, where a theme says how many photos it takes, average time and cost, and whether it moderates uploads. None of this blocks the build, which runs on fixtures.
+- [x] **Imagen API.** This app has its own key (issued 23 Nov, kept in Vercel only). Confirmed: the endpoint, Bearer auth, and the `theme_id`, `name` and `source_image` fields (Imagen API, above). Confirmed 24 Nov from its code: how extra photos are sent and where a theme says how many it takes. Still to learn from real use: average time and cost, and whether it moderates uploads. None of this blocks the build, which runs on fixtures.
 - [x] **Saving visitors' data.** Each visitor gets an id; photos and pictures are saved against it in `magic-vault` (Visitors and saved data).
 - [x] **One theme per product.** Art styles are Imagen themes, and each product has one.
 - [x] **Where it lives.** `/store`, with each product at `/store/product/<product id>`.

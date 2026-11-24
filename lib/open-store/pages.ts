@@ -228,7 +228,7 @@ export async function productPageData(legacyId: string) {
     shipping: [...descriptionBlocks(policies.shippingHtml), ...descriptionBlocks(policies.refundHtml)],
     reassurance: s["open_store.reassurance"] as ReassuranceRow[],
     variants,
-    slots: photoSlots(theme?.photos ?? photos.length, photos).map((x) => ({ ...x, nameLabel: x.nameLabel })),
+    slots: photoSlots(theme?.photos ?? photos.length, photos, theme?.inputs?.map((i) => i.label) ?? []),
     nameMax,
     photoTips,
     subject,

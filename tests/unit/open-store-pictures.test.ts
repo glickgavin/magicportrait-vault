@@ -8,7 +8,7 @@ import { defaultCrop } from "@/lib/shop/fit";
 import { fixtureTemplate } from "@/lib/shop/fixture-scenes";
 import { renderPreview } from "@/lib/shop/render";
 import { templateSchema } from "@/lib/shop/template";
-import { FX_TIMINGS, ImagenApiFixtures, parseSession } from "@/lib/sources/imagen-api";
+import { FX_TIMINGS, generateForm, ImagenApiFixtures, parseSession } from "@/lib/sources/imagen-api";
 
 const GOLDEN = "tests/fixtures/golden/open-store";
 
@@ -101,6 +101,30 @@ describe("Imagen's session body", () => {
     expect(parseSession({ session: { status: "generating" } }).status).toBe("generating");
     expect(parseSession({ status: "weird" }).status).toBe("pending");
     expect(parseSession(null).images).toEqual([]);
+    // Imagen sends url: null when it can't make a public link; that image is skipped, the rest still read.
+    expect(parseSession({ status: "done", images: [{ id: "a", url: null, width: 1, height: 1 }, { id: "b", url: "https://x.supabase.co/b.png", width: 2, height: 2 }] }).images).toEqual([{ id: "b", url: "https://x.supabase.co/b.png", width: 2, height: 2 }]);
+  });
+});
+
+describe("Imagen's generate body", () => {
+  const photo = Buffer.from([0xff, 0xd8, 0xff]);
+  const base = { theme: "bathroom-01", clientUserId: "open-store:v1" };
+  it("a one-photo theme sends source_image and the name as a string", () => {
+    const f = generateForm({ ...base, names: [" Rose "], photos: [photo] }, null);
+    expect(f.get("theme_id")).toBe("bathroom-01");
+    expect(f.get("name")).toBe("Rose");
+    expect(f.get("source_image")).toBeInstanceOf(Blob);
+    expect([...f.keys()].sort()).toEqual(["name", "source_image", "theme_id"]);
+    expect(generateForm({ ...base, names: [""], photos: [photo] }, null).has("name")).toBe(false);
+  });
+  it("a multi-photo theme sends one field per role, never source_image, and the names keyed by role", () => {
+    const f = generateForm({ ...base, theme: "duo-01", names: ["Teddy", ""], photos: [photo, photo] }, ["pet_1", "pet_2"]);
+    expect(f.has("source_image")).toBe(false);
+    expect(f.get("pet_1")).toBeInstanceOf(Blob);
+    expect(f.get("pet_2")).toBeInstanceOf(Blob);
+    expect(JSON.parse(String(f.get("name")))).toEqual({ pet_1: "Teddy" });
+    // A role that isn't a valid name key falls back to pet_<n>.
+    expect(JSON.parse(String(generateForm({ ...base, names: ["A", "B"], photos: [photo, photo] }, ["Owner", "dog"]).get("name")))).toEqual({ pet_1: "A", dog: "B" });
   });
   it("cancelled and face selection count as failed", () => {
     expect(ourStatus("cancelled")).toBe("failed");

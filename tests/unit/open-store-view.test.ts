@@ -76,6 +76,8 @@ describe("open store: page helpers", () => {
       { label: "Photo 2", nameLabel: null, namePlaceholder: null },
     ]);
     expect(photoSlots(0, [])).toHaveLength(1);
+    // Imagen's own slot labels fill in when Shopify's words have none.
+    expect(photoSlots(2, [{ label: "Your dog" }], ["First pet", "Second pet"]).map((x) => x.label)).toEqual(["Your dog", "Second pet"]);
   });
 
   it("progress steps fill in the name and product", () => {

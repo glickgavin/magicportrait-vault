@@ -16,10 +16,16 @@ export type ImagenTheme = {
   slug: string;
   name: string;
   active: boolean;
-  /** How many photos the theme takes; null when Imagen's list doesn't say. */
+  /** How many photos the theme takes (Imagen's `input_count`, always ≥ 1); null when Imagen's list doesn't say. */
   photos: number | null;
   category: string | null;
+  /**
+   * A multi-photo theme's named upload roles, in order (Imagen's `inputs`); null for a one-photo theme.
+   * `generate` sends one file field per role; `label` is Imagen's own wording for the slot.
+   */
+  inputs: ImagenInput[] | null;
 };
+export type ImagenInput = { role: string; label: string | null; required: boolean };
 
 /** Imagen's session statuses; `cancelled` and `awaiting_face_selection` count as failed in the open store. */
 export type ImagenStatus = "pending" | "preprocessing" | "generating" | "done" | "failed" | "cancelled" | "awaiting_face_selection";
@@ -33,6 +39,11 @@ export type GenerateInput = {
   photos: Buffer[];
   /** `open-store:<visitor id>`, sent as X-Client-User-Id. */
   clientUserId: string;
+  /**
+   * The theme's upload roles (ImagenTheme.inputs): null for a one-photo theme. Left out, the live source looks
+   * them up in Imagen's theme list.
+   */
+  roles?: string[] | null;
 };
 
 export interface ImagenApiSource {
@@ -49,12 +60,22 @@ export const asStatus = (v: unknown): ImagenStatus => (STATUSES.includes(v as Im
 
 /** Made-up themes for tests and local dev: one takes two photos, one is inactive. */
 export const FX_IMAGEN_THEMES: ImagenTheme[] = [
-  { slug: "admiral-01", name: "The Admiral", active: true, photos: 1, category: "pets" },
-  { slug: "bathroom-01", name: "Bath time", active: true, photos: 1, category: "pets" },
-  { slug: "journal-02", name: "Morning paper", active: true, photos: 1, category: "pets" },
-  { slug: "plumber-01", name: "The Plumber", active: true, photos: 1, category: "pets" },
-  { slug: "duo-portrait-01", name: "Best friends", active: true, photos: 2, category: "pets" },
-  { slug: "retired-01", name: "Retired style", active: false, photos: 1, category: "pets" },
+  { slug: "admiral-01", name: "The Admiral", active: true, photos: 1, category: "pets", inputs: null },
+  { slug: "bathroom-01", name: "Bath time", active: true, photos: 1, category: "pets", inputs: null },
+  { slug: "journal-02", name: "Morning paper", active: true, photos: 1, category: "pets", inputs: null },
+  { slug: "plumber-01", name: "The Plumber", active: true, photos: 1, category: "pets", inputs: null },
+  {
+    slug: "duo-portrait-01",
+    name: "Best friends",
+    active: true,
+    photos: 2,
+    category: "pets",
+    inputs: [
+      { role: "pet_1", label: "First pet", required: true },
+      { role: "pet_2", label: "Second pet", required: true },
+    ],
+  },
+  { slug: "retired-01", name: "Retired style", active: false, photos: 1, category: "pets", inputs: null },
 ];
 
 /**
@@ -123,40 +144,66 @@ export class ImagenApiFixtures implements ImagenApiSource {
   }
 }
 
-// Imagen's theme list: the field names below are the likely ones; which field says how many photos a theme
-// takes is still to confirm with Imagen (docs/open-store.md › Open questions), so several are accepted.
+// Imagen's theme list, as its api-themes function returns it (checked against its code, 24 Nov):
+// { themes: [{ id (uuid), slug, name, is_active, category: { id, slug, name } | null, input_count (≥ 1),
+//   inputs?: [{ role, label, required }] (multi-photo themes only), images, … }] }
+const rawInput = z.object({ role: z.string().min(1), label: z.string().nullable().optional(), required: z.boolean().optional() }).passthrough();
 const rawTheme = z
   .object({
     slug: z.string().optional(),
     id: z.union([z.string(), z.number()]).optional(),
-    theme_id: z.string().optional(),
     name: z.string().optional(),
-    title: z.string().optional(),
     is_active: z.boolean().optional(),
-    active: z.boolean().optional(),
-    category: z.string().nullable().optional(),
-    required_images: z.number().optional(),
-    image_count: z.number().optional(),
-    photos: z.number().optional(),
-    num_images: z.number().optional(),
-    min_images: z.number().optional(),
+    // An object today; a bare slug is accepted too.
+    category: z.union([z.string(), z.object({ slug: z.string().nullable().optional() }).passthrough()]).nullable().optional(),
+    input_count: z.number().optional(),
+    inputs: z.array(rawInput).nullable().optional(),
   })
   .passthrough();
 
 export function parseThemes(body: unknown): ImagenTheme[] {
-  const list = Array.isArray(body) ? body : body && typeof body === "object" ? ((body as Record<string, unknown>).themes ?? (body as Record<string, unknown>).data) : null;
+  const list = Array.isArray(body) ? body : body && typeof body === "object" ? (body as Record<string, unknown>).themes : null;
   if (!Array.isArray(list)) return [];
   const out: ImagenTheme[] = [];
   for (const item of list) {
     const r = rawTheme.safeParse(item);
     if (!r.success) continue;
     const t = r.data;
-    const slug = t.slug ?? t.theme_id ?? (typeof t.id === "string" ? t.id : undefined);
+    const slug = t.slug ?? undefined;
     if (!slug || !/^[a-z0-9][a-z0-9_-]{0,80}$/.test(slug)) continue;
-    const photos = t.required_images ?? t.image_count ?? t.photos ?? t.num_images ?? t.min_images ?? null;
-    out.push({ slug, name: t.name ?? t.title ?? slug, active: t.is_active ?? t.active ?? true, photos: photos && photos > 0 ? Math.round(photos) : null, category: t.category ?? null });
+    const inputs = t.inputs?.length ? t.inputs.map((i) => ({ role: i.role, label: i.label ?? null, required: i.required !== false })) : null;
+    const count = t.input_count ?? inputs?.length ?? null;
+    const category = typeof t.category === "string" ? t.category : (t.category?.slug ?? null);
+    out.push({ slug, name: t.name ?? slug, active: t.is_active ?? true, photos: count && count > 0 ? Math.round(count) : null, category, inputs });
   }
   return out;
+}
+
+/** Imagen accepts `name` as a string, or a JSON object of short parts; keys must look like `pet` or `pet_2`. */
+const NAME_KEY = /^[a-z][a-z0-9_]{0,29}$/;
+
+/**
+ * The multipart body for `POST /api-generate` (checked against Imagen's code, 24 Nov). A one-photo theme takes
+ * `source_image`; a multi-photo theme takes one file field per declared role and refuses `source_image`. Names
+ * go as a plain string for one photo and as `{ "<role>": "<name>" }` for several.
+ */
+export function generateForm(input: GenerateInput, roles: string[] | null): FormData {
+  const form = new FormData();
+  form.set("theme_id", input.theme);
+  const jpeg = (p: Buffer) => new Blob([new Uint8Array(p)], { type: "image/jpeg" });
+  const names = input.names.map((n) => n.trim());
+  if (roles?.length) {
+    input.photos.slice(0, roles.length).forEach((p, i) => form.set(roles[i], jpeg(p), `${roles[i]}.jpg`));
+    const parts = Object.fromEntries(
+      roles.map((role, i) => [NAME_KEY.test(role) ? role : `pet_${i + 1}`, names[i] ?? ""] as const).filter(([, v]) => v),
+    );
+    if (Object.keys(parts).length) form.set("name", JSON.stringify(parts));
+  } else {
+    form.set("source_image", jpeg(input.photos[0]), "photo.jpg");
+    const name = names.filter(Boolean).join(" & ");
+    if (name) form.set("name", name);
+  }
+  return form;
 }
 
 const rawSession = z
@@ -164,8 +211,9 @@ const rawSession = z
     status: z.string().optional(),
     expected_image_count: z.number().nullable().optional(),
     total_cost_usd: z.union([z.number(), z.string()]).nullable().optional(),
+    // Imagen sends `url: null` when it can't make a public link for an image; those are skipped, not fatal.
     images: z
-      .array(z.object({ id: z.union([z.string(), z.number()]), url: z.string().url(), width: z.number().nullable().optional(), height: z.number().nullable().optional() }).passthrough())
+      .array(z.object({ id: z.union([z.string(), z.number()]), url: z.string().url().nullable().optional(), width: z.number().nullable().optional(), height: z.number().nullable().optional() }).passthrough())
       .nullable()
       .optional(),
   })
@@ -179,7 +227,7 @@ export function parseSession(body: unknown): ImagenSession {
   return {
     status: asStatus(r.data.status),
     expectedImageCount: r.data.expected_image_count ?? null,
-    images: (r.data.images ?? []).map((i) => ({ id: String(i.id), url: i.url, width: i.width ?? null, height: i.height ?? null })),
+    images: (r.data.images ?? []).flatMap((i) => (i.url ? [{ id: String(i.id), url: i.url, width: i.width ?? null, height: i.height ?? null }] : [])),
     costUsd: Number.isFinite(cost) ? cost : null,
   };
 }
@@ -199,13 +247,8 @@ export class ImagenApiLive implements ImagenApiSource {
     return parseThemes(await res.json());
   }
   async generate(input: GenerateInput): Promise<{ sessionId: string; status: ImagenStatus }> {
-    const form = new FormData();
-    form.set("theme_id", input.theme);
-    const name = input.names.map((n) => n.trim()).filter(Boolean).join(" & ");
-    if (name) form.set("name", name);
-    form.set("source_image", new Blob([new Uint8Array(input.photos[0])], { type: "image/jpeg" }), "photo.jpg");
-    // The field for extra photos is still to confirm with Imagen (BUILD_LOG › Blocked).
-    input.photos.slice(1).forEach((p, i) => form.set(`source_image_${i + 2}`, new Blob([new Uint8Array(p)], { type: "image/jpeg" }), `photo-${i + 2}.jpg`));
+    const roles = input.roles !== undefined ? input.roles : ((await this.themes()).find((t) => t.slug === input.theme)?.inputs?.map((i) => i.role) ?? null);
+    const form = generateForm(input, roles);
     const res = await fetch(`${this.base}/api-generate`, { method: "POST", headers: { authorization: `Bearer ${this.cfg.key}`, "x-client-user-id": input.clientUserId }, body: form, cache: "no-store", signal: AbortSignal.timeout(30_000) });
     if (!res.ok) throw new Error(`imagen_api_http_${res.status}`);
     const body = (await res.json()) as { session_id?: unknown; status?: unknown };

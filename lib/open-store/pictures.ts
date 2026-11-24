@@ -115,7 +115,9 @@ export async function startGeneration(input: { visitor: StoreVisitorRow; product
   if (buffers.some((b) => !b)) return { error: "imagen_unavailable" };
   let session: { sessionId: string; status: ImagenStatus };
   try {
-    session = await api.generate({ theme: entry.theme, names, photos: buffers as Buffer[], clientUserId: `open-store:${input.visitor.id}` });
+    // A multi-photo theme needs its role names; left out (theme list unavailable), the source looks them up.
+    const roles = theme ? (theme.inputs?.map((i) => i.role) ?? null) : undefined;
+    session = await api.generate({ theme: entry.theme, names, photos: buffers as Buffer[], clientUserId: `open-store:${input.visitor.id}`, roles });
   } catch (e) {
     console.error(`[open-store] imagen generate failed: ${(e as Error).message}`);
     return { error: "imagen_unavailable" };

@@ -180,11 +180,30 @@ describe("Settings › Shop as one area", () => {
 
 describe("live reads", () => {
   it("parses Imagen's theme list in the shapes it may take", () => {
-    expect(parseThemes({ themes: [{ slug: "bathroom-01", name: "Bath", is_active: true, required_images: 1 }, { id: "duo-01", title: "Duo", image_count: 2 }, { slug: "BAD SLUG" }] })).toEqual([
-      { slug: "bathroom-01", name: "Bath", active: true, photos: 1, category: null },
-      { slug: "duo-01", name: "Duo", active: true, photos: 2, category: null },
+    // The shape Imagen's api-themes function returns (checked against its code, 24 Nov).
+    expect(
+      parseThemes({
+        themes: [
+          { id: "0b6c2f1e-0000-4000-8000-000000000001", slug: "bathroom-01", name: "Bath", is_active: true, category: { id: "c1", slug: "pets", name: "Pets" }, input_count: 1, images: { main: null, carousel: null, gallery: [] } },
+          { id: "0b6c2f1e-0000-4000-8000-000000000002", slug: "duo-01", name: "Duo", is_active: true, category: null, input_count: 2, inputs: [{ role: "pet_1", label: "First pet", required: true }, { role: "pet_2", label: null, required: false }] },
+          { slug: "BAD SLUG", name: "Bad", input_count: 1 },
+        ],
+      }),
+    ).toEqual([
+      { slug: "bathroom-01", name: "Bath", active: true, photos: 1, category: "pets", inputs: null },
+      {
+        slug: "duo-01",
+        name: "Duo",
+        active: true,
+        photos: 2,
+        category: null,
+        inputs: [
+          { role: "pet_1", label: "First pet", required: true },
+          { role: "pet_2", label: null, required: false },
+        ],
+      },
     ]);
-    expect(parseThemes([{ slug: "x-1", active: false }])).toEqual([{ slug: "x-1", name: "x-1", active: false, photos: null, category: null }]);
+    expect(parseThemes([{ slug: "x-1", is_active: false }])).toEqual([{ slug: "x-1", name: "x-1", active: false, photos: null, category: null, inputs: null }]);
     expect(parseThemes("nope")).toEqual([]);
   });
   it("reads the standard reviews rating", () => {
