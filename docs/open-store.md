@@ -49,7 +49,7 @@ They can leave and come back: the visitor cookie brings back their pictures on e
 |---|---|
 | Promotion bar | The existing `site.promo_bar*` settings (`docs/shop.md` › Promotion bar), audience "everyone" |
 | Header | The app's header with the cart icon (count, shown when the cart has lines). No sign-in needed; "Sign in" stays in the menu |
-| Category circles | Shopify navigation menu `open_store.menu_handle` (default `magic-store`): each item links to a collection. Circle image = the collection's image; label = the menu item's title; order = the menu's order. Edited in Shopify admin › Online Store › Navigation |
+| Category circles | Shopify navigation menu `open_store.menu_handle` (default `magic-store`): each item links to a collection. Circle image = the collection's image; label = the menu item's title; order = the menu's order. Edited in Shopify admin › Online Store › Navigation. Reading menus needs the app's `read_online_store_navigation` access (added to the checks on 24 Nov) |
 | Heading and intro | The collection's title and description |
 | Products | The collection's products in its sort order, 24 per page, "Show more" for the next 24 |
 | Filter | Chips for the product types in the collection (Shopify's Product type field) |

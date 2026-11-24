@@ -113,7 +113,11 @@ export default async function MagicStoreSettings() {
                 <Badge tone={menu ? "green" : "amber"}>{menu ? "OK" : "MISSING"}</Badge>
                 <span>
                   Menu <code>{s["open_store.menu_handle"]}</code>
-                  {menu ? `: ${menu.items.length} categories (${menu.items.map((i) => i.title).join(", ")})` : " wasn't found, so the store shows no category circles. Make it in Shopify admin › Online Store › Navigation, with one item per collection."}
+                  {menu
+                    ? `: ${menu.items.length} categories (${menu.items.map((i) => i.title).join(", ")})`
+                    : menu === null
+                      ? " wasn't found, so the store shows no category circles. Make it in Shopify admin › Online Store › Navigation, with one item per collection."
+                      : " couldn't be read from Shopify, so the store shows no category circles. Reading menus needs the app's read_online_store_navigation access (Shopify access, on Gifts & Products pages)."}
                 </span>
               </li>
             </ul>
