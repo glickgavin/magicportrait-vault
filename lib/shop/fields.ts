@@ -5,7 +5,7 @@ import type { FieldDefinitionSpec } from "./sources/types";
  * any that are missing; their values are edited in Shopify admin, or in Settings for page and occasions.
  */
 export const PAGE_CHOICES = ["Gifts", "Products", "All"] as const;
-export const MAKERS = ["gelato", "prodigi", "in_house"] as const;
+export const MAKERS = ["gelato", "prodigi", "dreamship", "in_house"] as const;
 export const PLACEMENTS = ["cover", "contain", "wrap_zone"] as const;
 export const IMAGE_KINDS = ["portraits", "photos", "both"] as const;
 
@@ -24,8 +24,8 @@ export function fieldSpecs(occasionChoices: string[], categoryChoices: string[] 
     { ownerType: "PRODUCT", key: "related", name: "Magic Store more gifts", type: "list.product_reference", description: `${MAGIC} The products under "On more gifts", in order.` },
     { ownerType: "PRODUCT", key: "open_store_related", name: "Magic Store related only", type: "boolean", description: `${MAGIC} Shown only under "On more gifts", never in the grid.` },
     { ownerType: "PRODUCT", key: "details", name: "Magic Store size and materials", type: "multi_line_text_field", description: `${MAGIC} Shown under Product details.` },
-    { ownerType: "PRODUCTVARIANT", key: "maker", name: "Shop maker", type: "single_line_text_field", description: "Who makes it: gelato, prodigi or in_house.", choices: [...MAKERS] },
-    { ownerType: "PRODUCTVARIANT", key: "maker_sku", name: "Shop maker's product code", type: "single_line_text_field", description: "The maker's product code, e.g. a Gelato product uid or a Prodigi SKU." },
+    { ownerType: "PRODUCTVARIANT", key: "maker", name: "Shop maker", type: "single_line_text_field", description: "Who makes it: gelato, prodigi, dreamship or in_house.", choices: [...MAKERS] },
+    { ownerType: "PRODUCTVARIANT", key: "maker_sku", name: "Shop maker's product code", type: "single_line_text_field", description: "The maker's product code, e.g. a Gelato product uid, a Prodigi SKU or a Dreamship item variant id." },
     { ownerType: "PRODUCTVARIANT", key: "print_px", name: "Shop print area (px)", type: "single_line_text_field", description: "Width x height in pixels, e.g. 2400x3000." },
     { ownerType: "PRODUCTVARIANT", key: "zone_px", name: "Shop picture zone (px)", type: "single_line_text_field", description: "wrap_zone only: the part of the print area the picture fills, e.g. 1155x1155 on one side of a mug." },
     { ownerType: "PRODUCTVARIANT", key: "placement", name: "Shop placement", type: "single_line_text_field", description: "cover (fill and crop), contain (fit on a background) or wrap_zone.", choices: [...PLACEMENTS] },

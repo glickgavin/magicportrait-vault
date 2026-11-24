@@ -46,6 +46,11 @@ describe("variant rules", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.rules).toMatchObject({ maker: "gelato", makerSku: "abc", printPx: { w: 2400, h: 3000 }, placement: "cover", minShortSidePx: 900, maxCropPct: 25, adjustable: true, imageKinds: "both", background: null, extra: {} });
   });
+  it("accepts Dreamship as a maker and keeps its order details in extra", () => {
+    const r = parseVariantRules(mf({ maker: "dreamship", maker_sku: "17383", print_px: "1800x2400", extra: '{"item_id":958,"print_area":"8x10","product_variant_id":45378125}' }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.rules).toMatchObject({ maker: "dreamship", makerSku: "17383", printPx: { w: 1800, h: 2400 }, extra: { item_id: 958, print_area: "8x10", product_variant_id: 45378125 } });
+  });
   it("reports bad values instead of guessing", () => {
     const r = parseVariantRules(mf({ maker: "acme", maker_sku: "x", print_px: "big", placement: "stretch", max_crop_pct: "200", adjustable: "maybe", background: "pink", extra: "[1]" }));
     expect(r.ok).toBe(false);
