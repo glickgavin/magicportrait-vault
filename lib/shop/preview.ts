@@ -5,9 +5,22 @@
  * as a mesh of small triangles, which both canvases can draw with plain affine transforms.
  */
 import type { Rect } from "./fit";
-import { isBent, mesh, zoneMapper, type Point, type Template } from "./template";
+import { isBent, mesh, zoneAspect, zoneMapper, type Point, type Template } from "./template";
 
 export type PreviewImage = { width: number; height: number };
+
+/**
+ * The part of a w × h area in the given shape that is shown when it fills another shape: the most
+ * that fits, kept to the top and centred side to side. Pictures are cropped, never stretched.
+ */
+export function coverTop(w: number, h: number, aspect: number): Rect & { x: number; y: number } {
+  if (!(aspect > 0) || !(w > 0) || !(h > 0)) return { x: 0, y: 0, w, h };
+  if (w / h > aspect) {
+    const cw = h * aspect;
+    return { x: (w - cw) / 2, y: 0, w: cw, h };
+  }
+  return { x: 0, y: 0, w, h: w / aspect };
+}
 
 /** The subset of CanvasRenderingContext2D both canvases provide. */
 export interface PreviewCtx {
@@ -130,7 +143,9 @@ export function flatPicture(input: Pick<PreviewInput, "picture" | "crop" | "plac
     const h = c.h * s;
     ctx.drawImage(input.picture, c.x, c.y, c.w, c.h, (fw - w) / 2, (fh - h) / 2, w, h);
   } else {
-    ctx.drawImage(input.picture, c.x, c.y, c.w, c.h, 0, 0, fw, fh);
+    // A crop in another shape (an old crop, a resized file) is trimmed, never squashed.
+    const k = coverTop(c.w, c.h, fw / fh);
+    ctx.drawImage(input.picture, c.x + k.x, c.y + k.y, k.w, k.h, 0, 0, fw, fh);
   }
   const mask = input.template.mask;
   if (mask.kind !== "none") {
@@ -164,6 +179,9 @@ export function drawPreview(ctx: PreviewCtx, input: PreviewInput) {
   const map = zoneMapper(t.zone, t.background.w, t.background.h);
   // Curved edges need more, smaller triangles to look smooth; flat quads are fine with 8 × 8.
   const [cols, rows] = t.zone.kind === "wrap" ? [32, 12] : isBent(t.zone) ? [12, 12] : [8, 8];
+  // The pink zone on the product photo may not be exactly the print shape: the flat picture is
+  // cropped to the zone's own shape (top kept) so the warp never stretches it.
+  const src = coverTop(flat.w, flat.h, zoneAspect(t.zone, t.background.w, t.background.h));
   const grid = mesh((u, v) => {
     const p = map(u, v);
     return { x: p.x * sx, y: p.y * sy };
@@ -175,7 +193,7 @@ export function drawPreview(ctx: PreviewCtx, input: PreviewInput) {
   target.save();
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
-      const s = (ii: number, jj: number): Point => ({ x: (ii / cols) * flat.w, y: (jj / rows) * flat.h });
+      const s = (ii: number, jj: number): Point => ({ x: src.x + (ii / cols) * src.w, y: src.y + (jj / rows) * src.h });
       const d = (ii: number, jj: number): Point => grid[jj][ii];
       triangle(target, flat.canvas, [s(i, j), s(i + 1, j), s(i + 1, j + 1)], [d(i, j), d(i + 1, j), d(i + 1, j + 1)]);
       triangle(target, flat.canvas, [s(i, j), s(i + 1, j + 1), s(i, j + 1)], [d(i, j), d(i + 1, j + 1), d(i, j + 1)]);

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { describe, expect, it } from "vitest";
-import { centredCrop } from "@/lib/shop/fit";
+import { defaultCrop } from "@/lib/shop/fit";
 import { FIXTURE_SCENES, fixtureTemplate } from "@/lib/shop/fixture-scenes";
 import { grow } from "@/lib/shop/preview";
 import { renderPreview } from "@/lib/shop/render";
@@ -73,7 +73,7 @@ describe("shop previews: golden images", () => {
           {
             template,
             picture: await testPicture(pw, ph),
-            crop: centredCrop(pw, ph, target.w, target.h),
+            crop: defaultCrop(pw, ph, target.w, target.h),
             placement: scene === "mug" ? "wrap_zone" : "cover",
             backgroundColour: null,
             targetAspect: target.w / target.h,

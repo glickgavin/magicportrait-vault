@@ -83,7 +83,7 @@ export function ShopPreview({ template, pictureUrl, crop, placement, aspect, bac
       role="img"
       aria-label={alt}
       data-preview="true"
-      className={cn("ph-no-capture block w-full rounded-[14px] bg-black/[0.05] transition-opacity", ready ? "opacity-100" : "opacity-60", className)}
+      className={cn("ph-no-capture block w-full rounded-[14px] bg-black/[0.05] transition-opacity", ready ? "opacity-100" : "animate-pulse opacity-60", className)}
       data-ph-mask
       style={{ aspectRatio: `${template.background.w} / ${template.background.h}` }}
     />

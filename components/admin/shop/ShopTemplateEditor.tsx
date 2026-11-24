@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { centredCrop } from "@/lib/shop/fit";
+import { defaultCrop } from "@/lib/shop/fit";
 import { drawPreview, previewSize, type MakeCanvas, type PreviewCtx } from "@/lib/shop/preview";
 import type { LibraryRoom } from "@/lib/shop/photo-library";
 import { BEND_RANGE, bendStops, defaultTemplate, homography, isBent, NO_BEND, zoneAspect, zoneMapper, type BendEdge, type Point, type Template } from "@/lib/shop/template";
@@ -328,7 +328,7 @@ function Editor({
             el.width = out.w;
             el.height = out.h;
             const ctx = el.getContext("2d") as unknown as PreviewCtx;
-            const crop = placement === "contain" ? { x: 0, y: 0, w: pw, h: ph } : centredCrop(pw, ph, aspect, 1);
+            const crop = placement === "contain" ? { x: 0, y: 0, w: pw, h: ph } : defaultCrop(pw, ph, aspect, 1);
             drawPreview(ctx, { template: t, background: bg, overlay: ov, picture: pic as never, crop, placement, backgroundColour: size?.background ?? null, targetAspect: aspect, size: out, makeCanvas: browserCanvas, flatMax: 900 });
           };
           pics.forEach((img, i) => img && draw(live.current[i], img, img.naturalWidth, img.naturalHeight, 640));
@@ -343,12 +343,50 @@ function Editor({
     };
   }, [t, size, samples]);
 
-  async function remove(m: Media) {
-    setMsg(null);
-    const r = await fetch("/api/admin/shop/template/upload", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId, mediaId: m.id }) }).catch(() => null);
+  const [fieldMsg, setFieldMsg] = useState<{ which: "background" | "overlay"; text: string; ok?: boolean } | null>(null);
+  const isOverlayFile = (m: Media) => m.id.startsWith("upload:") && m.id.endsWith(".webp");
+  const isPhotoFile = (m: Media) => m.id.startsWith("upload:") && !m.id.endsWith(".webp");
+
+  // Photos the live template uses: out of the draft and the lists now, deleted once Publish has replaced them.
+  const [pendingRemoval, setPendingRemoval] = useState<string[]>([]);
+
+  async function deleteUpload(id: string): Promise<string | null> {
+    const r = await fetch("/api/admin/shop/template/upload", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ productId, mediaId: id }) }).catch(() => null);
+    if (r?.ok) return null;
     const b = (await r?.json().catch(() => ({}))) as { error?: string } | undefined;
-    if (r?.ok) setMedia((list) => list.filter((x) => x.id !== m.id));
-    else setMsg({ ok: false, text: b?.error ?? "Couldn't remove that photo." });
+    return b?.error ?? "Couldn't remove that photo.";
+  }
+
+  /**
+   * Removes an uploaded photo. If this draft uses it, it is taken out of the draft first (the overlay
+   * goes back to None; the blank photo moves to another one). A photo the live template uses goes from
+   * the lists at once and is deleted when Publish has replaced it, so live previews never lose it.
+   */
+  async function remove(m: Media, which: "background" | "overlay") {
+    setMsg(null);
+    setFieldMsg(null);
+    let next = t;
+    if (t.overlay?.media_id === m.id) next = { ...next, overlay: null };
+    if (t.background.media_id === m.id) {
+      const other = media.find((x) => x.id !== m.id && !isOverlayFile(x) && !pendingRemoval.includes(x.id));
+      if (!other) {
+        setFieldMsg({ which, text: "Upload or pick another photo of the blank product first; a template always needs one." });
+        return;
+      }
+      next = { ...next, background: { media_id: other.id, url: other.url, w: other.width, h: other.height } };
+    }
+    if (published?.background.media_id === m.id || published?.overlay?.media_id === m.id) {
+      setT(next);
+      setPendingRemoval((l) => [...l, m.id]);
+      setFieldMsg({ which, text: "Removed. The live template still uses it, so it's deleted when you publish.", ok: true });
+      return;
+    }
+    const err = await deleteUpload(m.id);
+    if (err) setFieldMsg({ which, text: err });
+    else {
+      setT(next);
+      setMedia((list) => list.filter((x) => x.id !== m.id));
+    }
   }
 
   const added = (m: Media, which: "background" | "overlay") => {
@@ -477,7 +515,12 @@ function Editor({
         /* ignore */
       }
       setRestored(false);
-      setMsg({ ok: true, text: "Published to Shopify." });
+      // The live template no longer uses these: delete them now.
+      const gone = pendingRemoval;
+      const failed = (await Promise.all(gone.map(deleteUpload))).filter(Boolean).length;
+      setMedia((list) => list.filter((x) => !gone.includes(x.id)));
+      setPendingRemoval([]);
+      setMsg(failed ? { ok: false, text: `Published to Shopify, but ${failed} removed photo${failed === 1 ? "" : "s"} couldn't be deleted. Try its × again.` } : { ok: true, text: "Published to Shopify." });
       router.refresh();
     } else setMsg({ ok: false, text: b.error ?? "Couldn't publish" });
   }
@@ -492,10 +535,10 @@ function Editor({
             None
           </label>
         )}
-        {media.map((m) => {
+        {media.filter((m) => !pendingRemoval.includes(m.id) && (which === "background" ? !isOverlayFile(m) : !isPhotoFile(m))).map((m) => {
           const on = which === "background" ? t.background.media_id === m.id : t.overlay?.media_id === m.id;
-          // Uploaded photos can be removed while nothing uses them (this draft or the published template).
-          const removable = m.id.startsWith("upload:") && t.background.media_id !== m.id && t.overlay?.media_id !== m.id && published?.background.media_id !== m.id && published?.overlay?.media_id !== m.id;
+          // Every uploaded photo has a ×; Shopify's own product photos are never changed from here.
+          const removable = m.id.startsWith("upload:");
           return (
             <span key={m.id} className="relative">
             <label className={cn("block cursor-pointer rounded-[10px] border-2 p-0.5 focus-within:ring-2 focus-within:ring-[#DD07C4]", on ? "border-[#DD07C4]" : "border-transparent")}>
@@ -512,7 +555,7 @@ function Editor({
               <img src={m.url} alt={m.alt ?? "Product photo"} className="h-14 w-14 rounded-[8px] object-cover" />
             </label>
             {removable && (
-              <button type="button" aria-label="Remove this uploaded photo" onClick={() => void remove(m)} className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-ink text-[13px] font-bold leading-none text-white shadow">
+              <button type="button" aria-label="Remove this uploaded photo" onClick={() => void remove(m, which)} className="absolute -right-1.5 -top-1.5 z-10 grid h-6 w-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DD07C4] place-items-center rounded-full bg-ink text-[13px] font-bold leading-none text-white shadow">
                 ×
               </button>
             )}
@@ -521,6 +564,11 @@ function Editor({
         })}
         <UploadTile productId={productId} kind={which} upload={upload} onUploaded={(m) => added(m, which)} />
       </div>
+      {fieldMsg?.which === which && (
+        <p role={fieldMsg.ok ? "status" : "alert"} className={cn("text-[13px] font-bold", fieldMsg.ok ? "text-ink-2" : "text-[#a1251b]")}>
+          {fieldMsg.text}
+        </p>
+      )}
     </fieldset>
   );
 
@@ -531,7 +579,7 @@ function Editor({
         {restored && (
           <p role="status" className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[14px] text-[#7a4a00]">
             Your unpublished draft was restored.
-            <button type="button" className="font-bold underline" onClick={() => { setT(startFrom); setRestored(false); }}>
+            <button type="button" className="font-bold underline" onClick={() => { setT(startFrom); setRestored(false); setPendingRemoval([]); }}>
               Discard draft
             </button>
           </p>

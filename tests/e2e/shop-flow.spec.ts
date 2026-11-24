@@ -12,13 +12,20 @@ const SIZES = [
 ] as const;
 
 async function emptyCart(page: Page) {
-  await page.goto("/cart");
-  for (let i = 0; i < 10; i++) {
-    const remove = page.getByRole("button", { name: "Remove" }).first();
-    if (!(await remove.isVisible().catch(() => false))) break;
-    await remove.click();
-    await page.waitForLoadState("networkidle");
+  const remove = page.getByRole("button", { name: "Remove" });
+  // A removal can still be settling when the page reloads, so repeat until a fresh load shows none.
+  for (let round = 0; round < 5; round++) {
+    await page.goto("/cart");
+    await expect(page.getByRole("heading", { name: "Your cart" })).toBeVisible();
+    await expect(remove.first().or(page.getByText("Your cart is empty.").first())).toBeVisible();
+    if ((await remove.count()) === 0) return;
+    for (let i = 0; i < 10 && (await remove.count()) > 0; i++) {
+      const before = await remove.count();
+      await remove.first().click();
+      await expect(remove).toHaveCount(before - 1);
+    }
   }
+  await expect(remove).toHaveCount(0);
 }
 
 test.describe("shop", () => {
@@ -47,9 +54,12 @@ test.describe("shop", () => {
 
       await page.goto("/gifts");
       await expect(page.getByRole("heading", { name: "Gifts made from your pictures" })).toBeVisible();
-      await expectNoAxeViolations(page);
+      // Their newest picture is already on the gifts.
+      await expect(page.getByTestId("picture-bar")).toBeVisible();
+      await expect(page.locator('[data-testid="shop-card"][data-preview="yours"] canvas[data-preview]').first()).toBeVisible();
+      await expectNoAxeViolations(page, { exclude: ["canvas"] });
 
-      await page.getByRole("link", { name: "See gift ideas" }).click();
+      await page.getByRole("link", { name: "Change photo" }).click();
       await expect(page.getByRole("heading", { name: "Choose a picture" })).toBeVisible();
       await expectNoAxeViolations(page);
       await page.getByRole("radio").first().click();
@@ -70,7 +80,8 @@ test.describe("shop", () => {
       await expect(page.getByRole("link", { name: /Cart, 1 item/ })).toBeVisible();
       await expectNoAxeViolations(page);
 
-      // Name is required for a gift; the server says so too.
+      // Name is required for a gift; the server says so too. (The cart remembers a name from a run before.)
+      await page.getByLabel("Their name").fill("");
       await page.getByRole("button", { name: "Checkout" }).click();
       await expect(page.getByText("Add their name so we know who it's for.")).toBeVisible();
       await page.getByLabel("Their name").fill("Grandma Rose");
@@ -80,6 +91,30 @@ test.describe("shop", () => {
       await expect(page.getByRole("heading", { name: "Shopify checkout (fixture)" })).toBeVisible();
     });
   }
+
+  test("the landing page shows their newest picture on the products, and one tap switches it", async ({ page }) => {
+    await setSetting("shop.enabled", true);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signInWithLink(page, "sam@example.com", "/");
+    await page.goto("/products");
+    const yours = page.locator('[data-testid="shop-card"][data-preview="yours"]');
+    await expect(yours.first()).toBeVisible();
+    // Only their own picture on the products: never the plain product photo (all of these suit it).
+    await expect(page.locator('[data-testid="shop-card"][data-preview="product"]')).toHaveCount(0);
+    await expect(page.getByTestId("card-loading")).toHaveCount(0);
+    const first = await page.getByTestId("picture-bar").getByRole("img", { name: "Picture on the products now" }).getAttribute("src");
+    await page.getByRole("link", { name: "Show picture 2 on the products" }).click();
+    await expect(page).toHaveURL(/\/products\?pic=/);
+    await expect(page.getByTestId("picture-bar").getByRole("img", { name: "Picture on the products now" })).not.toHaveAttribute("src", first!);
+    await expect(yours.first()).toBeVisible();
+    // A product opens straight on its sheet for that picture.
+    await yours.first().click();
+    await expect(page).toHaveURL(/\/products\/i\/[^/?]+\?product=/);
+    await expect(page.getByRole("dialog")).toBeVisible();
+    // Someone else's (or a made-up) picture id just falls back to their newest.
+    await page.goto("/products?pic=p_not-theirs");
+    await expect(page.getByTestId("picture-bar")).toBeVisible();
+  });
 
   test("a Products-only cart never asks who it's for", async ({ page }) => {
     await setSetting("shop.enabled", true);
@@ -106,7 +141,11 @@ test.describe("shop", () => {
     // A picture id from Sam's list is not in super@'s list.
     const add = await other.request.post("/api/shop/cart/lines", { data: { page: "gifts", imageId: list.portraits[0].id, variantId: "gid://shopify/ProductVariant/4900100000000", quantity: 1 } });
     expect([404, 422]).toContain(add.status());
-    expect((await other.request.get(`/gifts/i/${list.portraits[0].id}`)).status()).toBe(404);
+    // The page streams (its loading placeholder), so the status can't change after the start; the
+    // server still re-checks the picture is theirs and shows only the not-found page.
+    await other.goto(`/gifts/i/${list.portraits[0].id}`);
+    await expect(other.getByRole("heading", { name: "We couldn't find that page" })).toBeVisible();
+    await expect(other.locator("canvas[data-preview]")).toHaveCount(0);
     expect((await other.request.patch("/api/shop/cart/lines/6b9f1c1e-7d2a-4c55-9e0a-5f9f2b9b0009", { data: { quantity: 2 } })).status()).toBe(404);
     await other.close();
   });

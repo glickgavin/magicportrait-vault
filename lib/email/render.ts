@@ -5,6 +5,7 @@ import CardScheduled, { type CardScheduledProps } from "@/emails/card-scheduled"
 import GiftOffer, { giftOfferSubject, type GiftOfferProps } from "@/emails/gift-offer";
 import SigninCode from "@/emails/signin-code";
 import SigninLink from "@/emails/signin-link";
+import StorePicture, { storePictureSubject, type StorePictureProps } from "@/emails/store-picture";
 
 export const TEMPLATES = {
   "card-delivery": { component: CardDelivery, subject: (p: CardDeliveryProps) => `${p.fromName} sent you a ${p.themeName} card` },
@@ -12,6 +13,7 @@ export const TEMPLATES = {
   "gift-offer": { component: GiftOffer, subject: (p: GiftOfferProps) => giftOfferSubject("A free gift with your order {order}", p.orderName) },
   "signin-code": { component: SigninCode, subject: () => "Your My Magic Portraits code" },
   "signin-link": { component: SigninLink, subject: () => "Your link to My Magic Portraits" },
+  "store-picture": { component: StorePicture, subject: (p: StorePictureProps) => storePictureSubject(p) },
 } as const;
 
 export type TemplateName = keyof typeof TEMPLATES;

@@ -39,10 +39,12 @@ Two pages, Gifts and Products, lead into the same four screens. Both are for sig
 |  | Gifts page | Products page |
 |---|---|---|
 | Menu item and address | Gifts, `/gifts` | Products, `/products` |
-| Browsed by | Occasion and person, e.g. Christmas, Birthday, For Mom | Product type, e.g. Mugs, Wall art, Apparel |
-| Products it shows | Products set to Gifts or All, by occasion | Products set to Products or All, by product type |
+| Browsed by | Occasion and person, e.g. Christmas, Birthday, For Mom | Category, e.g. Mugs, Wall art, Apparel |
+| Products it shows | Products set to Gifts or All, by occasion | Products set to Products or All, by category |
 | "Who's it for?" | Asked before checkout: their name and an optional gift message | Not asked |
 | Copy | Written for giving | Written for owning |
+
+**Their own picture on the landing page** (16 Nov). When the person has any picture, Gifts and Products pick their newest one (or the one in `?pic=`, checked as theirs; anything else falls back to the newest). Every product card then shows a live preview of that picture on the product, drawn with the cheapest size that suits it, with the top kept and nothing stretched. A **Choose your picture** box above the products shows four pictures (the one on the products highlighted, then three more; one tap switches, `?pic=<id>`) and a fifth **Gallery** tile that is always there (the Choose a picture screen, with Upload). The Products headline is "Bring your photo to life". A card opens Product ideas for that picture with the product's sheet already open. Products the picture doesn't suit keep the product's own photo and lead to Choose a picture. The products show at once; the previews stream in after (`landingPictures` in `lib/shop/pages.ts`). Someone with no pictures yet gets the old "Start with a picture" box.
 
 After the page, both run the same screens: Choose a picture, Product ideas, Product sheet and Cart. A product can appear on both pages.
 
@@ -88,12 +90,12 @@ Everything about a product lives in Shopify, including its sizes and the rules f
 | Which page: Gifts, Products or All | Product metafield `mmp_shop.page` | All shows it on both pages |
 | Occasions, e.g. Christmas, Birthday, For Mom | Product metafield `mmp_shop.occasions`, a list | The Gifts page's chips and sections |
 | Short description for the product sheet | Product metafield `mmp_shop.short_description` (multi-line text: a sentence or two, then `- ` lines for bullets; about 4 to 5 lines on a phone) | The product sheet. Empty: the product's own Shopify description, shown with its paragraphs and lists. Kept separate so the full description on other sales channels never changes |
-| Product type, e.g. Mugs, Wall art | Shopify's own Product type field | The Products page's chips and sections |
+| Categories, e.g. Mugs, Wall art | `mmp_shop.categories`, a list like occasions (17 Nov). A product with none falls back to Shopify's own Product type | The Products page's chips and sections, in the order set in Settings |
 | Maker, maker's code, print size and fit rules | Variant metafields, namespace `mmp_shop` | See Product rules |
 | Where the picture sits on the blank photo | Product metafield `mmp_shop.template` | Saved by the template editor in Settings |
 | Discounts | Two discounts limited to the Store collection | See Discounts |
 
-**Settings › Shop › Products** lists every product in the Store collection with its page, occasions and product type, and lets super users change them there. Since 23 Nov it also lists the Magic Store collection's products, each product once, with one page per product for both stores (`docs/open-store.md` › Settings: one area for both stores); the shop's own settings (switches, discounts, VIP tag, occasions) move to Settings › Shop › Gifts & Products pages. Settings writes each change straight to the product in Shopify, so Shopify admin and Settings always show the same thing.
+**Settings › Shop › Products** lists every product in the Store collection with its page, occasions and categories, and lets super users change them there. **Occasions** and **Categories** are two lists managed the same way (add, rename, reorder, remove; one still on a product can't be removed), saved as the choices of `mmp_shop.occasions` and `mmp_shop.categories`. When the categories field is first created it starts with the product types products use, so the Products page doesn't regroup. Since 23 Nov it also lists the Magic Store collection's products, each product once, with one page per product for both stores (`docs/open-store.md` › Settings: one area for both stores); the shop's own settings (switches, discounts, VIP tag, occasions, categories) move to Settings › Shop › Gifts & Products pages. Settings writes each change straight to the product in Shopify, so Shopify admin and Settings always show the same thing.
 
 **Occasions** are one list, kept in Shopify as the allowed values of the `mmp_shop.occasions` metafield definition. Settings › Shop › Occasions adds, renames, orders and retires them, and the Gifts page shows them in that order.
 
@@ -106,6 +108,8 @@ To start with, the existing Shopify products that could go in the shop include t
 ## Product rules
 
 Each Shopify variant carries its rules as metafields in the namespace mmp_shop. They decide whether the product suits an image, how the image sits on it, and what we tell the maker on the order line.
+
+**Editing them (16 Nov):** Settings › Shop › a product › **Add/Edit the print rules** (`/settings/shop/rules/[id]`) shows one card per size with maker, maker's product code, print area, placement, picture zone (wrap only), smallest picture, most crop, adjustable and which pictures, and a READY or "missing …" badge. **Save to Shopify** writes only the rules that changed (`metafieldsSet`, or `metafieldsDelete` for a cleared one) on that product's sizes, in mmp_shop only (allowed write 5); `background` and `extra` are left as they are. Prodigi products use Prodigi's own SKU as the maker's code (e.g. `JIGSAW-PUZZLE-252`), and the print area is Prodigi's `printAreaSizes` for the main print area. Event: `admin_shop_rules_updated`.
 
 | Rule | Example | Used for |
 |---|---|---|
@@ -142,6 +146,7 @@ A template has:
 How it's drawn:
 
 - The image is cropped to the variant's print area by the rules (Product rules), then warped into the print zone. The cropping and warping live in one shared module, as the card layout does today.
+- **Cropped, never stretched, and kept to the top** (16 Nov). The default crop keeps the top of the picture and trims the sides evenly (`defaultCrop` in `lib/shop/fit.ts`). If the print zone on the photo isn't exactly the print area's shape, the flat picture is cropped again to the zone's own shape (top kept) before warping, so it's never squashed to fill the zone. Sizes without Adjust also accept the old centred crop, so carts made before still check out.
 - The browser draws previews with that module, so changing the image or the crop redraws the 4 or 5 previews without a round trip.
 - The server draws the same thing with `@napi-rs/canvas` for cart thumbnails and for a preview image on the order line.
 
@@ -151,7 +156,7 @@ The template is one JSON value (`lib/shop/template.ts`): `background` and `overl
 
 **From a photo of a blank product** (`scripts/mockups/blank_template.py`, tuned on the Prodigi linen cushion): finds the product's outline from the fabric's texture (the floor shadow beside it is the same grey but smooth) and the contact shadow under it; evens the fabric toward white, keeping its weave and folds, so multiply doesn't dull pictures; makes the overlay (the photo, see-through exactly inside the outline); sets the corners just outside the outline; and fits each edge's curve points as far in as they go while the picture still covers the whole product (a small linear programme), so the top of the picture is the top of the cushion.
 
-The template editor in Settings works like the card template editor. A draft stays in the browser until Publish writes it to Shopify; Publish refuses any background or overlay that isn't one of the product's own Shopify photos or one its saved template already uses (the studio photos below). It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
+The template editor in Settings works like the card template editor. A draft stays in the browser until Publish writes it to Shopify; Publish refuses any background or overlay that isn't one of the product's own Shopify photos or one its saved template already uses (the studio photos below). Every uploaded photo has a × (16 Nov): one the draft uses is taken out of the draft first (the overlay goes back to None; the blank photo moves to another photo), and one the published template uses leaves the draft and the lists at once and is deleted when Publish has replaced it (so live previews never point at a missing file); a note beside the photos says so. Uploaded photos show only in their own list (blank photos under the photo, see-through overlays under the overlay); Shopify's own product photos show in both and have no ×. It has test renders with a square, a 3:4 and a landscape sample, and a warning when the zone's shape doesn't match the variant's print area.
 
 ### Studio templates
 
@@ -356,7 +361,7 @@ The first three need answers before the build starts; the rest can be settled du
 
 | Address | Screen |
 |---|---|
-| `/gifts`, `/products` (`?filter=` an occasion or product type) | The Gifts or Products page |
+| `/gifts`, `/products` (`?filter=` an occasion or category) | The Gifts or Products page |
 | `/gifts/choose`, `/products/choose` (`?tab=photos\|upload`, `?product=<handle>`) | Choose a picture |
 | `/gifts/i/<picture id>`, `/products/i/<picture id>` (`?product=<handle>` opens its sheet) | Product ideas, with the product sheet and Adjust as dialogs |
 | `/cart` | The cart, "Who's it for?" when it holds a gift, Checkout |

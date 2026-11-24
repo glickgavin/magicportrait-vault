@@ -73,7 +73,7 @@ describe("the Store collection", () => {
     expect(by["fx-ornaments"].hidden).toEqual([]);
     expect(by["fx-tile"].hidden).toEqual(["no_rules", "no_template"]);
     expect(by["fx-tee"].hidden).toEqual(["not_active", "no_page", "sold_out", "no_template"]);
-    expect(by["fx-tile"].warnings).toContain("No product type, so the Products page can't group it");
+    expect(by["fx-tile"].warnings).toContain("No category, so the Products page shows it under More products");
   });
   it("drops a size with no rules but keeps the product", async () => {
     const poster = evaluateProduct((await fx.storeProducts(FX_COLLECTION_ID)).find((p) => p.handle === "fx-poster")!);
@@ -109,7 +109,11 @@ describe("writes stay inside mmp_shop", () => {
   });
   it("defines every field in the namespace, products and variants", () => {
     const specs = fieldSpecs(["Christmas"]);
-    expect(specs.filter((s) => s.ownerType === "PRODUCT").map((s) => s.key)).toEqual(["page", "occasions", "short_description", "template"]);
+    expect(specs.filter((s) => s.ownerType === "PRODUCT").map((s) => s.key)).toEqual(["page", "occasions", "categories", "short_description", "template", "imagen_theme", "generation", "related", "open_store_related", "details"]);
+    expect(specs.filter((s) => s.ownerType === "PRODUCTVARIANT").map((s) => s.key)).toContain("lead_days");
+    // The Magic Store fields say they're only for that collection (Shopify can't limit a field to one).
+    for (const k of ["imagen_theme", "generation", "related", "open_store_related", "details", "badge", "lead_days"]) expect(specs.find((s) => s.key === k)?.description).toMatch(/^Only for products in the Magic Store collection/);
+    expect(fieldSpecs([], [], ["admiral-01"]).find((s) => s.key === "imagen_theme")?.choices).toEqual(["admiral-01"]);
     expect(specs.find((s) => s.key === "occasions")?.choices).toEqual(["Christmas"]);
     expect(fieldSpecs([]).find((s) => s.key === "occasions")?.choices).toBeUndefined();
   });

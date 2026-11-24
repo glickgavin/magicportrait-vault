@@ -175,7 +175,7 @@ export function CartView({ cart: saved, maxQty, maxMessage, label }: { cart: Car
             const price = linePrice(l);
             return (
             <li key={l.id} className={cn("flex gap-3 py-4", i > 0 && "border-t border-black/[0.07]")}>
-              {l.previewUrl ? <img src={l.previewUrl} alt={t("shop.previewAlt", { product: l.productTitle })} className="ph-no-capture h-[76px] w-[76px] flex-none rounded-[12px] object-cover lg:h-[112px] lg:w-[112px]" /> : <span className="h-[76px] w-[76px] flex-none rounded-[12px] bg-black/5 lg:h-[112px] lg:w-[112px]" aria-hidden="true" />}
+              {l.previewUrl ? <img src={l.previewUrl} alt={t("shop.previewAlt", { product: l.productTitle })} className="ph-no-capture h-[76px] w-[76px] flex-none rounded-[12px] object-cover object-top lg:h-[112px] lg:w-[112px]" /> : <span className="h-[76px] w-[76px] flex-none rounded-[12px] bg-black/5 lg:h-[112px] lg:w-[112px]" aria-hidden="true" />}
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[16px] font-bold lg:text-[18px]">{l.productTitle}</span>

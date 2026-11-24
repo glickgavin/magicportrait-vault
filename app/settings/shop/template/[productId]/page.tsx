@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperUser } from "@/lib/auth/session";
-import { getCatalog } from "@/lib/shop";
+import { adminProducts } from "@/lib/shop";
 import { target } from "@/lib/shop/fit";
 import { parseVariantRules } from "@/lib/shop/rules";
 import { parseTemplate } from "@/lib/shop/template";
@@ -21,7 +21,7 @@ export default async function ShopTemplatePage({ params, searchParams }: { param
   if (!/^\d{1,20}$/.test(productId)) notFound();
   let entries;
   try {
-    entries = await getCatalog({ fresh: true });
+    entries = await adminProducts();
   } catch {
     return (
       <div>
@@ -32,9 +32,8 @@ export default async function ShopTemplatePage({ params, searchParams }: { param
       </div>
     );
   }
-  const entry = entries.find((e) => e.product.legacyId === productId);
-  if (!entry) notFound();
-  const p = entry.product;
+  const p = entries.find((e) => e.legacyId === productId);
+  if (!p) notFound();
   // Every size with rules, so the test renders and the shape warning use real print areas.
   const sizes = p.variants.flatMap((v) => {
     const r = parseVariantRules(v.metafields);

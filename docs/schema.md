@@ -150,7 +150,7 @@ The outbox for Klaviyo (and any later destination). A row is written in the same
 |---|---|---|
 | id | uuid pk | also sent as Klaviyo's `unique_id` |
 | destination | text not null | `klaviyo` |
-| kind | text not null | `event` · `profile` |
+| kind | text not null | `event` · `profile` · `deletion` · `subscription` (an open-store visitor who ticked for offers) |
 | dedupe_key | text unique | e.g. `free_gift_unlocked:<order_id>`, `mug_photo_needed:<order_id>`, so each fires once |
 | email | text | the profile it's about |
 | payload | jsonb not null | the exact request body; **never** message text or recipient details |
@@ -184,6 +184,17 @@ The shop (`docs/shop.md`). One row per picture a customer has used in the shop: 
 
 Migration `20261110000002_shop.sql` also lets `settings.section` be `shop` or `site`; nothing else existing changes.
 
+### store_visitors
+The open store (`docs/open-store.md` › Visitors and saved data). One row per browser that did something real (a photo, an Add to cart), never on a page view. `id uuid pk` (the **visitor id**: storage paths, the cart attribute, Imagen's client user id, PostHog's `store_visitor_id`), `token_hash` (unique; `HMAC(VISITOR_SECRET, cookie token)`, so the id alone can't act as the visitor), `email` (lower-cased; proven only: sign-in, the email's link or a paid order) with `linked_via` (`sign_in` · `order` · `email_link`; both null until linked), `email_given` and `email_given_at` (typed while painting, not proven), `marketing_consent_at`, `first_touch jsonb` (utm tags, referrer host, landing path, time), `posthog_distinct_id`, `shopify_cart_id`, `shopify_checkout_url`, `first_seen_at`, `last_seen_at`, `created_at`, `updated_at`.
+
+### store_photos
+`id uuid pk`, `visitor_id` → `store_visitors` (cascade), `storage_path` (`<visitor>/photos/<id>.jpg` in `store-uploads`), `width`, `height`, `created_at`.
+
+### store_generations
+One picture: `id uuid pk`, `visitor_id` → `store_visitors` (cascade), `product_id` (Shopify gid), `theme` (Imagen slug), `photo_ids uuid[]`, `names text[]` (private: never in analytics, Klaviyo or logs), `imagen_session_id`, `status` (`pending` · `preprocessing` · `generating` · `done` · `failed` · `timed_out`), `images jsonb` (per result: Imagen image id, Imagen's URL, width, height, our `storage_path`), `chosen_index`, `cost_usd`, `ip_hash` (the per-IP limit), `email_to`, `email_consent`, `emailed_at` (the one "Your picture is ready" email), `order_id`, `ordered_at`, `created_at`, `finished_at`. The daily limits count rows that didn't fail or time out.
+
+Migrations `20261123000001` to `…0003_open_store_*.sql` add these and: `open_store` as a settings section (and keys with an underscore before the dot), sign-in link purpose `store_picture`, member `created_via` `store_order`, outbox kind `subscription`, and `activity_log.ref_type` `store_visitor` (business events before the visitor has a proven email). RLS on all three tables, no policies.
+
 ## Storage buckets
 
 | bucket | public | contents |
@@ -192,6 +203,7 @@ Migration `20261110000002_shop.sql` also lets `settings.section` be `shop` or `s
 | `portraits` | no | cached copies of chosen Imagen portraits |
 | `cards` | no | rendered JPEGs; served via short-lived signed URLs or the `/c/[slug]/image` route |
 | `shop-uploads` | no | new shop uploads (JPEG, location and camera data removed); fulfilment gets a signed link |
+| `store-uploads` | no | the open store: `<visitor>/photos/<id>.jpg`, `<visitor>/pictures/<generation>/<n>.png` (our copies of Imagen's results), `<visitor>/previews/<line>.jpg` (cart and order lines). Pages load them through `/api/store/files/<id>` after the ownership check; fulfilment gets a signed link |
 
 ## Layout JSON (`theme_versions.layout`)
 

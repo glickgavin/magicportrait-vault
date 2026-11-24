@@ -7,10 +7,10 @@ import { maskEmail } from "@/lib/utils";
 
 export type TrackSource = "vault" | "shopify" | "imagen" | "email";
 export type TrackActor = "customer" | "recipient" | "system" | `super_user:${string}`;
-export type RefType = "card" | "order" | "session" | "image" | "setting" | "theme" | "version" | "category" | "customer" | "request" | "delivery";
+export type RefType = "card" | "order" | "session" | "image" | "setting" | "theme" | "version" | "category" | "customer" | "request" | "delivery" | "store_visitor";
 
 export type OutboxInput = {
-  kind: "event" | "profile" | "deletion";
+  kind: "event" | "profile" | "deletion" | "subscription";
   dedupe_key?: string | null;
   email: string;
   event_name?: string | null;
@@ -27,6 +27,11 @@ export type TrackOptions = {
   distinctId?: string;
   /** Written in the same transaction as the activity row (Klaviyo outbox). Built automatically for Klaviyo events. */
   outbox?: OutboxInput | null;
+  /**
+   * PostHog person properties set with the event (`$set`, `$set_once`), and whether PostHog keeps a person profile for
+   * an anonymous distinct id (the open store's visitors). Never in activity_log.
+   */
+  person?: { set?: Record<string, unknown>; setOnce?: Record<string, unknown>; profile?: boolean };
   /** Klaviyo-only properties (e.g. the one-tap link) that must never reach PostHog or activity_log, and a dedupe key. */
   klaviyo?: { extra?: Record<string, unknown>; dedupeKey?: string | null };
 };
@@ -39,6 +44,26 @@ function posthog(): PostHog | null {
   if (!key || process.env.NODE_ENV === "test" || process.env.DATA_SOURCE === "fixtures" && process.env.POSTHOG_SERVER_IN_FIXTURES !== "1") return null;
   if (!ph) ph = new PostHog(key, { host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com", flushAt: 1, flushInterval: 0 });
   return ph;
+}
+
+/**
+ * Joins an anonymous PostHog id to a proven email (the open store's paid orders: docs/open-store.md › Identity), so
+ * the whole journey sits on one person. In tests it's recorded as a `$create_alias` capture.
+ */
+export async function aliasPerson(email: string, anonymousId: string): Promise<void> {
+  const e = email.trim().toLowerCase();
+  if (!anonymousId || anonymousId === e) return;
+  if (process.env.NODE_ENV === "test" || process.env.VAULT_CAPTURE_EVENTS === "1") capturedForTests.push({ event: "$create_alias", distinctId: e, properties: { alias: anonymousId } });
+  const client = posthog();
+  if (!client) return;
+  await afterResponse(async () => {
+    try {
+      client.alias({ distinctId: e, alias: anonymousId });
+      await client.flush();
+    } catch (err) {
+      console.warn(`[track] posthog alias failed: ${(err as Error).message}`);
+    }
+  });
 }
 
 /** In tests, every event sent to PostHog is recorded here so tests can inspect it. */
@@ -59,7 +84,9 @@ export async function track(event: EventName, props: Record<string, unknown> = {
   const clean = scrubProps(props);
   const email = opts.email ? opts.email.trim().toLowerCase() : null;
   const distinctId = email ?? opts.distinctId ?? "anonymous";
-  const properties = { ...clean, app: "vault", $process_person_profile: Boolean(email) };
+  const properties: Record<string, unknown> = { ...clean, app: "vault", $process_person_profile: Boolean(email) || Boolean(opts.person?.profile) };
+  if (opts.person?.set && Object.keys(opts.person.set).length) properties.$set = scrubProps(opts.person.set);
+  if (opts.person?.setOnce && Object.keys(opts.person.setOnce).length) properties.$set_once = scrubProps(opts.person.setOnce);
 
   if (process.env.NODE_ENV === "test" || process.env.VAULT_CAPTURE_EVENTS === "1") capturedForTests.push({ event, distinctId, properties });
 

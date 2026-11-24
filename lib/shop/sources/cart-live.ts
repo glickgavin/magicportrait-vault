@@ -111,8 +111,8 @@ export class ShopCartLive implements ShopCartSource {
     return map(r.cart);
   }
 
-  create(input: { lines: CartLineInput[]; email: string; discountCodes: string[]; attributes: Attr[] }) {
-    return this.mutate(M_CREATE, "cartCreate", { input: { lines: input.lines, buyerIdentity: { email: input.email }, discountCodes: input.discountCodes, attributes: input.attributes } });
+  create(input: { lines: CartLineInput[]; email: string | null; discountCodes: string[]; attributes: Attr[] }) {
+    return this.mutate(M_CREATE, "cartCreate", { input: { lines: input.lines, ...(input.email ? { buyerIdentity: { email: input.email } } : {}), discountCodes: input.discountCodes, attributes: input.attributes } });
   }
   async get(cartId: string) {
     const d = await this.gql<{ cart: RawCart | null }>(Q_CART, { id: cartId });

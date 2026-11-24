@@ -11,6 +11,7 @@ import { getCatalog, pricingFor, type CustomerType } from "./index";
 import { discounted, lowest } from "./money";
 import { ensureSize, listPictures, pictureFor, pictureLink } from "./pictures";
 import { getShopCatalogSource } from "./sources";
+import type { ShopListKey } from "./sources/types";
 import { parseTemplate, type Template } from "./template";
 
 export type ShopPage = "gifts" | "products";
@@ -33,25 +34,35 @@ function card(e: CatalogEntry, pct: number | null): CardView {
   return { handle: e.product.handle, title: e.product.title, productType: e.product.productType, occasions: e.product.occasions, image: e.product.media[0]?.url ?? null, from, fromDiscounted: discounted(from, pct), many: e.sellable.length > 1 };
 }
 
-async function occasionOrder(entries: CatalogEntry[]): Promise<string[]> {
+/** A product's Products page categories; until it has any, its Shopify product type (how the page grouped before). */
+export function categoriesOf(e: CatalogEntry): string[] {
+  if (e.product.categories.length) return e.product.categories;
+  const t = e.product.productType.trim();
+  return t ? [t] : [];
+}
+
+/** The occasion or category list in the order set in Settings › Shop, then any others products use. */
+async function listOrder(entries: CatalogEntry[], key: ShopListKey): Promise<string[]> {
+  const used = [...new Set(entries.flatMap((e) => (key === "occasions" ? e.product.occasions : categoriesOf(e))))];
   const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
   try {
     const defs = await (await getShopCatalogSource()).fieldDefinitions(ns);
-    const choices = defs.find((d) => d.ownerType === "PRODUCT" && d.key === "occasions")?.choices;
-    if (choices?.length) return choices;
+    const choices = defs.find((d) => d.ownerType === "PRODUCT" && d.key === key)?.choices;
+    if (choices?.length) return [...choices, ...used.filter((u) => !choices.includes(u))];
   } catch {
-    /* fall back to the occasions products use */
+    /* fall back to the ones products use */
   }
-  return [...new Set(entries.flatMap((e) => e.product.occasions))];
+  return used;
 }
 
 /** The Gifts page (by occasion) or the Products page (by product type). */
 export async function landingData(user: SessionUser, page: ShopPage, filter: string | null) {
-  // Pricing, the catalog and the setting side by side; the person's pictures stream in separately (recentPictures).
+  // Pricing, the catalog and the setting side by side; the person's pictures stream in separately (landingPictures).
   const [pricing, catalog, s] = await Promise.all([pricingFor(user.email), getCatalog(), getSettings(["shop.top_picks_count"] as const)]);
   const entries = forPage(catalog, page);
-  const groups = page === "gifts" ? (await occasionOrder(entries)).filter((o) => entries.some((e) => e.product.occasions.includes(o))) : [...new Set(entries.map((e) => e.product.productType.trim()).filter(Boolean))];
-  const inGroup = (e: CatalogEntry, g: string) => (page === "gifts" ? e.product.occasions.includes(g) : e.product.productType.trim() === g);
+  // Gifts by occasion, Products by category: both lists are set and ordered in Settings › Shop.
+  const inGroup = (e: CatalogEntry, g: string) => (page === "gifts" ? e.product.occasions.includes(g) : categoriesOf(e).includes(g));
+  const groups = (await listOrder(entries, page === "gifts" ? "occasions" : "categories")).filter((g) => entries.some((e) => inGroup(e, g)));
   const chosen = filter && groups.includes(filter) ? filter : null;
   const sections = (chosen ? [chosen] : groups).map((g) => ({ title: g, products: entries.filter((e) => inGroup(e, g)).map((e) => card(e, pricing.pct)) })).filter((s) => s.products.length);
   const ungrouped = entries.filter((e) => !groups.some((g) => inGroup(e, g)));
@@ -61,13 +72,52 @@ export async function landingData(user: SessionUser, page: ShopPage, filter: str
 
 export type RecentPicture = { id: string; url: string | null };
 
-/** The person's three newest pictures for the "Start with a picture" box. Never throws: none on failure. */
-export async function recentPictures(email: string): Promise<RecentPicture[]> {
+/** One product drawn with the person's picture (what ShopPreview needs). */
+export type LandingPreview = { template: Template; crop: { x: number; y: number; w: number; h: number }; placement: "cover" | "contain" | "wrap_zone"; aspect: number; background: string | null };
+export type LandingPictures = {
+  /** The picture shown on the products: the one asked for (when it's theirs), else their newest. */
+  selected: { id: string; url: string; width: number | null; height: number | null } | null;
+  /** Their other pictures, for one-tap switching. */
+  others: RecentPicture[];
+  /** By product handle; a product the picture doesn't suit has none and keeps its own photo. */
+  previews: Record<string, LandingPreview>;
+};
+
+/**
+ * The landing pages show the person's own picture on every product (docs/shop.md › Gifts and Products).
+ * Streamed after the products; never throws (no previews on failure, so the product photos stay).
+ */
+export async function landingPictures(user: SessionUser, page: ShopPage, pictureId: string | null): Promise<LandingPictures> {
+  const none: LandingPictures = { selected: null, others: [], previews: {} };
   try {
-    const pictures = await listPictures(email);
-    return await Promise.all([...pictures.portraits, ...pictures.photos].slice(0, 3).map(async (p) => ({ id: p.id, url: await pictureLink(p) })));
+    const [list, s, catalog] = await Promise.all([listPictures(user.email), getSettings(["shop.change_strip_count"] as const), getCatalog()]);
+    const all = [...list.portraits, ...list.photos];
+    const asked = pictureId ? await pictureFor(user.email, pictureId) : null;
+    const pic = asked ?? all[0];
+    if (!pic) return none;
+    const img = await ensureSize(user.email, pic);
+    const url = await pictureLink(img);
+    if (!url) return none;
+    const previews: Record<string, LandingPreview> = {};
+    if (img.width && img.height) {
+      for (const idea of ideasFor(forPage(catalog, page), { kind: img.kind, width: img.width, height: img.height })) {
+        const template = parseTemplate(idea.entry.product.template?.value);
+        // The cheapest size that suits the picture stands for the product.
+        const v = [...idea.variants].sort((a, b) => Number(a.variant.price) - Number(b.variant.price))[0];
+        if (!template || !v) continue;
+        const t = target(v.rules);
+        previews[idea.entry.product.handle] = { template, crop: v.fit.crop, placement: v.rules.placement, aspect: t.w / t.h, background: v.rules.background };
+      }
+    }
+    const others = await Promise.all(
+      all
+        .filter((p) => p.id !== img.id)
+        .slice(0, s["shop.change_strip_count"])
+        .map(async (p) => ({ id: p.id, url: await pictureLink(p) })),
+    );
+    return { selected: { id: img.id, url, width: img.width, height: img.height }, others, previews };
   } catch {
-    return [];
+    return none;
   }
 }
 
