@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { COPY_PART_TEXT, COPY_PARTS, type CopyPart } from "@/lib/shop/copy-settings";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
  */
 export function CopySettings({ productId, products }: { productId: string; products: { id: string; title: string; store: boolean }[] }) {
   const router = useRouter();
+  const pathname = usePathname();
   const uid = useId();
   const [from, setFrom] = useState("");
   const [parts, setParts] = useState<CopyPart[]>(["template", "magic_store", "sizes"]);
@@ -30,7 +31,8 @@ export function CopySettings({ productId, products }: { productId: string; produ
       else {
         const n = j.copied?.length ?? 0;
         setMsg({ ok: true, text: n ? `Copied from ${fromTitle}: ${n} ${n === 1 ? "part" : "parts"}.` : "Nothing could be copied.", skipped: j.skipped });
-        router.refresh();
+        // A new ?copied= starts the page's editors again from the copied values.
+        router.replace(`${pathname}?copied=${Date.now()}`, { scroll: false });
       }
     } finally {
       setBusy(false);

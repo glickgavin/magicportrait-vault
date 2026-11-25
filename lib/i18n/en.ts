@@ -341,6 +341,7 @@ export const en = {
     addError: "We couldn't add that to your cart. Please try again.",
     personalise: "Personalise it",
     personaliseSub: "Shown on your preview and printed just like this.",
+    personaliseLater: "Add it now or after: you'll see it on your picture once it's made, and it's printed just like that.",
     optional: "optional",
     required: "required",
     noPicture: "None",

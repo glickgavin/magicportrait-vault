@@ -27,9 +27,12 @@ export const metadata = { title: "Shop: product" };
 const CARD = "rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]";
 
 /** Settings › Shop › one product: every field of a product, for both stores, on one page (docs/open-store.md › Settings). */
-export default async function ShopProductPage({ params }: { params: Promise<{ productId: string }> }) {
+export default async function ShopProductPage({ params, searchParams }: { params: Promise<{ productId: string }>; searchParams: Promise<{ copied?: string | string[] }> }) {
   await requireSuperUser();
   const { productId } = await params;
+  // Set by "Copy settings from…": the editors start again from the copied values (a plain save keeps them as they are).
+  const copied = (await searchParams).copied;
+  const copyKey = typeof copied === "string" && /^\d{1,15}$/.test(copied) ? copied : "0";
   if (!/^\d{1,20}$/.test(productId)) notFound();
   const [found, overview, defaults, s] = await Promise.all([
     productRow(productId),
@@ -75,6 +78,7 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
   const initial: StoreFieldsValues = {
     imagen_theme: p.store?.imagenTheme ?? "",
     photos: goodOr<PhotoSlotWords[] | null>("photos", (v) => Array.isArray(v) && v.every((w) => w && typeof w === "object" && typeof (w as PhotoSlotWords).label === "string"), null),
+    ask_name: goodOr<boolean | null>("ask_name", (v) => typeof v === "boolean", null),
     name_max: goodOr<number | null>("name_max", (v) => Number.isInteger(v), null),
     photo_tips: goodOr<string>("photo_tips", (v) => typeof v === "string", ""),
     subject: goodOr<StoreFieldsValues["subject"]>("subject", (v) => v === "pet" || v === "person" || v === "any", ""),
@@ -153,7 +157,7 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
               Open template editor →
             </Link>
           </div>
-          <ShortDescriptionEditor key={p.shortDescription ?? ""} productId={p.id} initial={p.shortDescription ?? ""} />
+          <ShortDescriptionEditor key={`sd-${copyKey}`} productId={p.id} initial={p.shortDescription ?? ""} />
           <div>
             <h3 className="mb-2 text-[16px] font-extrabold">Print rules</h3>
             <ShopRulesEditor productId={p.id} sizes={sizes} defaults={ruleDefaults} />
@@ -193,11 +197,12 @@ export default async function ShopProductPage({ params }: { params: Promise<{ pr
         {row.store ? (
           <div className="mt-3">
             <StoreFieldsEditor
-              key={JSON.stringify(initial)}
+              key={`store-${copyKey}`}
               productId={p.id}
               initial={initial}
               defaults={{
                 photos: defaults.photos as PhotoSlotWords[],
+                ask_name: defaults.ask_name as boolean,
                 name_max: defaults.name_max as number,
                 photo_tips: defaults.photo_tips as string,
                 subject: defaults.subject as string,

@@ -14,6 +14,8 @@ export type SlotWords = { label: string; name_label?: string; name_placeholder?:
 export type StoreFieldsValues = {
   imagen_theme: string;
   photos: SlotWords[] | null;
+  /** null: the store default. */
+  ask_name: boolean | null;
   name_max: number | null;
   photo_tips: string;
   subject: "" | "pet" | "person" | "any";
@@ -24,7 +26,7 @@ export type StoreFieldsValues = {
   details: string;
   variants: { id: string; title: string; badge: string; lead_days: string }[];
 };
-export type StoreFieldsDefaults = { photos: SlotWords[]; name_max: number; photo_tips: string; subject: string; images_to_show: number; step_labels: string[] };
+export type StoreFieldsDefaults = { photos: SlotWords[]; ask_name: boolean; name_max: number; photo_tips: string; subject: string; images_to_show: number; step_labels: string[] };
 export type ThemeOption = { slug: string; name: string; active: boolean; photos: number | null };
 
 const input = "h-10 w-full min-w-0 rounded-[10px] border border-line bg-white px-3 text-[15px] placeholder:text-black/35";
@@ -78,6 +80,7 @@ export function StoreFieldsEditor({
         details: v.details.trim() || null,
         generation: {
           photos: v.photos,
+          ask_name: v.ask_name,
           name_max: v.name_max,
           photo_tips: v.photo_tips.trim() || null,
           subject: v.subject || null,
@@ -172,6 +175,23 @@ export function StoreFieldsEditor({
             </div>
           );
         })}
+        <div className="flex flex-col gap-1 rounded-[12px] border border-line bg-white p-3" data-testid="ask-name">
+          <label className="flex items-start gap-2 text-[15px] font-semibold">
+            <input type="checkbox" className="mt-1 h-4 w-4" checked={v.ask_name ?? defaults.ask_name} onChange={(e) => set("ask_name", e.target.checked === defaults.ask_name ? null : e.target.checked)} />
+            <span>
+              Ask for the pet&apos;s name (used to make the picture)
+              <span className="block text-[13px] font-normal text-ink-2">
+                Shows the name box next to the photo and sends the name to Imagen. Turn off when the personalisation layer asks for the name, so customers aren&apos;t asked twice.
+                {v.ask_name === null ? ` Store default: ${defaults.ask_name ? "on" : "off"}.` : ""}
+              </span>
+            </span>
+          </label>
+          {problemFor("ask_name") && (v.ask_name ?? defaults.ask_name) && (
+            <p role="note" className="rounded-[10px] bg-[#fff1d6] px-3 py-2 text-[13px] font-semibold text-[#7a4a00]" data-testid="ask-name-twice">
+              {problemFor("ask_name")}
+            </p>
+          )}
+        </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
             {label("name_max", "Name length (characters)")}

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * product's template offers. The preview above redraws as they type; nothing is sent until Add to cart, where the
  * server checks it all again. The words are the customer's own: masked in session replay, never tracked.
  */
-export function Personalise({ layer, art, values, onChange, error }: { layer: Layer; art: { id: string; name: string; url: string }[]; values: LayerValues; onChange: (v: LayerValues) => void; error: { field: LayerTextId | "art"; text: string } | null }) {
+export function Personalise({ layer, art, values, onChange, error, note }: { layer: Layer; art: { id: string; name: string; url: string }[]; values: LayerValues; onChange: (v: LayerValues) => void; error: { field: LayerTextId | "art"; text: string } | null; note?: string | null }) {
   const uid = useId();
   const choices = layer.art ? layer.art.choices.map((id) => art.find((a) => a.id === id)).filter((a) => a !== undefined) : [];
   return (
@@ -19,7 +19,7 @@ export function Personalise({ layer, art, values, onChange, error }: { layer: La
         <h2 id={`${uid}-title`} className="text-[17px] font-extrabold text-[#1a1a1a]">
           {t("store.personalise")}
         </h2>
-        <p className="text-[13px] text-[#616161]">{t("store.personaliseSub")}</p>
+        <p className="text-[13px] text-[#616161]">{note ?? t("store.personaliseSub")}</p>
       </div>
       {layer.texts.map((box) => {
         const v = values[box.id] ?? "";

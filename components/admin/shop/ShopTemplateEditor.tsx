@@ -142,6 +142,8 @@ export function ShopTemplateEditor({
   rooms = [],
   focusRoom = null,
   art = [],
+  askName = false,
+  productLegacyId = "",
 }: {
   productId: string;
   media: Media[];
@@ -153,10 +155,13 @@ export function ShopTemplateEditor({
   focusRoom?: string | null;
   /** The personalisation layer's art library (live pictures, and archived ones this product offers). */
   art?: ArtItem[];
+  /** The product asks for the pet's name for the picture (Magic Store), so a name in the layer would ask twice. */
+  askName?: boolean;
+  productLegacyId?: string;
 }) {
   const [media, setMedia] = useState<Media[]>(initialMedia);
   if (!media.length && !published) return <FirstPhoto productId={productId} upload={upload} onUploaded={(m) => setMedia([m])} />;
-  return <Editor productId={productId} media={media} setMedia={setMedia} published={published} sizes={sizes} samples={samples} upload={upload} rooms={rooms} focusRoom={focusRoom} art={art} />;
+  return <Editor productId={productId} media={media} setMedia={setMedia} published={published} sizes={sizes} samples={samples} upload={upload} rooms={rooms} focusRoom={focusRoom} art={art} askName={askName} productLegacyId={productLegacyId} />;
 }
 
 /** Sends one of the photo library's files (an app file) through the template upload, so it's kept like any upload. */
@@ -248,9 +253,13 @@ function Editor({
   rooms,
   focusRoom,
   art: initialArt,
+  askName,
+  productLegacyId,
 }: {
   productId: string;
   art: ArtItem[];
+  askName: boolean;
+  productLegacyId: string;
   media: Media[];
   setMedia: React.Dispatch<React.SetStateAction<Media[]>>;
   published: Template | null;
@@ -673,7 +682,7 @@ function Editor({
           </div>
         )}
       </section>
-      <LayerEditor template={t} setTemplate={setT} aspect={size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h)} sample={samples[0] ?? null} art={art} setArt={setArt} />
+      <LayerEditor template={t} setTemplate={setT} aspect={size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h)} sample={samples[0] ?? null} art={art} setArt={setArt} askName={askName} productLegacyId={productLegacyId} />
       </div>
 
       <div className="flex flex-col gap-5">

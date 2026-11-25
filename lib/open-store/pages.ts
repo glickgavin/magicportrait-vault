@@ -172,7 +172,7 @@ export async function productPageData(legacyId: string) {
   const entry = magic.entries.find((e) => e.product.legacyId === legacyId);
   if (!entry || entry.hidden.length) return null;
   const p = entry.product;
-  const [pricing, themes, policies, photos, nameMax, photoTips, subject, stepLabels, imagesToShow] = await Promise.all([
+  const [pricing, themes, policies, photos, nameMax, photoTips, subject, stepLabels, imagesToShow, askName] = await Promise.all([
     storePricing(magic.collection?.id ?? null),
     imagenThemes(),
     cachedRead("policies", async () => (await getOpenStoreSource()).policies()).catch(() => ({ shippingHtml: null, refundHtml: null })),
@@ -182,6 +182,7 @@ export async function productPageData(legacyId: string) {
     getProductSetting(p, "subject"),
     getProductSetting(p, "step_labels"),
     getProductSetting(p, "images_to_show"),
+    getProductSetting(p, "ask_name"),
   ]);
   const themeNames = new Map(themes?.map((t) => [t.slug, t.name]) ?? []);
   const theme = entry.theme ? (themes?.find((t) => t.slug === entry.theme) ?? null) : null;
@@ -233,7 +234,8 @@ export async function productPageData(legacyId: string) {
     shipping: [...descriptionBlocks(policies.shippingHtml), ...descriptionBlocks(policies.refundHtml)],
     reassurance: s["open_store.reassurance"] as ReassuranceRow[],
     variants,
-    slots: photoSlots(theme?.photos ?? photos.length, photos, theme?.inputs?.map((i) => i.label) ?? []),
+    // No name box when the product doesn't ask for the name (e.g. its personalisation layer does).
+    slots: photoSlots(theme?.photos ?? photos.length, photos, theme?.inputs?.map((i) => i.label) ?? []).map((sl) => (askName ? sl : { ...sl, nameLabel: null, namePlaceholder: null })),
     nameMax,
     photoTips,
     subject,

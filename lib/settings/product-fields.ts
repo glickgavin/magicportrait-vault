@@ -1,5 +1,7 @@
 import type { ShopProduct, ShopVariant } from "../shop/sources/types";
 import { PRODUCT_FIELDS, type ProductFieldDef, type ProductFieldKey } from "./registry";
+import { layerActive } from "../shop/layer";
+import { parseTemplate } from "../shop/template";
 
 /**
  * Pure: a product or variant field's stored value from its mmp_shop metafields, checked by the same Zod rule
@@ -78,6 +80,12 @@ export function productFieldProblems(product: ShopProduct): { key: string; label
         if (r.state === "invalid") out.push({ key, label: `${d.label} (${v.title})`, problem: r.problem });
       }
     }
+  }
+  // The same name asked twice: for the picture (Imagen) and in the personalisation layer.
+  const askName = readProductField(product, "ask_name");
+  const t = parseTemplate(product.template?.value);
+  if (product.store && (askName.state === "set" ? askName.value !== false : true) && layerActive(t?.layer) && t.layer.texts.length) {
+    out.push({ key: "ask_name", label: "Ask for the pet's name", problem: "Customers may be asked for a name twice: next to the photo (for the picture) and in the personalisation layer. Untick “Ask for the pet's name” if the layer asks for it." });
   }
   return out;
 }

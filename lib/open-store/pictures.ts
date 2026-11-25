@@ -70,10 +70,11 @@ export async function startGeneration(input: { visitor: StoreVisitorRow; product
   if (!entry || entry.hidden.length || !entry.theme) return { error: "not_in_store" };
   const themes = await imagenThemes();
   const theme = themes?.find((t) => t.slug === entry.theme) ?? null;
-  const [wording, nameMax] = await Promise.all([getProductSetting(entry.product, "photos"), getProductSetting(entry.product, "name_max")]);
+  const [wording, nameMax, askName] = await Promise.all([getProductSetting(entry.product, "photos"), getProductSetting(entry.product, "name_max"), getProductSetting(entry.product, "ask_name")]);
   const slots = Math.max(1, theme?.photos ?? wording.length);
   if (input.photos.length < slots) return { error: "photos_missing" };
-  const names = input.names.slice(0, slots).map((n) => n.trim());
+  // A product that doesn't ask for the name sends none to Imagen, whatever the browser sent.
+  const names = askName ? input.names.slice(0, slots).map((n) => n.trim()) : [];
   if (names.some((n) => n.length > nameMax)) return { error: "names_too_long" };
 
   const s = await getSettings(["open_store.generations_per_visitor_per_day", "open_store.generations_per_ip_per_day", "open_store.generations_daily_cap"] as const);
