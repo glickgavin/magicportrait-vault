@@ -130,7 +130,7 @@ function ProductItem({ row, dreamship }: { row: ProductRow; dreamship: Dreamship
             </div>
             {dreamship && (dreamship.warnings > 0 || dreamship.differs > 0) && (
               <div className="mt-2 text-[13px]" data-testid="dreamship-warnings">
-                <Link href={`${href}#dreamship`} className="font-bold text-[#7a4b00] hover:underline">
+                <Link href={`${href}?tab=print#dreamship`} className="font-bold text-[#7a4b00] hover:underline">
                   Dreamship: {dreamship.warnings} {dreamship.warnings === 1 ? "warning" : "warnings"}
                   {dreamship.differs ? ` · ${dreamship.differs} ${dreamship.differs === 1 ? "field differs" : "fields differ"}` : ""}
                 </Link>

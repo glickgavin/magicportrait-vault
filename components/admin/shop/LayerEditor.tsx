@@ -191,7 +191,7 @@ export function LayerEditor({
       {on && layer && askName && layer.texts.length > 0 && (
         <p role="note" className="rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[13px] text-[#7a4a00]" data-testid="layer-name-twice">
           This product also asks for the pet&apos;s name next to the photo (for the picture), so customers may be asked twice. If a text box here is for the name, untick “Ask for the pet&apos;s name” on the{" "}
-          <a href={`/settings/shop/products/${productLegacyId}#magic`} className="font-bold underline">
+          <a href={`/settings/shop/products/${productLegacyId}?tab=magic`} className="font-bold underline">
             product&apos;s page
           </a>
           .

@@ -18,7 +18,8 @@ test.describe("Dreamship link and sync", () => {
   });
 
   test("link the Flush poster from the suggestion, sync, see the diff and save to Shopify", async ({ page }) => {
-    await signInWithLink(page, "super@example.com", `/settings/shop/products/${FLUSH}`);
+    // The Dreamship card is on the Print rules tab; ?tab=print opens it.
+    await signInWithLink(page, "super@example.com", `/settings/shop/products/${FLUSH}?tab=print`);
     const card = page.getByRole("region", { name: "Dreamship" });
     await expect(card.getByTestId("dreamship-suggestion")).toContainText("Suggested: 9972256");
     await expect(card.getByLabel("Dreamship product id or designer link")).toHaveValue("9972256");
@@ -55,10 +56,16 @@ test.describe("Dreamship link and sync", () => {
     await expect(page.getByTestId("shop-product").filter({ hasText: "Flush" }).getByTestId("dreamship-warnings")).toContainText(/Dreamship: \d+ warnings/);
     await page.goto("/settings/printers");
     await expect(page.getByTestId("dreamship-products")).toContainText("Dreamship 9972256");
+    // Its warnings link opens the product on the Print rules tab, at the Dreamship card.
+    await page.getByTestId("dreamship-products").getByRole("link", { name: /warning/ }).first().click();
+    await page.waitForURL(/\/settings\/shop\/products\/\d+\?tab=print/);
+    await expect(page.getByRole("tab", { name: "Print rules" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("region", { name: "Dreamship", exact: true })).toBeVisible();
   });
 
   test("a wrong id is refused and nothing is written", async ({ page }) => {
     await signInWithLink(page, "super@example.com", `/settings/shop/products/${FLUSH}`);
+    await page.getByRole("tab", { name: "Print rules" }).click();
     const card = page.getByRole("region", { name: "Dreamship" });
     await card.getByLabel("Dreamship product id or designer link").fill("123");
     await card.getByRole("button", { name: "Link" }).click();

@@ -264,15 +264,26 @@ The SHOP group in the Settings menu:
 | **Magic Store** | `/settings/shop/magic-store` | That store's own settings: who sees it (switches), its collection (`open_store.collection`, default `magic-store`), the menu, the home collection, the discount, the reassurance rows, the limits, timings, photo sizes, the visitor cookie, the email ask, and the store defaults for every product field. **Refresh themes from Imagen**. The numbers (Settings › Shop › Magic Store numbers, below) and the PostHog dashboard link |
 | **Photo library**, **AI room photos** | as today | Unchanged |
 
-**One product page**, top to bottom:
+**One product page** (re-laid out 26 Nov: a header, then tabs):
 
-1. **Where it's sold.** Whether it's in the Store collection, the Magic Store collection or both, with links to the product and the collections in Shopify admin. Membership is changed in Shopify, not here, because collections aren't an allowed write.
-2. **Both stores:** the template (with **Open template editor**), the short description, and each variant's print rules (maker, print area, picture zone, placement, smallest image, most it may crop, can adjust, which pictures, background, extra). These fields are shared, so changing one changes it for both stores, and the page says so.
-3. **Gifts & Products pages:** page, occasions, categories.
-4. **Magic Store:** theme (a dropdown of Imagen's themes, with how many photos each takes), picture settings (photo and name labels, name length, photo tips, step labels, results to show), more gifts (a picker of Magic Store products), related only, and size and materials. Per variant: badge and making time. An empty field shows the store default in grey (Product settings use the store's settings framework, above).
-5. **Status:** for each store, shown or hidden and why, using the same checks the pages use.
+1. **Header:**
+   - **Status** for each store (Gifts & Products pages, Magic Store): SHOWN, HIDDEN with the reasons, RELATED ONLY, or NOT IN COLLECTION. It uses the same checks the pages use. Collection membership is changed in Shopify, not here, because collections aren't an allowed write.
+   - Warnings, such as the name being asked for twice.
+   - **Open template editor** (the main button, with whether a template is set) and **Open in Shopify**.
+   - **Copy settings from…**, folded until opened.
+2. **Tabs.** The open tab is kept in the address as `?tab=magic|pages|print`, so links open the right one. Every tab stays mounted, so unsaved edits survive switching. On phones, the middle tab reads "Gifts & Products".
+   - **Magic Store** (opens first for products in the Magic Store):
+     - theme (a dropdown of Imagen's themes, with how many photos each takes);
+     - picture settings: photo and name labels, "Ask for the pet's name", name length, photo tips, step labels, results to show;
+     - more gifts (a picker of Magic Store products), related only, size and materials;
+     - per variant: badge and making time;
+     - the **short description**, noted as also shown on the Gifts & Products pages.
 
-A section for a store the product isn't in stays folded, with "Not in the Magic Store collection. Add it in Shopify to sell it there." (or the same for Store). Saving writes only the fields that changed, through `metafieldsSet` (`CLAUDE.md`, allowed write 5), and records `admin_shop_product_updated` with the field names.
+     An empty field shows the store default in grey (Product settings use the store's settings framework, above).
+   - **Gifts & Products pages** (opens first otherwise): page, occasions, categories. The short description is here when the product isn't in the Magic Store.
+   - **Print rules:** each variant's print rules (maker, print area, picture zone, placement, smallest image, most it may crop, can adjust, which pictures, background, extra), shared by both stores. Below them is the **Dreamship** card for Dreamship products. Links from Settings › Printers open this tab at the card.
+
+A tab for a store the product isn't in says so: "Not in the Magic Store collection. Add it in Shopify to sell it there." (or the same for Store). Saving writes only the fields that changed, through `metafieldsSet` (`CLAUDE.md`, allowed write 5), and records `admin_shop_product_updated` with the field names.
 
 ## Analytics and PostHog
 

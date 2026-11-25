@@ -32,7 +32,9 @@ export function CopySettings({ productId, products }: { productId: string; produ
         const n = j.copied?.length ?? 0;
         setMsg({ ok: true, text: n ? `Copied from ${fromTitle}: ${n} ${n === 1 ? "part" : "parts"}.` : "Nothing could be copied.", skipped: j.skipped });
         // A new ?copied= starts the page's editors again from the copied values.
-        router.replace(`${pathname}?copied=${Date.now()}`, { scroll: false });
+        const q = new URLSearchParams(window.location.search);
+        q.set("copied", String(Date.now()));
+        router.replace(`${pathname}?${q.toString()}`, { scroll: false });
       }
     } finally {
       setBusy(false);

@@ -121,7 +121,7 @@ export default async function PrintersPage() {
                     )}
                   </span>
                   <span className="text-ink-2">{p.lastSyncedAt ? `Synced ${fmtBiz(p.lastSyncedAt, tz)}` : "Never synced"}</span>
-                  <Link href={`/settings/shop/products/${p.legacyId}#dreamship`} className={p.warnings ? "font-bold text-[#7a4b00] hover:underline" : "link"}>
+                  <Link href={`/settings/shop/products/${p.legacyId}?tab=print#dreamship`} className={p.warnings ? "font-bold text-[#7a4b00] hover:underline" : "link"}>
                     {p.warnings} {p.warnings === 1 ? "warning" : "warnings"}
                   </Link>
                 </li>
