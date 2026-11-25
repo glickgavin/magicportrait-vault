@@ -675,6 +675,35 @@ Built on `claude/cool-volta-69zljg` from `main` through `docs/dreamship.md` › 
 - Settings › Printers › Orders: the latest 50, with the Shopify order, the Dreamship order link, the picture's state (waiting, picture set, needs attention with the reason, lines done), Dreamship's own status read live, when, and **Retry**.
 - Tests: `tests/unit/dreamship-artwork.test.ts` (7: only personalised Dreamship lines; the print file's size; not imported then imported, the picture set on each line, only uploads and line updates, the event; idempotent re-runs and a repeated webhook; an order already sent to print flagged and untouched; never imported, flagged after the wait; nothing queued without a Dreamship line) and the source's no-submit/cancel test from Dreamship 1; `tests/e2e/dreamship-orders.spec.ts` (2 × 390 and 1280: a signed fixture paid order shows on Settings › Printers with its picture set, the Dreamship order link and Dreamship's status "draft", axe clean; an order already "accepted" is flagged with Retry and stays unchanged).
 
+## Copy settings and the personalisation layer (25 Nov)
+
+Plan approved 24 Nov: "Copy settings from…" first, then a personalisation layer (two text boxes and one picture slot) set up in the template editor, filled in on the Magic Store, and printed.
+
+### Copy settings from… (done)
+- **Done:** a "Copy settings from…" card on Settings › Shop › one product. It copies the template (onto this product's own first photo), the Magic Store fields, and badges and lead times matched by size name; it can also copy page, occasions and categories. It never copies the theme, the Dreamship link or the print rules. Writes go through `updateStoreFields`, `updateProductFields` and `setProductTemplate` only (allowed write 5). New event `admin_shop_settings_copied`.
+- **Tests:** unit `copy-settings.test.ts` (7); e2e `shop-copy.spec.ts` (2 × 2 widths).
+
+### Layer 1: schema, art library, drawing (done)
+- **Done:** the template's optional `layer` (`lib/shop/layer.ts`: two text boxes and a picture slot, boxes as fractions of the print area, checks for what the customer fills in, `drawLayer`), drawn by `flatPicture` over the picture and under the mask, in the browser and on the server (`lib/shop/layer-server.ts`: fonts registered, art read from our bucket). The art library: table `layer_art` (migration `20261125000001`), uploads checked and SVGs cleaned and drawn as 2400 px PNGs (`lib/shop/layer-art.ts`), `GET/POST/PATCH /api/admin/layer-art`. Publish checks the layer's pictures are in the library. The browser font loader moved out of CardPreview into `lib/render/fonts-browser.ts` for both. New event `admin_layer_art_changed`; `admin_shop_template_published` says whether the layer is on.
+- **Decision:** the cleaned SVG is kept as text in `layer_art.svg`, not in the bucket: `theme-assets` serves only raster pictures, and every canvas draws the PNG anyway.
+- **Tests:** unit `layer.test.ts` (9, including a real canvas: unchanged without a layer, changed only inside the box with one), `layer-art.test.ts` (3).
+
+### Layer 2: template editor (done)
+- **Done:** a "Personalisation layer" section in the template editor (`components/admin/shop/LayerEditor.tsx`): on/off, Text 1 and Text 2 (question, example words, font, size, colour, line-up, most characters and lines, required), a picture slot with up to 3 pictures from the art library and an upload in place, and boxes dragged, resized or typed as numbers over a flat view of the print area. The live preview and test renders draw the layer with the example words. Publish is held back while the layer has a problem, with the reason shown.
+- **Tests:** e2e `layer-editor.spec.ts` (set up, publish and read back; an unsafe SVG refused; 390 and 1280).
+
+### Layer 3: Magic Store customer (done)
+- **Done:** a "Personalise it" step on the Magic Store product page once the picture is ready (`components/open-store/Personalise.tsx`): the text boxes and the picture choice, drawn on the preview a moment after each change. Add to cart sends them; `addStoreLine` checks them against the live template and puts them on the line (`_shop_layer_*`), and the cart thumbnail is drawn with them. New UI event `store_layer_filled` (which parts, never the words); `store_added_to_cart` gains `personalised`. Test-only `GET /api/test/cart` reads a fixture cart's line attributes (404 outside fixtures + the e2e flag).
+- **Tests:** e2e `store-layer.spec.ts` (required name blocks Add to cart, the preview changes, the line carries the words and the picture, the activity log doesn't; 390 and 1280).
+
+### Layer 4: the print file for every printer (done, one switch off)
+- **Done:** `composePrintFile` (`lib/shop/print-file.ts`): the picture cropped and sized to `print_px`, with the layer drawn at print size by the same `drawLayer`; plain lines are made exactly as before. Dreamship lines now carry what the customer filled in and the product's layer (kept on the job when the order is paid), so Dreamship's artwork has the words on. For other printers (Prodigi, Gelato, in house) a new job kind `print_file` (migration `20261125000002`, `lib/shop/print-jobs.ts`) makes each personalised line's file after the webhook's reply, keeps it in `shop-uploads`, and lists it on Settings › Printers › Personalised print files with Retry. New event `shop_print_file_made` (never the words). A line whose product has lost its layer is flagged, never printed without the words.
+- **Tests:** unit `print-file.test.ts` (5) and a layered line in `dreamship-artwork.test.ts`; e2e `print-files.spec.ts` (paid order → file → Printers page; 390 and 1280).
+
+### Blocked
+- **Linking the print files from the Shopify order** (`mmp_shop.print_files` on the order, `metafieldsSet`) is built, but behind the setting `printers.print_files_to_order`, **off**. CLAUDE.md's allowed write 1 covers only the mug choice on an order, so it needs Gavin's OK to extend it (the proposed wording is in the summary). Also to confirm with whoever runs the print system: that it reads that metafield and uses the app's file for those lines instead of building its own. Until both, the files are made and listed on Settings › Printers, and Dreamship lines (allowed write 7) already get the composed file.
+- Migrations `20261125000001_layer_art.sql` and `…0002_print_files.sql` and the new seed row are applied locally only; magic-vault gets them with the next merge.
+
 ## 24 Nov: Dreamship connection check
 - Settings › Printers › Check connection failed on every try. Dreamship's public API has no `/business/` or `/business/settings/` (both return 404), so the account came back empty.
 - The check now lists the shops (`/shops/`) to prove the key and name the account. Dreamship's order settings aren't in its API and show as "Not reported". Test added.

@@ -1,11 +1,13 @@
 import "server-only";
 import sharp from "sharp";
 import { z } from "zod";
-import { dueJobs, jobById, queueArtworkJob, recentJobs, updateJob, type JobLine, type PrinterJobRow } from "@/lib/db/printers";
+import { dueJobs, jobById, queuePrinterJob, recentJobs, updateJob, type JobLine, type PrinterJobRow } from "@/lib/db/printers";
 import { lineForFulfilment } from "@/lib/db/shop";
 import { generationBySession } from "@/lib/db/store";
 import { getSettings } from "@/lib/settings";
 import { pictureBytes } from "@/lib/shop/pictures";
+import { layerValuesFromProps } from "@/lib/shop/layer";
+import { composePrintFile } from "@/lib/shop/print-file";
 import { DreamshipError, getDreamship, LOCKED_STATUSES, orderUrl, type DreamshipOrder } from "@/lib/sources/dreamship";
 import { getObject, putObject, signedUrl } from "@/lib/storage";
 import { track } from "@/lib/track";
@@ -23,7 +25,7 @@ const paidSchema = z.object({
   id: z.union([z.number(), z.string()]).transform(String),
   name: z.string().optional().nullable(),
   test: z.boolean().optional().nullable(),
-  line_items: z.array(z.object({ id: z.union([z.number(), z.string()]).transform(String), sku: z.string().optional().nullable(), quantity: z.number().default(1), properties: z.array(prop).optional().nullable() }).passthrough()).default([]),
+  line_items: z.array(z.object({ id: z.union([z.number(), z.string()]).transform(String), product_id: z.union([z.number(), z.string()]).nullable().optional(), sku: z.string().optional().nullable(), quantity: z.number().default(1), properties: z.array(prop).optional().nullable() }).passthrough()).default([]),
 });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -62,7 +64,8 @@ export function dreamshipLines(payload: unknown): { orderId: string; name: strin
           : null;
     // Without a picture or a print area there's nothing to put on it: Dreamship's own artwork stays.
     if (!printArea || !printPx || !picture) continue;
-    lines.push({ lineId: li.id, quantity: li.quantity, productVariantId: Number.isFinite(pv) ? pv : null, printArea, printPx, crop: cropOf(at("_shop_crop")), picture });
+    const layerValues = layerValuesFromProps(Object.fromEntries((li.properties ?? []).map((x) => [x.name, x.value ?? ""])));
+    lines.push({ lineId: li.id, quantity: li.quantity, productVariantId: Number.isFinite(pv) ? pv : null, printArea, printPx, crop: cropOf(at("_shop_crop")), picture, ...(layerValues && li.product_id ? { layerValues, productId: `gid://shopify/Product/${li.product_id}` } : {}) });
   }
   return { orderId: p.data.id, name: p.data.name ?? null, lines };
 }
@@ -71,12 +74,14 @@ export function dreamshipLines(payload: unknown): { orderId: string; name: strin
 export async function queueFromPaidOrder(payload: unknown): Promise<{ queued: boolean; jobId?: string }> {
   const found = dreamshipLines(payload);
   if (!found || !found.lines.length) return { queued: false };
-  const job = await queueArtworkJob({ shopifyOrderId: found.orderId, name: found.name, lines: found.lines });
+  // Personalised lines keep the product's layer as it is now, so the words land where the customer saw them.
+  const { attachLayers } = await import("@/lib/shop/print-jobs");
+  const job = await queuePrinterJob({ kind: "dreamship_artwork", shopifyOrderId: found.orderId, name: found.name, lines: await attachLayers(found.lines) });
   return { queued: true, jobId: job.id };
 }
 
 /** Our copy of the line's chosen picture. */
-async function pictureFor(line: JobLine): Promise<Buffer | null> {
+export async function pictureFor(line: JobLine): Promise<Buffer | null> {
   if (line.picture.kind === "open_store") {
     const gen = await generationBySession(line.picture.sessionId);
     const img = gen?.images.find((i) => i.imagen_id === (line.picture as { imageId: string }).imageId) ?? gen?.images[gen.chosen_index];
@@ -88,12 +93,8 @@ async function pictureFor(line: JobLine): Promise<Buffer | null> {
 }
 
 /** The print file: the picture cropped as the customer saw it and sized to the print area, as JPEG. */
-export async function printFile(picture: Buffer, line: Pick<JobLine, "crop" | "printPx">): Promise<Buffer> {
-  let img = sharp(picture, { limitInputPixels: 200_000_000 }).rotate();
-  const meta = await sharp(picture).rotate().metadata();
-  const c = line.crop;
-  if (c && meta.width && meta.height && c.x + c.w <= meta.width && c.y + c.h <= meta.height) img = img.extract({ left: c.x, top: c.y, width: c.w, height: c.h });
-  return img.resize(line.printPx.w, line.printPx.h, { fit: "cover", position: "top" }).flatten({ background: "#ffffff" }).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
+export async function printFile(picture: Buffer, line: Pick<JobLine, "crop" | "printPx" | "layer" | "layerValues">): Promise<Buffer> {
+  return composePrintFile(picture, { crop: line.crop, printPx: line.printPx, layer: line.layer && line.layerValues ? { layer: line.layer, values: line.layerValues } : null });
 }
 
 const backoffMs = (attempts: number) => Math.min(30 * 60_000, 60_000 * 2 ** Math.max(0, attempts - 1));
@@ -117,6 +118,7 @@ async function record(job: PrinterJobRow, status: "picture_set" | "failed", reas
 export async function runJob(jobId: string, now = new Date()): Promise<PrinterJobRow | null> {
   let job = await jobById(jobId);
   if (!job || job.status !== "waiting") return job;
+  if (job.kind === "print_file") return (await import("@/lib/shop/print-jobs")).runPrintFileJob(job.id, now);
   const s = await getSettings(["dreamship.import_wait_hours"] as const);
   const attempts = job.attempts + 1;
   let order: DreamshipOrder | null;
@@ -223,11 +225,11 @@ export async function retryJob(actor: { email: string }, jobId: string): Promise
   const job = await jobById(jobId);
   if (!job || job.status === "picture_set") return job;
   await updateJob(job.id, { status: "waiting", attempts: 0, reason: null, next_attempt_at: new Date().toISOString() });
-  await track("admin_printer_job_retried", { maker: "dreamship", order_id: job.shopify_order_id }, { email: actor.email, actor: `super_user:${actor.email}`, ref: { type: "order", id: job.shopify_order_id } });
+  await track("admin_printer_job_retried", { maker: job.kind === "print_file" ? (job.lines[0]?.maker ?? "app") : "dreamship", order_id: job.shopify_order_id }, { email: actor.email, actor: `super_user:${actor.email}`, ref: { type: "order", id: job.shopify_order_id } });
   return runJob(job.id);
 }
 
-export type OrderView = { id: string; orderName: string; orderId: string; status: PrinterJobRow["status"]; reason: string | null; dreamshipOrderId: number | null; dreamshipUrl: string | null; dreamshipStatus: string | null; lines: number; linesDone: number; at: string };
+export type OrderView = { id: string; kind: PrinterJobRow["kind"]; files: { lineId: string; url: string }[]; orderName: string; orderId: string; status: PrinterJobRow["status"]; reason: string | null; dreamshipOrderId: number | null; dreamshipUrl: string | null; dreamshipStatus: string | null; lines: number; linesDone: number; at: string };
 
 /** Settings › Printers › Orders: the latest 50, with Dreamship's own status read live (shown as it is). */
 export async function printerOrders(): Promise<OrderView[]> {
@@ -241,8 +243,8 @@ export async function printerOrders(): Promise<OrderView[]> {
   return Promise.all(
     jobs.map(async (j) => {
       let live = j.dreamship_status;
-      if (ds && j.dreamship_order_id) live = (await ds.order(j.dreamship_order_id).catch(() => null))?.status ?? live;
-      return { id: j.id, orderName: j.shopify_order_name ?? j.shopify_order_id, orderId: j.shopify_order_id, status: j.status, reason: j.reason, dreamshipOrderId: j.dreamship_order_id, dreamshipUrl: j.dreamship_order_id ? orderUrl(j.dreamship_order_id) : null, dreamshipStatus: live, lines: j.lines.length, linesDone: j.lines.filter((l) => l.done).length, at: j.updated_at };
+      if (ds && j.kind === "dreamship_artwork" && j.dreamship_order_id) live = (await ds.order(j.dreamship_order_id).catch(() => null))?.status ?? live;
+      return { id: j.id, kind: j.kind, files: j.lines.flatMap((l) => (l.fileUrl ? [{ lineId: l.lineId, url: l.fileUrl }] : [])), orderName: j.shopify_order_name ?? j.shopify_order_id, orderId: j.shopify_order_id, status: j.status, reason: j.reason, dreamshipOrderId: j.dreamship_order_id, dreamshipUrl: j.dreamship_order_id ? orderUrl(j.dreamship_order_id) : null, dreamshipStatus: live, lines: j.lines.length, linesDone: j.lines.filter((l) => l.done).length, at: j.updated_at };
     }),
   );
 }

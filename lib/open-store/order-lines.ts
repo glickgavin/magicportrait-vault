@@ -7,6 +7,7 @@
 import type { Rect } from "@/lib/shop/fit";
 import type { VariantRules } from "@/lib/shop/rules";
 import type { Attr } from "@/lib/shop/sources/cart";
+import { layerAttributes, type LayerValues } from "@/lib/shop/layer";
 
 export type StoreLineInput = {
   lineId: string;
@@ -14,6 +15,8 @@ export type StoreLineInput = {
   rules: VariantRules;
   crop: Rect;
   previewUrl: string | null;
+  /** What the customer added on the personalisation layer, and the template it was checked against. */
+  layer?: { values: LayerValues; version: string | null } | null;
 };
 
 export function storeLineAttributes(i: StoreLineInput): Attr[] {
@@ -38,6 +41,13 @@ export function storeLineAttributes(i: StoreLineInput): Attr[] {
   if (Object.keys(i.rules.extra).length) a.push({ key: "_shop_extra", value: JSON.stringify(i.rules.extra) });
   if (i.rules.version) a.push({ key: "_shop_rules_version", value: i.rules.version });
   if (i.previewUrl) a.push({ key: "_shop_preview_url", value: i.previewUrl });
+  if (i.layer) {
+    const l = layerAttributes(i.layer.values);
+    if (l.length) {
+      a.push(...l);
+      if (i.layer.version) a.push({ key: "_shop_layer_v", value: i.layer.version });
+    }
+  }
   return a;
 }
 

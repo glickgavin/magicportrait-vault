@@ -8,6 +8,7 @@ import { fitVariant, target } from "@/lib/shop/fit";
 import { getShopCartSource } from "@/lib/shop/sources";
 import type { RemoteCart } from "@/lib/shop/sources/cart";
 import { parseTemplate } from "@/lib/shop/template";
+import { checkLayerValues, layerActive, type LayerValues } from "@/lib/shop/layer";
 import { getObject, putObject, signedUrl } from "@/lib/storage";
 import { aliasPerson } from "@/lib/track";
 import { storeTrack } from "./analytics";
@@ -26,10 +27,12 @@ export const addSchema = z.object({
   variantId: z.string().regex(/^gid:\/\/shopify\/ProductVariant\/\d{1,20}$/),
   quantity: z.number().int().min(1).max(100),
   from: z.enum(["product", "related"]).default("product"),
+  /** The personalisation layer (text boxes t1, t2 and a picture id); checked against the product's template. */
+  layer: z.object({ t1: z.string().max(400).optional(), t2: z.string().max(400).optional(), art: z.string().max(40).nullable().optional() }).strict().optional(),
 });
 
-export type CartFail = { ok: false; status: number; error: string };
-const fail = (status: number, error: string): CartFail => ({ ok: false, status, error });
+export type CartFail = { ok: false; status: number; error: string; message?: string };
+const fail = (status: number, error: string, message?: string): CartFail => ({ ok: false, status, error, ...(message ? { message } : {}) });
 
 
 /** File id of a line's preview: `v_<visitor id>_<line id>` (the ownership check reads the visitor from it). */
@@ -88,15 +91,23 @@ export async function addStoreLine(a: Asker, visitor: StoreVisitorRow, input: z.
   const current = await remoteCart(owner);
   if (current && current.lines.length >= s["shop.cart_max_lines"]) return fail(409, "cart_full");
 
+  // The personalisation layer: re-checked here against the live template (never trusted from the browser).
+  const template = parseTemplate(found.entry.product.template?.value);
+  let layerValues: LayerValues | null = null;
+  if (layerActive(template?.layer)) {
+    const c = checkLayerValues(template.layer, input.layer ?? {});
+    if (!c.ok) return fail(422, "layer_invalid", c.error);
+    layerValues = c.values;
+  }
+
   const lineId = randomUUID();
   let previewUrl: string | null = null;
-  const template = parseTemplate(found.entry.product.template?.value);
   if (template) {
     try {
       const bytes = await getObject("store-uploads", img.storage_path);
       const { renderPreview } = await import("@/lib/shop/render");
       const t = target(found.sv.rules);
-      const jpeg = bytes ? await renderPreview({ template, picture: bytes, crop: fit.crop, placement: found.sv.rules.placement, backgroundColour: found.sv.rules.background, targetAspect: t.w / t.h, width: s["shop.preview_width_px"] }) : null;
+      const jpeg = bytes ? await renderPreview({ template, picture: bytes, crop: fit.crop, placement: found.sv.rules.placement, backgroundColour: found.sv.rules.background, targetAspect: t.w / t.h, width: s["shop.preview_width_px"], layerValues }) : null;
       if (jpeg) {
         const path = previewPath(owner.id, lineId);
         await putObject("store-uploads", path, jpeg, "image/jpeg");
@@ -109,7 +120,7 @@ export async function addStoreLine(a: Asker, visitor: StoreVisitorRow, input: z.
   const line = {
     merchandiseId: input.variantId,
     quantity: input.quantity,
-    attributes: storeLineAttributes({ lineId, picture: { imagenImageId: img.imagen_id, sessionId: gen.imagen_session_id, url: img.url, width: img.width, height: img.height, theme: gen.theme }, rules: found.sv.rules, crop: fit.crop, previewUrl }),
+    attributes: storeLineAttributes({ lineId, picture: { imagenImageId: img.imagen_id, sessionId: gen.imagen_session_id, url: img.url, width: img.width, height: img.height, theme: gen.theme }, rules: found.sv.rules, crop: fit.crop, previewUrl, layer: layerValues ? { values: layerValues, version: template?.updated_at ?? null } : null }),
   };
   const src = await getShopCartSource();
   const code = s["open_store.discount_code"].trim();
@@ -126,7 +137,7 @@ export async function addStoreLine(a: Asker, visitor: StoreVisitorRow, input: z.
   if (cart.id !== owner.shopify_cart_id) await setVisitorCart(owner.id, { id: cart.id, checkoutUrl: cart.checkoutUrl });
   await storeTrack(
     "store_added_to_cart",
-    { product_id: found.entry.product.legacyId, variant_id: found.sv.variant.legacyId, theme_slug: gen.theme, price: found.sv.variant.price, quantity: input.quantity, from: input.from, lines_after: cart.lines.length, store_visitor_id: owner.id },
+    { product_id: found.entry.product.legacyId, variant_id: found.sv.variant.legacyId, theme_slug: gen.theme, personalised: Boolean(layerValues && (layerValues.t1 || layerValues.t2 || layerValues.art)), price: found.sv.variant.price, quantity: input.quantity, from: input.from, lines_after: cart.lines.length, store_visitor_id: owner.id },
     { visitor: owner, email: a.user?.email ?? null },
   );
   return { ok: true, lines: cart.lines.length };

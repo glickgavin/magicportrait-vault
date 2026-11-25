@@ -173,6 +173,7 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_generation_slow` | browser | "Still painting…" shown | `product_id`, `seconds` |
 | `store_generation_left` | browser | Page left while painting | `product_id`, `seconds` |
 | `store_result_picked` | browser | Another result chosen | `product_id`, `index`, `of` |
+| `store_layer_filled` | browser | Added to cart with the personalisation layer | `product_id`, `has_text1`, `has_text2`, `has_art` (never the words) |
 | `store_try_again_tapped` | browser | Try another photo | `product_id`, `after` (`ready` · `failed`) |
 | `store_email_ask_shown`, `store_email_ask_closed` | browser | The email box while painting | `product_id` |
 | `store_email_given` | server, business | Email given while painting | `product_id`, `marketing_consent` |
@@ -180,7 +181,7 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_email_link_opened` | server, business | The email's link used | `product_id`, `expired` |
 | `store_related_shown` | browser | "On more gifts" in view | `product_id`, `count`, `with_picture` |
 | `store_related_tapped` | browser | A product under "On more gifts" | `from_product_id`, `to_product_id`, `position`, `with_picture` |
-| `store_added_to_cart` | server, business, Klaviyo-able | Add to cart | `product_id`, `variant_id`, `theme_slug`, `price`, `quantity`, `from` (`product` · `related`), `lines_after` |
+| `store_added_to_cart` | server, business, Klaviyo-able | Add to cart | `product_id`, `variant_id`, `theme_slug`, `price`, `quantity`, `from` (`product` · `related`), `lines_after`, `personalised` (true when the customer added text or a picture on the personalisation layer; never the text) |
 | `store_cart_opened` | browser | Cart drawer opened | `lines`, `subtotal` |
 | `store_cart_changed` | server, business | Quantity changed or line removed | `change`, `lines` |
 | `store_checkout_started` | server, business, Klaviyo-able | Shopify checkout link handed out | `lines`, `subtotal`, `signed_in` |
@@ -191,6 +192,7 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `admin_open_store_themes_refreshed` | server, business | Imagen themes copied into the Shopify dropdown | `themes`, `added`, `removed` |
 | `admin_dreamship_linked` | server, business | A Shopify product linked to its Dreamship product (`docs/dreamship.md` › Part A) | `product_id`, `fields_changed` |
 | `admin_dreamship_synced` | server, business | Dreamship's numbers saved to a product's sizes with Save to Shopify | `product_id`, `fields_changed` |
+| `shop_print_file_made` | server, business | The print file with the personalisation layer made for an order's lines (printers other than Dreamship) and linked from the order, or it couldn't be | `maker`, `status` (`picture_set` · `failed`), `lines`, `of`, `reason` (when failed); never the words |
 | `shop_order_sent_to_maker` | server, business | The customer's picture set on the printer's order (`docs/dreamship.md` › Part B), or it couldn't be | `maker`, `status` (`picture_set` · `failed`), `lines`, `reason` (when failed) |
 | `admin_printer_job_retried` | server, business | Retry on Settings › Printers re-queued a picture job | `maker`, `order_id` |
 | `admin_printer_settings_updated` | server, business | A printer setting changed on Settings › Printers (`docs/dreamship.md` › Part C) | `maker`, `keys` |
@@ -217,7 +219,7 @@ Every store event carries the super properties `area: "open_store"`, `signed_in`
 
 `shop_added_to_cart` and `shop_checkout_started` reach Klaviyo only once they're added to the `klaviyo.events` setting (they aren't by default), for an abandoned-cart flow later. The shop funnel in PostHog: `page_view_shop_ideas` → `shop_product_opened` → `shop_added_to_cart` → `shop_checkout_started` → `shop_order_paid`, broken down by `page`.
 
-`settings_viewed`, `setting_changed` (`key`, `section`; never the value), `super_user_added` / `super_user_removed`, `admin_theme_created`, `admin_version_published`, `admin_version_archived`, `data_source_tested` (`source`, `ok`), `admin_shop_product_updated` (`product_id`, `fields`: the names of the fields that changed, shop or Magic Store (page, occasions, categories, …), from the one product page in Settings › Shop; never their values), `admin_shop_occasions_updated` (`count`, `added`, `removed`), `admin_shop_categories_updated` (`count`, `added`, `removed`: the Products page category list), `admin_shop_fields_created` (`created`, `failed`), `admin_shop_template_published` (`product_id`, `zone`: corners or wrap), `admin_shop_rules_updated` (`product_id`, `sizes`: how many sizes changed, `fields`: which rule keys changed; never their values), `admin_shop_template_uploaded` (`product_id`, `kind`: background or overlay), `admin_shop_scene_made` (`product_id`, `preset`, `model`, `ok`, `reason` when it failed, `ms`; never the prompt or the picture). Super users sit in the existing test-account cohort so they never count as customers.
+`settings_viewed`, `setting_changed` (`key`, `section`; never the value), `super_user_added` / `super_user_removed`, `admin_theme_created`, `admin_version_published`, `admin_version_archived`, `data_source_tested` (`source`, `ok`), `admin_shop_product_updated` (`product_id`, `fields`: the names of the fields that changed, shop or Magic Store (page, occasions, categories, …), from the one product page in Settings › Shop; never their values), `admin_shop_occasions_updated` (`count`, `added`, `removed`), `admin_shop_categories_updated` (`count`, `added`, `removed`: the Products page category list), `admin_shop_fields_created` (`created`, `failed`), `admin_shop_template_published` (`product_id`, `zone`: corners or wrap, `layer`: whether the personalisation layer is on, `layer_texts`, `layer_art`: how many text boxes and pictures it offers), `admin_shop_rules_updated` (`product_id`, `sizes`: how many sizes changed, `fields`: which rule keys changed; never their values), `admin_shop_settings_copied` (`product_id`, `from_product_id`, `parts`: which of template, magic_store, sizes and pages were copied, `skipped`: how many things couldn't be), `admin_layer_art_changed` (`action`: added, archived or restored, `kind`: png or svg when added: the personalisation layer's art library), `admin_shop_template_uploaded` (`product_id`, `kind`: background or overlay), `admin_shop_scene_made` (`product_id`, `preset`, `model`, `ok`, `reason` when it failed, `ms`; never the prompt or the picture). Super users sit in the existing test-account cohort so they never count as customers.
 
 Insights actions (all carry `actor = super_user:<email>` in `activity_log`):
 

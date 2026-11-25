@@ -8,6 +8,9 @@ import { drawPreview, previewSize, type MakeCanvas, type PreviewCtx } from "@/li
 import type { LibraryRoom } from "@/lib/shop/photo-library";
 import { BEND_RANGE, bendStops, defaultTemplate, homography, isBent, NO_BEND, zoneAspect, zoneMapper, type BendEdge, type Point, type Template } from "@/lib/shop/template";
 import { cn } from "@/lib/utils";
+import { cssFamily, ensureFonts } from "@/lib/render/fonts-browser";
+import { layerActive } from "@/lib/shop/layer";
+import { LayerEditor, layerProblem, loadLayerArt, sampleValues, type ArtItem } from "./LayerEditor";
 
 type Media = { id: string; url: string; alt: string | null; width: number; height: number };
 type Size = { id: string; title: string; aspect: number; placement: "cover" | "contain" | "wrap_zone"; background: string | null };
@@ -138,6 +141,7 @@ export function ShopTemplateEditor({
   upload,
   rooms = [],
   focusRoom = null,
+  art = [],
 }: {
   productId: string;
   media: Media[];
@@ -147,10 +151,12 @@ export function ShopTemplateEditor({
   upload: { maxMb: number; maxPx: number };
   rooms?: LibraryRoom[];
   focusRoom?: string | null;
+  /** The personalisation layer's art library (live pictures, and archived ones this product offers). */
+  art?: ArtItem[];
 }) {
   const [media, setMedia] = useState<Media[]>(initialMedia);
   if (!media.length && !published) return <FirstPhoto productId={productId} upload={upload} onUploaded={(m) => setMedia([m])} />;
-  return <Editor productId={productId} media={media} setMedia={setMedia} published={published} sizes={sizes} samples={samples} upload={upload} rooms={rooms} focusRoom={focusRoom} />;
+  return <Editor productId={productId} media={media} setMedia={setMedia} published={published} sizes={sizes} samples={samples} upload={upload} rooms={rooms} focusRoom={focusRoom} art={art} />;
 }
 
 /** Sends one of the photo library's files (an app file) through the template upload, so it's kept like any upload. */
@@ -241,8 +247,10 @@ function Editor({
   upload,
   rooms,
   focusRoom,
+  art: initialArt,
 }: {
   productId: string;
+  art: ArtItem[];
   media: Media[];
   setMedia: React.Dispatch<React.SetStateAction<Media[]>>;
   published: Template | null;
@@ -268,6 +276,8 @@ function Editor({
   const live = useRef<(HTMLCanvasElement | null)[]>([]);
   const size = sizes.find((s) => s.id === sizeId) ?? null;
   const dirty = JSON.stringify(t) !== JSON.stringify(startFrom);
+  const [art, setArt] = useState<ArtItem[]>(initialArt);
+  const problemWithLayer = layerProblem(t.layer);
   const [overlayClear, setOverlayClear] = useState<number | null>(null);
   const overlayUrl = t.overlay?.url ?? null;
   useEffect(() => {
@@ -318,7 +328,8 @@ function Editor({
       frame.current = null;
       void (async () => {
         try {
-          const [bg, ov, ...pics] = await Promise.all([cachedImg(t.background.url), t.overlay ? cachedImg(t.overlay.url) : Promise.resolve(null), ...samples.map((u) => cachedImg(u).catch(() => null))]);
+          const [bg, ov, artMap, , ...pics] = await Promise.all([cachedImg(t.background.url), t.overlay ? cachedImg(t.overlay.url) : Promise.resolve(null), loadLayerArt(t.layer, art), ensureFonts(t.layer?.texts.map((x) => x.font) ?? []), ...samples.map((u) => cachedImg(u).catch(() => null))]);
+          const layer = layerActive(t.layer) ? { layer: t.layer, values: sampleValues(t.layer), art: artMap, family: cssFamily } : null;
           if (cancelled) return;
           const aspect = size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h);
           const placement = size?.placement ?? (t.zone.kind === "wrap" ? "wrap_zone" : "cover");
@@ -329,7 +340,7 @@ function Editor({
             el.height = out.h;
             const ctx = el.getContext("2d") as unknown as PreviewCtx;
             const crop = placement === "contain" ? { x: 0, y: 0, w: pw, h: ph } : defaultCrop(pw, ph, aspect, 1);
-            drawPreview(ctx, { template: t, background: bg, overlay: ov, picture: pic as never, crop, placement, backgroundColour: size?.background ?? null, targetAspect: aspect, size: out, makeCanvas: browserCanvas, flatMax: 900 });
+            drawPreview(ctx, { template: t, background: bg, overlay: ov, picture: pic as never, crop, placement, backgroundColour: size?.background ?? null, targetAspect: aspect, size: out, makeCanvas: browserCanvas, flatMax: 900, layer });
           };
           pics.forEach((img, i) => img && draw(live.current[i], img, img.naturalWidth, img.naturalHeight, 640));
           SAMPLES.forEach(([, pw, ph], i) => draw(canvases.current[i], samplePicture(pw, ph), pw, ph, 360));
@@ -341,7 +352,7 @@ function Editor({
     return () => {
       cancelled = true;
     };
-  }, [t, size, samples]);
+  }, [t, size, samples, art]);
 
   const [fieldMsg, setFieldMsg] = useState<{ which: "background" | "overlay"; text: string; ok?: boolean } | null>(null);
   const isOverlayFile = (m: Media) => m.id.startsWith("upload:") && m.id.endsWith(".webp");
@@ -574,6 +585,7 @@ function Editor({
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="flex min-w-0 flex-col gap-5">
       <section aria-label="Zone" className="grid content-start gap-5 rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)] lg:grid-cols-[minmax(0,1fr)_minmax(220px,320px)]">
         <div className="min-w-0">
         {restored && (
@@ -661,6 +673,8 @@ function Editor({
           </div>
         )}
       </section>
+      <LayerEditor template={t} setTemplate={setT} aspect={size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h)} sample={samples[0] ?? null} art={art} setArt={setArt} />
+      </div>
 
       <div className="flex flex-col gap-5">
         {rooms.length > 0 && (
@@ -756,8 +770,13 @@ function Editor({
               {overlayProblem}
             </p>
           )}
+          {problemWithLayer && (
+            <p role="alert" className="rounded-[12px] bg-[#fff4f2] px-3 py-2 text-[14px] font-bold text-[#a1251b]" data-testid="layer-problem">
+              {problemWithLayer}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
-            <Button disabled={busy || Boolean(overlayProblem) || (!dirty && Boolean(published))} onClick={() => void publish()}>
+            <Button disabled={busy || Boolean(overlayProblem) || Boolean(problemWithLayer) || (!dirty && Boolean(published))} onClick={() => void publish()}>
               {busy ? "Publishing…" : "Publish to Shopify"}
             </Button>
             {dirty && (

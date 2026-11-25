@@ -55,6 +55,10 @@ export class ShopifyFixtures implements ShopifySource {
     o.mugChoice = { value: input.value, updatedAt: new Date().toISOString(), compareDigest: `fx-${Date.now()}` };
     return { ok: true as const };
   }
+  async setOrderPrintFiles(input: { orderGid: string; namespace: string; key: string; value: string }) {
+    this.writes.push({ type: "metafieldsSet", orderGid: input.orderGid, payload: input });
+    return { ok: true as const };
+  }
   async addTags(orderGid: string, tags: string[]) {
     this.writes.push({ type: "tagsAdd", orderGid, payload: tags });
     const o = this.orders.find((x) => x.id === orderGid);

@@ -217,11 +217,16 @@ export async function productPageData(legacyId: string) {
   const related: RelatedCard[] = relatedEntries(p, magic.entries, 8).map((e) => ({ ...card(e, pricing, themeNames), href: `/store/product/${e.product.legacyId}`, draw: drawInfo(e) }));
   const details: DescriptionBlock[] = [...descriptionBlocks(p.descriptionHtml, p.description), ...(p.store?.details ? descriptionBlocks(null, p.store.details) : [])];
   const homeTitle = magic.collection?.handle === s["open_store.home_collection"] ? magic.collection.title : null;
+  // The personalisation layer's pictures (from the art library), when the template offers any.
+  const template = parseTemplate(p.template?.value) as Template | null;
+  const { layerActive } = await import("@/lib/shop/layer");
+  const layerArt = layerActive(template?.layer) && template.layer.art ? (await (await import("@/lib/shop/layer-art")).layerArtByIds(template.layer.art.choices).catch(() => [])).map((a) => ({ id: a.id, name: a.name, url: a.url, width: a.width, height: a.height })) : [];
   return {
     product: { id: p.id, legacyId: p.legacyId, title: p.title, handle: p.handle, seoTitle: p.store?.seoTitle ?? null, seoDescription: p.store?.seoDescription ?? null, rating: p.store?.rating ?? null, ratingCount: p.store?.ratingCount ?? null },
     theme: theme ? { slug: theme.slug, name: theme.name } : entry.theme ? { slug: entry.theme, name: entry.theme } : null,
     gallery: p.media.map((m) => ({ url: m.url, alt: m.alt ?? p.title })),
-    template: parseTemplate(p.template?.value) as Template | null,
+    template,
+    layerArt,
     bullets: p.shortDescription ? descriptionBlocks(null, p.shortDescription) : [],
     details,
     howItWorks: s["open_store.how_it_works"],

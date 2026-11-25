@@ -200,6 +200,14 @@ export class ShopifyLive implements ShopifySource {
     return errs.length ? { ok: false, reason: errs.map((e) => e.code || e.message).join(",") } : { ok: true };
   }
 
+  async setOrderPrintFiles(input: { orderGid: string; namespace: string; key: string; value: string }): Promise<MetafieldWriteResult> {
+    const d = await this.gql<{ metafieldsSet: { userErrors: { message: string; code?: string }[] } }>(M_METAFIELD, {
+      metafields: [{ ownerId: input.orderGid, namespace: input.namespace, key: input.key, type: "json", value: input.value }],
+    });
+    const errs = d.metafieldsSet.userErrors;
+    return errs.length ? { ok: false, reason: errs.map((e) => e.code || e.message).join(",") } : { ok: true };
+  }
+
   async addTags(orderGid: string, tags: string[]): Promise<MetafieldWriteResult> {
     const d = await this.gql<{ tagsAdd: { userErrors: { message: string }[] } }>(M_TAGS, { id: orderGid, tags });
     const errs = d.tagsAdd.userErrors;

@@ -48,5 +48,18 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error(`[webhook] dreamship job failed: ${(e as Error).message}`);
   }
+  // Personalised lines for other printers (docs/shop.md › Personalisation layer): the app makes the print file with the
+  // customer's words and links it from the order. Never changes the reply.
+  try {
+    const { queuePrintFiles, runPrintFileJob } = await import("@/lib/shop/print-jobs");
+    const q = await queuePrintFiles(JSON.parse(raw));
+    if (q.jobId) {
+      const { afterResponse } = await import("@/lib/perf");
+      const jobId = q.jobId;
+      await afterResponse(() => runPrintFileJob(jobId));
+    }
+  } catch (e) {
+    console.error(`[webhook] print file job failed: ${(e as Error).message}`);
+  }
   return Response.json({ ok: true, created: r.created, status: r.status });
 }

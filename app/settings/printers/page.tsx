@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Printers" };
 
 const CARD = "rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]";
+const FILE_KEYS = ["printers.print_files_to_order"];
 const DREAMSHIP_KEYS = ["dreamship.sync_enabled", "dreamship.import_wait_hours", "dreamship.sale_pct", "dreamship.min_margin_pct", "dreamship.api_url"];
 const OTHERS: [Maker, string][] = [
   ["prodigi", "Prodigi"],
@@ -35,6 +36,8 @@ export default async function PrintersPage() {
   const tz = s["brand.timezone"];
   const dsRows = DREAMSHIP_KEYS.map((k) => rows.find((r) => r.key === k)).filter((r) => r !== undefined);
   const autoSubmit = conn.account?.settings.autoSubmitImportOrders === true;
+  const dsOrders = orders?.filter((o) => o.kind === "dreamship_artwork") ?? null;
+  const fileJobs = orders?.filter((o) => o.kind === "print_file") ?? null;
   const count = (m: Maker) => (use ? `${use[m].products} ${use[m].products === 1 ? "product" : "products"}, ${use[m].sizes} ${use[m].sizes === 1 ? "size" : "sizes"}` : "Couldn't read the products");
 
   return (
@@ -128,9 +131,9 @@ export default async function PrintersPage() {
 
           <h3 className="mt-5 text-[16px] font-extrabold">Orders</h3>
           <p className="text-[13px] text-ink-2">The latest 50 paid orders with personalised Dreamship lines: what the app did, and Dreamship&apos;s own status. Submitting or cancelling happens in Dreamship and Shopify, never here.</p>
-          {orders === null ? (
+          {dsOrders === null ? (
             <p className="mt-2 text-[14px] text-ink-2">Couldn&apos;t read the orders.</p>
-          ) : orders.length === 0 ? (
+          ) : dsOrders.length === 0 ? (
             <p className="mt-2 text-[14px] text-ink-2">No orders yet.</p>
           ) : (
             <div className="mt-2 overflow-x-auto" tabIndex={0} role="region" aria-label="Dreamship orders">
@@ -145,7 +148,7 @@ export default async function PrintersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((o) => (
+                  {dsOrders.map((o) => (
                     <tr key={o.id} className="border-t border-black/[0.06] align-top">
                       <td className="py-1.5 pr-2 font-semibold">{o.orderName}</td>
                       <td className="py-1.5 pr-2">
@@ -180,6 +183,55 @@ export default async function PrintersPage() {
         </section>
 
         <div className="flex flex-col gap-5">
+          <section className={CARD} aria-labelledby="print-files" data-testid="printer-print-files">
+            <h2 id="print-files" className="text-[19px] font-extrabold">
+              Personalised print files
+            </h2>
+            <p className="mt-1 text-[13px] text-ink-2">For lines the customer personalised (words or a picture) and made by Prodigi, Gelato or in house: the app makes the print file with the layer drawn on and links it from the order in Shopify (<code>mmp_shop.print_files</code>). Dreamship&apos;s are set on its order instead.</p>
+            {FILE_KEYS.map((k) => rows.find((r) => r.key === k)).filter((r) => r !== undefined).map((r) => (
+              <div key={r.key} className="mt-3 flex items-center justify-between gap-3 rounded-[14px] bg-black/[0.03] p-3">
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold">{r.label}</p>
+                  {r.description && <p className="text-[13px] text-ink-2">{r.description}</p>}
+                </div>
+                <SettingField row={r} compact={false} />
+              </div>
+            ))}
+            {fileJobs === null ? (
+              <p className="mt-2 text-[14px] text-ink-2">Couldn&apos;t read them.</p>
+            ) : fileJobs.length === 0 ? (
+              <p className="mt-2 text-[14px] text-ink-2">None yet.</p>
+            ) : (
+              <ul className="mt-2 flex flex-col gap-2 text-[14px]" data-testid="print-file-jobs">
+                {fileJobs.map((o) => (
+                  <li key={o.id} className="rounded-[14px] bg-black/[0.03] p-3" aria-label={`Order ${o.orderName}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{o.orderName}</span>
+                      <Badge tone={o.status === "picture_set" ? "green" : o.status === "waiting" ? "grey" : "amber"}>{o.status === "picture_set" ? "FILES READY" : o.status === "waiting" ? "MAKING" : "NEEDS ATTENTION"}</Badge>
+                      <span className="text-[13px] text-ink-2">
+                        {o.linesDone}/{o.lines} {o.lines === 1 ? "line" : "lines"} · {fmtBiz(o.at, tz)}
+                      </span>
+                    </div>
+                    {o.reason && <p className="mt-1 text-[13px] text-ink-2">{o.reason}</p>}
+                    {o.files.length > 0 && (
+                      <p className="mt-1 flex flex-wrap gap-x-3 text-[13px]">
+                        {o.files.map((f) => (
+                          <a key={f.lineId} href={f.url} target="_blank" rel="noreferrer" className="link">
+                            Line {f.lineId} file
+                          </a>
+                        ))}
+                      </p>
+                    )}
+                    {(o.status === "needs_attention" || o.status === "failed") && (
+                      <div className="mt-1">
+                        <RetryJob jobId={o.id} order={o.orderName} />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           {OTHERS.map(([m, name]) => (
             <section key={m} className={CARD} aria-labelledby={`printer-${m}`} data-testid={`printer-${m}`}>
               <h2 id={`printer-${m}`} className="text-[19px] font-extrabold">

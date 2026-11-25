@@ -1,5 +1,6 @@
 import "server-only";
 import { db, must } from "./client";
+import type { Layer, LayerValues } from "@/lib/shop/layer";
 
 /** Printers' own rows (docs/dreamship.md): the last Dreamship sync report per linked product. */
 
@@ -37,11 +38,18 @@ export type JobLine = {
   artworkId?: number | null;
   done?: boolean;
   error?: string | null;
+  /** The personalisation layer (docs/shop.md): the Shopify product, its layer as it was when the order was paid, and what the customer filled in. */
+  productId?: string | null;
+  layer?: Layer | null;
+  layerValues?: LayerValues | null;
+  /** print_file jobs: who makes it, and the link to the file the app made. */
+  maker?: string | null;
+  fileUrl?: string | null;
 };
 
 export type PrinterJobRow = {
   id: string;
-  kind: "dreamship_artwork";
+  kind: "dreamship_artwork" | "print_file";
   shopify_order_id: string;
   shopify_order_name: string | null;
   lines: JobLine[];
@@ -57,9 +65,9 @@ export type PrinterJobRow = {
 const JOB_COLS = "id, kind, shopify_order_id, shopify_order_name, lines, status, reason, attempts, next_attempt_at, dreamship_order_id, dreamship_status, created_at, updated_at";
 
 /** Queues the job once per order (a repeated webhook changes nothing). Returns the job. */
-export async function queueArtworkJob(input: { shopifyOrderId: string; name: string | null; lines: JobLine[] }): Promise<PrinterJobRow> {
-  must(await db().from("printer_jobs").upsert({ kind: "dreamship_artwork", shopify_order_id: input.shopifyOrderId, shopify_order_name: input.name, lines: input.lines }, { onConflict: "kind,shopify_order_id", ignoreDuplicates: true }), "queue printer job");
-  return must(await db().from("printer_jobs").select(JOB_COLS).eq("kind", "dreamship_artwork").eq("shopify_order_id", input.shopifyOrderId).single(), "read printer job") as PrinterJobRow;
+export async function queuePrinterJob(input: { kind: PrinterJobRow["kind"]; shopifyOrderId: string; name: string | null; lines: JobLine[] }): Promise<PrinterJobRow> {
+  must(await db().from("printer_jobs").upsert({ kind: input.kind, shopify_order_id: input.shopifyOrderId, shopify_order_name: input.name, lines: input.lines }, { onConflict: "kind,shopify_order_id", ignoreDuplicates: true }), "queue printer job");
+  return must(await db().from("printer_jobs").select(JOB_COLS).eq("kind", input.kind).eq("shopify_order_id", input.shopifyOrderId).single(), "read printer job") as PrinterJobRow;
 }
 
 export async function jobById(id: string): Promise<PrinterJobRow | null> {

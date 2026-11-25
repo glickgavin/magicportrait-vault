@@ -14,6 +14,8 @@ import { t, tn } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 import { ShopPreview } from "@/components/shop/ShopPreview";
+import { checkLayerValues, layerActive, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
+import { Personalise } from "./Personalise";
 import { ProductCard } from "./ProductCard";
 import { Stars } from "./Stars";
 import { STORE_CART_EVENT, type StoreCartEvent } from "./StoreCart";
@@ -142,6 +144,16 @@ export function ProductView({
   });
   const picture = state.phase === "ready" ? state.picture : null;
   const result = picture ? (picture.images[picture.chosen] ?? picture.images[0]) : null;
+
+  // The personalisation layer (docs/open-store.md › Personalise): drawn on the preview as they type, a moment later.
+  const layer = layerActive(data.template?.layer) ? data.template.layer : null;
+  const [layerVals, setLayerVals] = useState<LayerValues>(() => ({ art: layer?.art?.required ? (layer.art.choices[0] ?? null) : null }));
+  const [drawVals, setDrawVals] = useState<LayerValues>(layerVals);
+  const [layerError, setLayerError] = useState<{ field: LayerTextId | "art"; text: string } | null>(null);
+  useEffect(() => {
+    const id = window.setTimeout(() => setDrawVals(layerVals), 250);
+    return () => window.clearTimeout(id);
+  }, [layerVals]);
   const creating = state.phase === "creating";
   const petName = names[0]?.trim() || null;
 
@@ -305,6 +317,7 @@ export function ProductView({
           aspect={variant.aspect}
           background={variant.background}
           width={640}
+          layer={layer ? { values: drawVals, art: data.layerArt } : null}
           alt={t("store.yourPictureOn", { product: data.product.title })}
           className="rounded-none lg:rounded-[16px]"
         />
@@ -555,6 +568,21 @@ export function ProductView({
             </p>
           )}
 
+          {picture && layer && (
+            <Personalise
+              layer={layer}
+              art={data.layerArt}
+              values={layerVals}
+              error={layerError}
+              onChange={(v) => {
+                setLayerVals(v);
+                setLayerError(null);
+                // Show their picture on the product, where the words go.
+                if (canDraw) setShown(0);
+              }}
+            />
+          )}
+
           <section className="mx-4 mt-3.5 flex flex-col gap-2.5 lg:mx-0">
             {picture ? (
               <div className="flex gap-2.5">
@@ -686,14 +714,26 @@ export function ProductView({
 
   async function addToCart() {
     if (!picture || !variant) return;
+    let layerBody: LayerValues | undefined;
+    if (layer) {
+      const c = checkLayerValues(layer, layerVals);
+      if (!c.ok) {
+        const label = c.field === "art" ? (layer.art?.label ?? "") : (layer.texts.find((x) => x.id === c.field)?.label ?? "");
+        setLayerError({ field: c.field, text: c.error.endsWith("please fill this in.") ? t("store.layerFill", { label }) : c.error.endsWith("please choose one.") ? t("store.layerChoose", { label }) : c.error });
+        return;
+      }
+      layerBody = c.values;
+    }
     setAdding(true);
     setNote(null);
-    const r = await storeFetch("/api/store/cart/lines", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ generationId: picture.id, variantId: variant.id, quantity: qty, from: from === "related" ? "related" : "product" }) }).catch(() => null);
+    const r = await storeFetch("/api/store/cart/lines", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ generationId: picture.id, variantId: variant.id, quantity: qty, from: from === "related" ? "related" : "product", ...(layerBody ? { layer: layerBody } : {}) }) }).catch(() => null);
     setAdding(false);
     if (!r?.ok) {
-      setNote(t("store.addError"));
+      const b = (await r?.json().catch(() => null)) as { error?: string; message?: string } | null;
+      setNote(b?.error === "layer_invalid" && b.message ? b.message : t("store.addError"));
       return;
     }
+    if (layer && layerBody) trackClient("store_layer_filled", { product_id: pid, has_text1: Boolean(layerBody.t1), has_text2: Boolean(layerBody.t2), has_art: Boolean(layerBody.art) });
     const body = (await r.json()) as { cart: StoreCartEvent["cart"] };
     window.dispatchEvent(new CustomEvent<StoreCartEvent>(STORE_CART_EVENT, { detail: { cart: body.cart, open: true } }));
   }
