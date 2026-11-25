@@ -559,21 +559,13 @@ export function ProductView({
                 </section>
               );
             })}
-          {!picture && (
-            <p className="mx-4 mt-3 text-[12px] leading-[1.5] text-[#616161] lg:mx-0">
-              {t("store.consent")}{" "}
-              <a href="https://magicportraits.ai/policies/privacy-policy" className="underline" target="_blank" rel="noreferrer">
-                {t("store.privacy")}
-              </a>
-            </p>
-          )}
-
-          {picture && layer && (
+          {layer && (
             <Personalise
               layer={layer}
               art={data.layerArt}
               values={layerVals}
               error={layerError}
+              note={picture ? null : t("store.personaliseLater")}
               onChange={(v) => {
                 setLayerVals(v);
                 setLayerError(null);
@@ -581,6 +573,15 @@ export function ProductView({
                 if (canDraw) setShown(0);
               }}
             />
+          )}
+
+          {!picture && (
+            <p className="mx-4 mt-3 text-[12px] leading-[1.5] text-[#616161] lg:mx-0">
+              {t("store.consent")}{" "}
+              <a href="https://magicportraits.ai/policies/privacy-policy" className="underline" target="_blank" rel="noreferrer">
+                {t("store.privacy")}
+              </a>
+            </p>
           )}
 
           <section className="mx-4 mt-3.5 flex flex-col gap-2.5 lg:mx-0">

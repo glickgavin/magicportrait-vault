@@ -709,3 +709,6 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 - The check now lists the shops (`/shops/`) to prove the key and name the account. Dreamship's order settings aren't in its API and show as "Not reported". Test added.
 - **Blocked:** Part B uploads to `/artworks/` and patches line items, and neither exists in Dreamship's public API. The fix is a product per personalised line plus the documented line match (`docs/dreamship.md` › Dreamship's public API). It waits for Gavin to approve rewording allowed write 7.
 
+
+### 25 Nov: Personalise it shows from the start
+- **Fixed:** the Magic Store showed "Personalise it" only after the picture was made, so on the posters it looked missing. It now shows under the photo slots from the start ("you'll see it on your picture once it's made"); what's typed first is kept. The required check stays at Add to cart, so it never stops a picture being made. e2e `store-layer.spec.ts` checks it before upload.
