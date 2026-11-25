@@ -1,5 +1,4 @@
 import "server-only";
-import sharp from "sharp";
 import { z } from "zod";
 import { dueJobs, jobById, queuePrinterJob, recentJobs, updateJob, type JobLine, type PrinterJobRow } from "@/lib/db/printers";
 import { lineForFulfilment } from "@/lib/db/shop";
