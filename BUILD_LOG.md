@@ -703,3 +703,9 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 ### Blocked
 - **Linking the print files from the Shopify order** (`mmp_shop.print_files` on the order, `metafieldsSet`) is built, but behind the setting `printers.print_files_to_order`, **off**. CLAUDE.md's allowed write 1 covers only the mug choice on an order, so it needs Gavin's OK to extend it (the proposed wording is in the summary). Also to confirm with whoever runs the print system: that it reads that metafield and uses the app's file for those lines instead of building its own. Until both, the files are made and listed on Settings › Printers, and Dreamship lines (allowed write 7) already get the composed file.
 - Migrations `20261125000001_layer_art.sql` and `…0002_print_files.sql` and the new seed row are applied locally only; magic-vault gets them with the next merge.
+
+## 24 Nov: Dreamship connection check
+- Settings › Printers › Check connection failed on every try. Dreamship's public API has no `/business/` or `/business/settings/` (both return 404), so the account came back empty.
+- The check now lists the shops (`/shops/`) to prove the key and name the account. Dreamship's order settings aren't in its API and show as "Not reported". Test added.
+- **Blocked:** Part B uploads to `/artworks/` and patches line items, and neither exists in Dreamship's public API. The fix is a product per personalised line plus the documented line match (`docs/dreamship.md` › Dreamship's public API). It waits for Gavin to approve rewording allowed write 7.
+

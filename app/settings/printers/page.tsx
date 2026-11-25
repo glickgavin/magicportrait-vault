@@ -73,7 +73,7 @@ export default async function PrintersPage() {
           </div>
 
           <h3 className="mt-5 text-[16px] font-extrabold">Dreamship&apos;s own order settings</h3>
-          <p className="text-[13px] text-ink-2">Read from Dreamship; change them in Dreamship. The app changes nothing because of them.</p>
+          <p className="text-[13px] text-ink-2">Set in Dreamship, and the app changes nothing because of them. Dreamship&apos;s API doesn&apos;t share them, so they show as Not reported: check them in Dreamship&apos;s settings.</p>
           <dl className="mt-2 grid grid-cols-[1fr_max-content] gap-x-4 gap-y-1.5 text-[14px]" data-testid="dreamship-order-settings">
             <dt>Auto-import orders with Dreamship products</dt>
             <dd className="font-semibold">{conn.account ? onOff(conn.account.settings.autoImportOrders) : "–"}</dd>

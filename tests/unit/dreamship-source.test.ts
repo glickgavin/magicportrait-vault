@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { getDef, validateSetting } from "@/lib/settings/registry";
-import { DreamshipError, DreamshipFixtures, DreamshipLive, PATHS, parseAccount, parseOrder, parseProduct } from "@/lib/sources/dreamship";
+import { DreamshipError, DreamshipFixtures, DreamshipLive, PATHS, parseAccount, parseOrder, parseProduct, parseShops } from "@/lib/sources/dreamship";
 
 describe("Dreamship source: fixtures", () => {
   it("reads the account and Dreamship's own order settings", async () => {
@@ -88,6 +88,11 @@ describe("Dreamship responses", () => {
     const o = parseOrder({ id: 9, reference_id: "5003", status: "draft", line_items: [{ id: 90, product_variant_id: 45378125, quantity: 2, print_areas: [{ key: "8x10", artwork_id: 1 }] }] })!;
     expect(o.lineItems[0]).toEqual({ id: 90, productVariantId: 45378125, itemVariantId: null, quantity: 2, printAreas: [{ key: "8x10", artworkId: 1 }] });
     expect(parseAccount({ business_name: "Storyboards Inc", subscription_plan: "basic" }, { auto_submit_order_import_orders: true, auto_submit_api_orders: false })).toEqual({ businessName: "Storyboards Inc", plan: "basic", settings: { autoImportOrders: null, autoSubmitImportOrders: true, autoSubmitApiOrders: false } });
+  });
+  it("reads the account from the shop list (Dreamship's API has no account endpoint)", () => {
+    expect(parseShops({ count: 1, results: [{ id: 15218, name: "Storyboards", channel: "Shopify" }] })).toEqual({ businessName: "Storyboards (Shopify)", plan: null, settings: { autoImportOrders: null, autoSubmitImportOrders: null, autoSubmitApiOrders: null } });
+    expect(parseShops([{ id: 1, shop_name: "Etsy shop" }]).businessName).toBe("Etsy shop");
+    expect(parseShops({ results: [] }).businessName).toBe("Connected (no shops)");
   });
   it("a refusal is a DreamshipError with a code", () => {
     expect(new DreamshipError("x", "not_editable", 400)).toMatchObject({ code: "not_editable", status: 400 });

@@ -33,6 +33,14 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
   - **No template yet**, so the Magic Store hides it, although it's on the Storefront channel. Adding a template puts it on sale: wait for Part B, or take it off the channel first.
   - Dreamship's minimum for blankets is 150 dpi, with 600 px of safe margin and 300 px of bleed per side.
   - Cost $14.09 / $29.39 / $38.59 against $59.99 / $79.99 / $99.99.
+- **Museum Quality "Mona Lisa" Poster** (Shopify 8916356464836, Dreamship product 9974634, catalog item 287 Standard Poster, theme `mona-lisa`). Print rules and text filled in on 24 Nov:
+  - 8x10: item variant 12915, print area 2400x3000, product variant 45380612, cost $2.89, price $29.99.
+  - 12x18: item variant 4324, print area 3600x5400, product variant 45380613, cost $6.69, price $39.99.
+  - 16x24: item variant 4329, print area 4800x7200, product variant 45380610, cost $7.99, price $45.99.
+  - 20x30: item variant 12917, print area 6000x9000, product variant 45380611, cost $6.29, price $69.99.
+  - `extra` with `item_id` 287, `lead_days` 1-3.
+  - `max_crop_pct` 40 on the three 2:3 sizes, because Mona Lisa paints 1024 × 1024 squares and those sizes cut a third.
+  - Minimum 250 dpi. No template yet, and not on the Storefront channel, so it's hidden.
 - **Dreamship's print rules:** every area is printed at 300 dpi with a minimum of 250 dpi. The safe area is about 2% in from each edge, and the art must run to the edges (`get_print_areas`, item 958).
 
 ## Part A: Link and sync (reads Dreamship; writes only `mmp_shop`)
@@ -129,6 +137,32 @@ A new Settings page, `/settings/printers` (404 unless super user, like every Set
 **Prodigi, Gelato and In house cards**
 - How many products and sizes use each maker.
 - "Orders go to the existing print system straight from Shopify." No settings yet. The cards are there so a printer's settings have one home when they're added.
+
+## Dreamship's public API (checked 24 Nov)
+
+From docs.dreamship.com (its `llms.txt` index) after the first live connection check failed. Base `https://api.dreamship.com/v1`, `Authorization: Bearer <key>`.
+
+- **What exists:**
+  - **Orders:**
+    - list, filtered by `reference_id`, `status`, `shop` and others;
+    - create;
+    - get, cancel, submit a draft, move to draft, update address or shipping, estimate.
+  - **Shops:** list, get, create and update.
+  - **Products:** list, get, create, update, delete and reprocess.
+  - **Categories, items (with ship zones), and mockup template groups.**
+  - **Line items:** create a ticket, and **match a line to a product variant** (`POST /orders/{order_id}/line-items/{id}/match/` with `product_variant` and `save_match`, for a draft order's line).
+  - **Creating an order or a product** takes artwork as print areas: `{key, url, resize, position, rotate, background_hex, ai_upscale}`.
+- **What doesn't exist:**
+  - an account or business endpoint, or Dreamship's order settings (auto-import and auto-submit);
+  - an artwork upload;
+  - any way to change an existing line's artwork;
+  - product-variant or item print-area endpoints.
+- **Fixed 24 Nov:** Check connection used `/business/` and `/business/settings/`, which return 404, so it always failed. It now lists the shops, which proves the key works and names the account. Dreamship's order settings show as "Not reported"; check them in Dreamship.
+- **Part B as built can't work:** it uploads to `/artworks/` and patches the line item, and neither exists.
+  - **Fix (needs a new approval):** for each personalised line, **create a Dreamship product** with the customer's picture (`POST /products/`: the item, that one item variant, the print area with the picture's URL, `resize` fill, `ai_upscale`). Then **match the imported line to it**.
+  - The order stays where Dreamship put it; a draft waits for a person.
+  - This creates one Dreamship product per personalised line, so allowed write 7 needs rewording first.
+- **Part A:** reading a product works (`/products/{id}/`). Print areas come from the product's design. The item print-areas and product-variant paths it also tries may 404, and it falls back without them.
 
 ## Build parts
 
