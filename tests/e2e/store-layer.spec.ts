@@ -43,6 +43,31 @@ test.describe("Personalise in the Magic Store", () => {
     await admin().from("layer_art").delete().like("name", "e2e-%");
   });
 
+  test("a product whose layer asks for the name can stop asking for it next to the photo: one name box, none sent to Imagen", async ({ page }) => {
+    await setUpLayer(page, `e2e-badge2-${test.info().project.name}`);
+    await page.goto(`/settings/shop/products/${PILLOW}`);
+    const ask = page.getByTestId("ask-name");
+    await expect(ask.getByTestId("ask-name-twice")).toContainText("asked for a name twice");
+    await ask.getByLabel(/Ask for the pet's name/).uncheck();
+    await expect(ask.getByTestId("ask-name-twice")).toHaveCount(0);
+    await page.getByRole("button", { name: "Save Magic Store fields" }).click();
+    await expect(page.getByTestId("store-fields").getByRole("status")).toHaveText("Saved to Shopify.");
+    await page.reload();
+    await expect(page.getByTestId("ask-name").getByLabel(/Ask for the pet's name/)).not.toBeChecked();
+
+    await page.goto(`/store/product/${PILLOW}`);
+    await expect(page.getByLabel("Their name (optional, shown on the picture)")).toHaveCount(0);
+    await expect(page.getByTestId("store-personalise").getByLabel(/Pet's name/)).toBeVisible();
+    await page.getByLabel("Choose a photo: Add their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
+    await page.getByTestId("store-create").click();
+    await expect(page.getByTestId("store-ready")).toBeVisible({ timeout: 20_000 });
+    const gen = (await admin().from("store_generations").select("names").eq("product_id", `gid://shopify/Product/${PILLOW}`).order("created_at", { ascending: false }).limit(1).single()).data!;
+    expect(gen.names).toEqual([]);
+    await expectNoAxeViolations(page);
+    // Put it back for the next test.
+    await page.request.post("/api/test/reset-fixtures?shop=1");
+  });
+
   test("fill in the words and pick a badge: the preview changes, and the cart line carries them", async ({ page }) => {
     const art = `e2e-badge-${test.info().project.name}`;
     await setUpLayer(page, art);

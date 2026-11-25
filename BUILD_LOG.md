@@ -712,3 +712,8 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 
 ### 25 Nov: Personalise it shows from the start
 - **Fixed:** the Magic Store showed "Personalise it" only after the picture was made, so on the posters it looked missing. It now shows under the photo slots from the start ("you'll see it on your picture once it's made"); what's typed first is kept. The required check stays at Add to cart, so it never stops a picture being made. e2e `store-layer.spec.ts` checks it before upload.
+
+### 25 Nov: "Ask for the pet's name" per product
+- **Done:** product field `ask_name` (in `generation`, store default `open_store.ask_name`, on, new seed row). A checkbox on Settings › Shop › product; off hides the name box next to the photo and `startGeneration` sends Imagen no names. A note on the product page and in the template editor's layer section while it's on and the layer has a text box. Copy settings carries it.
+- **Fixed with it:** after a plain save on the product page, "Saved to Shopify." vanished because Part A keyed the editors on their saved values (it broke `shop-settings.spec`). They're now keyed on a `?copied=` marker that only Copy settings sets.
+- **Tests:** unit `ask-name.test.ts` (3); e2e `store-layer.spec.ts` (turn it off: one name box, no names sent), `shop-settings`, `shop-copy` and the open-store suites pass.

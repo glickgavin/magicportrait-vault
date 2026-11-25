@@ -25,7 +25,7 @@ const GROUPS: [string, string, string[]][] = [
   ["store-page", "Product page", ["open_store.reassurance", "open_store.how_it_works", "open_store.shipping_days"]],
   ["store-pictures", "Pictures: limits and timings", ["open_store.upload_max_px", "open_store.min_photo_px", "open_store.slow_after_s", "open_store.timeout_s", "open_store.generations_per_visitor_per_day", "open_store.generations_per_ip_per_day", "open_store.generations_daily_cap"]],
   ["store-visitors", "Visitors and the email ask", ["open_store.visitor_cookie_days", "open_store.ask_email_while_painting", "open_store.email_link_days", "open_store.emails_per_address_per_day"]],
-  ["store-defaults", "Store defaults for every product", ["open_store.photos", "open_store.name_max", "open_store.photo_tips", "open_store.subject", "open_store.images_to_show", "open_store.step_labels"]],
+  ["store-defaults", "Store defaults for every product", ["open_store.photos", "open_store.ask_name", "open_store.name_max", "open_store.photo_tips", "open_store.subject", "open_store.images_to_show", "open_store.step_labels"]],
 ];
 
 export default async function MagicStoreSettings() {

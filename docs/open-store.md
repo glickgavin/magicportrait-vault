@@ -162,6 +162,8 @@ Product fields are declared in `lib/settings/registry.ts` next to the store's se
 
 Names go one per photo, when the theme prints names; `name_max` applies to each.
 
+**`ask_name`** (25 Nov; boolean, store default `open_store.ask_name`, on): whether the product asks for the pet's name next to the photo, which Imagen uses to make the picture. Off: no name box, and the server sends no names to Imagen whatever the browser sends. It's for products whose personalisation layer asks for the name, so customers are never asked twice. Settings › Shop › product shows a checkbox, and a note while it's on and the template's layer has a text box (the template editor's layer section shows the same note). Copy settings carries it.
+
 ### Imagen API
 
 The server, never the browser, calls Imagen's public API, the same one the main site uses (`/functions/v1/api-generate`, `/api-sessions/<id>`, `/api-themes`):

@@ -86,6 +86,8 @@ export function LayerEditor({
   sample,
   art,
   setArt,
+  askName = false,
+  productLegacyId = "",
 }: {
   template: Template;
   setTemplate: React.Dispatch<React.SetStateAction<Template>>;
@@ -95,6 +97,8 @@ export function LayerEditor({
   sample: string | null;
   art: ArtItem[];
   setArt: React.Dispatch<React.SetStateAction<ArtItem[]>>;
+  askName?: boolean;
+  productLegacyId?: string;
 }) {
   const uid = useId();
   const layer = template.layer;
@@ -184,6 +188,15 @@ export function LayerEditor({
         Let customers personalise this product
       </label>
 
+      {on && layer && askName && layer.texts.length > 0 && (
+        <p role="note" className="rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[13px] text-[#7a4a00]" data-testid="layer-name-twice">
+          This product also asks for the pet&apos;s name next to the photo (for the picture), so customers may be asked twice. If a text box here is for the name, untick “Ask for the pet&apos;s name” on the{" "}
+          <a href={`/settings/shop/products/${productLegacyId}#magic`} className="font-bold underline">
+            product&apos;s page
+          </a>
+          .
+        </p>
+      )}
       {on && layer && (
         <>
           <div

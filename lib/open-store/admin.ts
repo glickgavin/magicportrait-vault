@@ -61,7 +61,7 @@ export async function productRow(legacyId: string): Promise<{ ok: true; row: Pro
 // ---------- Saving one product's shared and Magic Store fields ----------
 
 const productField = <K extends ProductFieldKey>(k: K) => (PRODUCT_FIELDS[k] as unknown as ProductFieldDef<unknown>).schema;
-const GENERATION_KEYS = ["photos", "name_max", "photo_tips", "subject", "images_to_show", "step_labels"] as const;
+const GENERATION_KEYS = ["photos", "ask_name", "name_max", "photo_tips", "subject", "images_to_show", "step_labels"] as const;
 
 /** A field set to null is cleared (the store default applies again); a field left out isn't touched. */
 export const storeFieldsSchema = z.object({
@@ -76,6 +76,7 @@ export const storeFieldsSchema = z.object({
       generation: z
         .object({
           photos: productField("photos").nullable().optional(),
+          ask_name: productField("ask_name").nullable().optional(),
           name_max: productField("name_max").nullable().optional(),
           photo_tips: productField("photo_tips").nullable().optional(),
           subject: productField("subject").nullable().optional(),

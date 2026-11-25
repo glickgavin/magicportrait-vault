@@ -204,6 +204,7 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('dreamship.api_url', '"https://api.dreamship.com/v1"'::jsonb, 'text', 'printers', 'Dreamship API address', null, null, 'seed', now()),
   ('open_store.posthog_dashboard_url', '""'::jsonb, 'text', 'open_store', 'PostHog dashboard link', 'The “Magic Store” dashboard, linked from this page.', null, 'seed', now()),
   ('open_store.photos', '[{"label":"Add their photo","name_label":"Their name (optional, shown on the picture)","name_placeholder":"Teddy"}]'::jsonb, 'json', 'open_store', 'Default photo slots'' words', 'Slot 1 uses the first entry''s label and name label, slot 2 the second, and so on. How many photos a product takes comes from its Imagen theme.', null, 'seed', now()),
+  ('open_store.ask_name', 'true'::jsonb, 'boolean', 'open_store', 'Ask for the pet''s name by default', 'The name next to the photo, used by Imagen to make the picture. A product can turn it off (e.g. when its personalisation layer asks for the name).', null, 'seed', now()),
   ('open_store.name_max', '14'::jsonb, 'number', 'open_store', 'Default name length (characters)', null, null, 'seed', now()),
   ('open_store.photo_tips', '"Best results: one pet, facing the camera, in good light, with the whole head in the picture."'::jsonb, 'text', 'open_store', 'Default photo tips', null, null, 'seed', now()),
   ('open_store.subject', '"pet"'::jsonb, 'choice', 'open_store', 'Default subject (changes the copy only)', null, '["pet","person","any"]'::jsonb, 'seed', now()),

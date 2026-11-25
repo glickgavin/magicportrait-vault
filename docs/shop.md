@@ -387,6 +387,8 @@ A product's template can carry a layer the Magic Store customer fills in: **up t
 
 **Printed.** The print file is composed by the app at the size's print pixels: the picture cropped as the customer saw it, then the layer drawn by the same `drawLayer` (`lib/shop/print-file.ts`). For Dreamship lines it's the artwork set on Dreamship's imported order; for every other printer it's stored and linked from the order (`docs/data.md` › Print files).
 
+**One name, not two.** A product that asks for the pet's name next to the photo (for Imagen) and also has a name box in its layer would ask twice: untick **Ask for the pet's name** on the product's page (`docs/open-store.md` › `ask_name`). Both pages warn while both are on.
+
 **Privacy.** The words are the customer's own: never in PostHog, Klaviyo, `activity_log` or logs, masked in session replay. Events carry only whether something was filled in (`store_layer_filled`, `personalised` on `store_added_to_cart`).
 
 ## Routes (as built)
