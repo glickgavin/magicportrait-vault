@@ -74,15 +74,15 @@ test.describe("Personalise in the Magic Store", () => {
 
     await page.goto(`/store/product/${PILLOW}`);
     // The step is there next to the photo, before any picture is made; the name can be typed first.
+    // Just the fields, next to the photo: no heading or explanation.
     const step = page.getByTestId("store-personalise");
-    await expect(step.getByRole("heading", { name: "Personalise it" })).toBeVisible();
-    await expect(step).toContainText("you'll see it on your picture once it's made");
+    await expect(step.getByLabel(/Pet's name/)).toBeVisible();
+    await expect(page.getByText("Personalise it")).toHaveCount(0);
     await step.getByLabel(/Pet's name/).fill("Bis");
     await page.getByLabel("Choose a photo: Add their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
     await page.getByTestId("store-create").click();
     await expect(page.getByTestId("store-ready")).toBeVisible({ timeout: 20_000 });
 
-    await expect(step).toContainText("Shown on your preview and printed just like this.");
     await expect(step.getByLabel(/Pet's name/)).toHaveValue("Bis");
     await step.getByLabel(/Pet's name/).fill("");
     // The name is required: Add to cart says so and adds nothing.

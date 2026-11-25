@@ -120,6 +120,13 @@ export function ProductView({
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const relatedRef = useRef<HTMLElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
+  // While the picture is made: on phones the progress shows where they added their photo, not up in the gallery.
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const wide = useIsWide();
+  const wideRef = useRef(wide);
+  useEffect(() => {
+    wideRef.current = wide;
+  }, [wide]);
   const started = useRef<number | null>(null);
   const slowSent = useRef(false);
   const pid = data.product.legacyId;
@@ -138,8 +145,10 @@ export function ProductView({
         started.current = null;
         setShown(0);
       }
-      // The steps and then the picture show in the picture area, above the button on phones.
-      if (e === "started" || e === "ready") stageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      // Phones: the steps show around their photo (scrolled into view); then the finished picture in the gallery.
+      // Desktop: the gallery stays beside the form, so both show there.
+      if (e === "started") (wideRef.current ? stageRef.current : progressRef.current)?.scrollIntoView({ block: wideRef.current ? "start" : "center", behavior: "smooth" });
+      if (e === "ready") stageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
     },
   });
   const picture = state.phase === "ready" ? state.picture : null;
@@ -305,6 +314,18 @@ export function ProductView({
     </div>
   );
 
+  // The email offer while we paint, under the progress (one place at a time).
+  const emailBits = (
+    <>
+      {askEmail && state.phase === "creating" && state.id && !emailDone && !emailClosed && <EmailAsk generationId={state.id} productId={pid} name={petName} onDone={() => setEmailDone(true)} onClose={() => setEmailClosed(true)} />}
+      {emailDone && (
+        <p role="status" className="mx-4 rounded-[14px] bg-pink-tint px-4 py-3 text-[14px] font-bold text-[#8E047B] lg:mx-0">
+          {t("store.emailWillSend")}
+        </p>
+      )}
+    </>
+  );
+
   const mainPicture = () => {
     if (slide?.kind === "drawn" && result && data.template && variant?.aspect)
       return (
@@ -347,34 +368,13 @@ export function ProductView({
             {slide?.kind === "media" && slide.example && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.example")}</span>}
             {!creating && data.pricing.pct != null && <span className="absolute right-3 top-3 rounded-full bg-[#B8059F] px-2.5 py-[5px] text-[12px] font-extrabold tracking-[0.06em] text-white">{t("store.off", { pct: Math.round(data.pricing.pct * 100) })}</span>}
             {result && theirPhoto && slide?.kind !== "media" && <img src={theirPhoto} alt={t("store.yourPhoto")} className="absolute bottom-3 left-3 h-14 w-14 rounded-full border-[3px] border-white object-cover shadow-md" />}
-            {creating && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6" role="status" aria-live="polite" data-testid="store-creating">
-                <span className="relative flex h-[112px] w-[112px] items-center justify-center">
-                  <span className="absolute inset-0 animate-spin rounded-full border-4 border-[#F6D3EF] border-t-[#DD07C4]" aria-hidden="true" />
-                  {theirPhoto ? <img src={theirPhoto} alt="" className="h-[92px] w-[92px] rounded-full object-cover" /> : <span className="h-[92px] w-[92px] rounded-full bg-pink-tint" aria-hidden="true" />}
-                </span>
-                <ol className="flex w-full max-w-[300px] flex-col gap-2 rounded-[14px] bg-white/[0.94] p-3.5 text-[14px] shadow-sm">
-                  {steps.map((s, i) => {
-                    const done = state.step > i;
-                    const now = state.step === i;
-                    return (
-                      <li key={i} className={cn("flex items-center gap-2.5", done ? "text-[#2b2b2b]" : now ? "font-extrabold text-[#1a1a1a]" : "text-[#8a8a8a]")} aria-current={now ? "step" : undefined}>
-                        {done ? <Check className="h-4 w-4 text-[#1f8a4c]" aria-hidden="true" /> : now ? <Loader2 className="h-4 w-4 animate-spin text-[#B8059F]" aria-hidden="true" /> : <span className="h-4 w-4 rounded-full border-2 border-[#D9D5CA]" aria-hidden="true" />}
-                        {s}
-                      </li>
-                    );
-                  })}
-                </ol>
-                {state.slow && <p className="max-w-[300px] rounded-[12px] bg-white/[0.94] px-3 py-2 text-center text-[14px] font-bold text-[#8E047B]">{t("store.slow")}</p>}
+            {creating && wide && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
+                <Progress photo={theirPhoto} steps={steps} step={state.step} slow={state.slow} />
               </div>
             )}
           </div>
-          {creating && askEmail && state.id && !emailDone && !emailClosed && <EmailAsk generationId={state.id} productId={pid} name={petName} onDone={() => setEmailDone(true)} onClose={() => setEmailClosed(true)} />}
-          {creating && emailDone && (
-            <p role="status" className="mx-4 rounded-[14px] bg-pink-tint px-4 py-3 text-[14px] font-bold text-[#8E047B] lg:mx-0">
-              {t("store.emailWillSend")}
-            </p>
-          )}
+          {creating && wide && emailBits}
           {!creating && slides.length > 1 && (
             <div className="flex gap-2 px-4 lg:flex-col lg:px-0">
               {slides.map((g, i) => (
@@ -495,7 +495,12 @@ export function ProductView({
                       e.target.value = "";
                     }}
                   />
-                  {p ? (
+                  {creating && !wide && i === 0 ? (
+                    <div ref={progressRef} className="ph-no-capture scroll-mt-[88px] flex flex-col gap-3 rounded-[16px] border border-[#E7E3D8] bg-[#FFF8FD] px-4 py-5" data-ph-mask>
+                      <Progress photo={p?.url || theirPhoto} steps={steps} step={state.step} slow={state.slow} />
+                      {emailBits}
+                    </div>
+                  ) : p ? (
                     <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border border-[#E7E3D8] p-2.5" data-testid="photo-added" data-ph-mask>
                       {p.url ? <img src={p.url} alt={t("store.yourPhoto")} className="h-14 w-14 flex-none rounded-[10px] object-cover" /> : <span className="h-14 w-14 flex-none rounded-[10px] bg-page" aria-hidden="true" />}
                       <span className="min-w-0 flex-1 text-[14px] font-extrabold">{t("store.photoAdded")}</span>
@@ -565,7 +570,6 @@ export function ProductView({
               art={data.layerArt}
               values={layerVals}
               error={layerError}
-              note={picture ? null : t("store.personaliseLater")}
               onChange={(v) => {
                 setLayerVals(v);
                 setLayerError(null);
@@ -832,4 +836,42 @@ function EmailAsk({ generationId, productId, name, onDone, onClose }: { generati
       </button>
     </form>
   );
+}
+
+/** The picture being made: their photo in a spinning ring, then each step. */
+function Progress({ photo, steps, step, slow }: { photo: string | null; steps: string[]; step: number; slow: boolean }) {
+  return (
+    <div className="flex w-full flex-col items-center gap-5" role="status" aria-live="polite" data-testid="store-creating">
+      <span className="relative flex h-[112px] w-[112px] items-center justify-center">
+        <span className="absolute inset-0 animate-spin rounded-full border-4 border-[#F6D3EF] border-t-[#DD07C4]" aria-hidden="true" />
+        {photo ? <img src={photo} alt="" className="h-[92px] w-[92px] rounded-full object-cover" /> : <span className="h-[92px] w-[92px] rounded-full bg-pink-tint" aria-hidden="true" />}
+      </span>
+      <ol className="flex w-full max-w-[300px] flex-col gap-2 rounded-[14px] bg-white/[0.94] p-3.5 text-[14px] shadow-sm">
+        {steps.map((s, i) => {
+          const done = step > i;
+          const now = step === i;
+          return (
+            <li key={i} className={cn("flex items-center gap-2.5", done ? "text-[#2b2b2b]" : now ? "font-extrabold text-[#1a1a1a]" : "text-[#8a8a8a]")} aria-current={now ? "step" : undefined}>
+              {done ? <Check className="h-4 w-4 text-[#1f8a4c]" aria-hidden="true" /> : now ? <Loader2 className="h-4 w-4 animate-spin text-[#B8059F]" aria-hidden="true" /> : <span className="h-4 w-4 rounded-full border-2 border-[#D9D5CA]" aria-hidden="true" />}
+              {s}
+            </li>
+          );
+        })}
+      </ol>
+      {slow && <p className="max-w-[300px] rounded-[12px] bg-white/[0.94] px-3 py-2 text-center text-[14px] font-bold text-[#8E047B]">{t("store.slow")}</p>}
+    </div>
+  );
+}
+
+/** True on desktop widths (the lg breakpoint), where the gallery sits beside the form. */
+function useIsWide(): boolean {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia("(min-width: 1024px)");
+    const on = () => setWide(m.matches);
+    on();
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return wide;
 }

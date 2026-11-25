@@ -4,6 +4,11 @@ import { expect, type Page } from "@playwright/test";
 export async function expectNoAxeViolations(page: Page, opts: { exclude?: string[] } = {}) {
   let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]);
   for (const sel of opts.exclude ?? []) builder = builder.exclude(sel);
+  // A smooth scroll still moving (e.g. to the finished picture) briefly puts links under the sticky header: wait it out.
+  await page.waitForFunction(() => new Promise<boolean>((done) => {
+    const y = window.scrollY;
+    setTimeout(() => done(window.scrollY === y), 300);
+  }), undefined, { timeout: 5_000 }).catch(() => undefined);
   const results = await builder.analyze();
   const summary = results.violations.map((v) => `${v.id}: ${v.help} → ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
   expect(summary, summary.join("\n")).toEqual([]);

@@ -52,6 +52,12 @@ test.describe("open store pictures", () => {
     const creating = page.getByTestId("store-creating");
     await expect(creating).toBeVisible();
     await expect(creating).toContainText("Painting Teddy as The Admiral");
+    // Phones: the progress is where they added their photo (scrolled to), not up in the gallery; desktop: over the gallery.
+    const inGallery = page.getByTestId("store-stage").getByTestId("store-creating");
+    if (test.info().project.name === "mobile") {
+      await expect(inGallery).toHaveCount(0);
+      await expect(creating).toBeInViewport();
+    } else await expect(inGallery).toBeVisible();
     await expect(page.getByTestId("store-create")).toHaveText("Creating their picture…");
 
     await expect(page.getByTestId("store-ready")).toContainText("Teddy is ready", { timeout: 20_000 });

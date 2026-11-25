@@ -10,17 +10,12 @@ import { cn } from "@/lib/utils";
  * product's template offers. The preview above redraws as they type; nothing is sent until Add to cart, where the
  * server checks it all again. The words are the customer's own: masked in session replay, never tracked.
  */
-export function Personalise({ layer, art, values, onChange, error, note }: { layer: Layer; art: { id: string; name: string; url: string }[]; values: LayerValues; onChange: (v: LayerValues) => void; error: { field: LayerTextId | "art"; text: string } | null; note?: string | null }) {
+export function Personalise({ layer, art, values, onChange, error }: { layer: Layer; art: { id: string; name: string; url: string }[]; values: LayerValues; onChange: (v: LayerValues) => void; error: { field: LayerTextId | "art"; text: string } | null }) {
   const uid = useId();
   const choices = layer.art ? layer.art.choices.map((id) => art.find((a) => a.id === id)).filter((a) => a !== undefined) : [];
   return (
-    <section className="mx-4 mt-6 flex flex-col gap-3.5 lg:mx-0" aria-labelledby={`${uid}-title`} data-testid="store-personalise">
-      <div>
-        <h2 id={`${uid}-title`} className="text-[17px] font-extrabold text-[#1a1a1a]">
-          {t("store.personalise")}
-        </h2>
-        <p className="text-[13px] text-[#616161]">{note ?? t("store.personaliseSub")}</p>
-      </div>
+    // No heading: the fields sit with the photo's own, so it's just "the pet's name" (or a picture) to fill in.
+    <section className="mx-4 mt-6 flex flex-col gap-3.5 lg:mx-0" aria-label={t("store.personalise")} data-testid="store-personalise">
       {layer.texts.map((box) => {
         const v = values[box.id] ?? "";
         const bad = error?.field === box.id;
