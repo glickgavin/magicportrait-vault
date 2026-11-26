@@ -195,6 +195,17 @@ export async function updateStoreFields(actor: { email: string }, input: StoreFi
 
   if (!change.set.length && !change.clear.length && !variantChanges.length) return { ok: true };
   const src = await getShopCatalogSource();
+  // A theme Imagen added (or switched on) since the last "Refresh themes from Imagen" isn't in Shopify's dropdown
+  // yet, and Shopify refuses a value outside it: add it first (the same mmp_shop definition write as Refresh).
+  const newTheme = change.set.find((x) => x.key === "imagen_theme")?.value;
+  if (newTheme) {
+    const choices = (await src.fieldDefinitions(ns)).find((d) => d.ownerType === "PRODUCT" && d.key === "imagen_theme")?.choices ?? [];
+    if (choices.length && !choices.includes(newTheme)) {
+      const r = await src.setThemeChoices(ns, [...choices, newTheme].sort());
+      if (!r.ok) return { ok: false, status: 502, error: `Shopify wouldn't add “${newTheme}” to its theme list (${r.reason}). Try Refresh themes from Imagen on Settings › Magic Store.` };
+      changed.push("imagen_theme_choices");
+    }
+  }
   if (change.set.length || change.clear.length) {
     const r = await src.setProductMetafields(p.id, ns, change);
     if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };

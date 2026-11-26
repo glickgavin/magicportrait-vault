@@ -788,3 +788,8 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 - **Checked:** no other server file calls a value exported from a `"use client"` file (scripted scan; only unit tests import two, which is fine).
 - **Dreamship shop list:** Settings › Printers and Data sources said Dreamship was "Connected (no shops)", though Dreamship has the Storyboards Shopify shop connected and active. `parseShops` only read a `results` list; it now reads `data` too, as the order lookup already did.
 - Removed the unused `store.howItWorks` copy.
+
+### 26 Nov: fix: saving a new Imagen theme on a product was refused
+- **Why:** Shopify's `mmp_shop.imagen_theme` dropdown only changes on "Refresh themes from Imagen". But the product page offers every active theme in the Magic Shop category, so a theme Imagen gained after the last Refresh was refused by Shopify. Live case: `store-pet-water-color` (created 13:22) and `store-mona-lisa-copy` (switched on 13:16), after the 13:13 Refresh, chosen for the Fleece Blanket.
+- **Fixed:** `updateStoreFields` adds a missing theme to Shopify's dropdown (`setThemeChoices`, allowed write 5) before saving it. `admin_shop_product_updated` then lists `imagen_theme_choices`. Inactive or unknown themes are still refused by the app.
+- **Tests:** unit `open-store-catalogue` (a theme missing from the dropdown is added, then saved; an inactive one is refused).
