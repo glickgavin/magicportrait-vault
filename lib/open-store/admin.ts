@@ -69,7 +69,7 @@ export function themesInUse(entries: StoreEntry[]): string[] {
 // ---------- Saving one product's shared and Magic Store fields ----------
 
 const productField = <K extends ProductFieldKey>(k: K) => (PRODUCT_FIELDS[k] as unknown as ProductFieldDef<unknown>).schema;
-const GENERATION_KEYS = ["photos", "ask_name", "name_max", "photo_tips", "subject", "images_to_show", "step_labels"] as const;
+const GENERATION_KEYS = ["photos", "ask_name", "name_max", "photo_tips", "subject", "images_to_show", "step_labels", "quality"] as const;
 
 /** A field set to null is cleared (the store default applies again); a field left out isn't touched. */
 export const storeFieldsSchema = z.object({
@@ -90,6 +90,7 @@ export const storeFieldsSchema = z.object({
           subject: productField("subject").nullable().optional(),
           images_to_show: productField("images_to_show").nullable().optional(),
           step_labels: productField("step_labels").nullable().optional(),
+          quality: productField("quality").nullable().optional(),
         })
         .strict()
         .optional(),

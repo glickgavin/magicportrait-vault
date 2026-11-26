@@ -14,6 +14,7 @@ import { target } from "@/lib/shop/fit";
 import type { VariantRules } from "@/lib/shop/rules";
 import { parseTemplate, type Template } from "@/lib/shop/template";
 import { canSeeOpenStore } from "./access";
+import type { FaqItem, Guarantee, HowStep, StoreReview, TrustpilotSetting, TrustStat } from "./lower";
 import { gridProducts, type StoreEntry } from "./catalog";
 import { cachedRead, getStoreCatalog, imagenThemes } from "./index";
 import type { OptionPictures } from "./sources/types";
@@ -170,12 +171,12 @@ function drawInfo(e: StoreEntry): DrawInfo | null {
 
 /** Everything the product page needs before a picture (docs/open-store.md › Product page). Null: not in the store. */
 export async function productPageData(legacyId: string) {
-  const s = await getSettings(["open_store.shipping_days", "open_store.reassurance", "open_store.how_it_works", "open_store.home_collection", "brand.timezone", "open_store.picture_options"] as const);
+  const s = await getSettings(["open_store.shipping_days", "open_store.reassurance", "open_store.home_collection", "brand.timezone", "open_store.picture_options"] as const);
   const magic = await getStoreCatalog();
   const entry = magic.entries.find((e) => e.product.legacyId === legacyId);
   if (!entry || entry.hidden.length) return null;
   const p = entry.product;
-  const [pricing, themes, policies, photos, nameMax, photoTips, subject, stepLabels, imagesToShow, askName, pictures] = await Promise.all([
+  const [pricing, themes, policies, photos, nameMax, photoTips, subject, stepLabels, imagesToShow, askName, pictures, lower, quality] = await Promise.all([
     storePricing(magic.collection?.id ?? null),
     imagenThemes(),
     cachedRead("policies", async () => (await getOpenStoreSource()).policies()).catch(() => ({ shippingHtml: null, refundHtml: null })),
@@ -188,6 +189,8 @@ export async function productPageData(legacyId: string) {
     getProductSetting(p, "ask_name"),
     // Swatches and variant photos for the option chips; none when Shopify can't be read (plain chips).
     cachedRead(`option-pictures:${p.id}`, async () => (await getOpenStoreSource()).optionPictures(p.id)).catch((): OptionPictures => ({ swatches: {}, variantImages: {} })),
+    lowerPage(),
+    getProductSetting(p, "quality"),
   ]);
   const themeNames = new Map(themes?.map((t) => [t.slug, t.name]) ?? []);
   const theme = entry.theme ? (themes?.find((t) => t.slug === entry.theme) ?? null) : null;
@@ -236,7 +239,6 @@ export async function productPageData(legacyId: string) {
     layerArt,
     bullets: p.shortDescription ? descriptionBlocks(null, p.shortDescription) : [],
     details,
-    howItWorks: s["open_store.how_it_works"],
     shipping: [...descriptionBlocks(policies.shippingHtml), ...descriptionBlocks(policies.refundHtml)],
     reassurance: s["open_store.reassurance"] as ReassuranceRow[],
     variants,
@@ -255,6 +257,34 @@ export async function productPageData(legacyId: string) {
     relatedOnly: entry.relatedOnly,
     pricing,
     breadcrumb: homeTitle ? { title: homeTitle, href: "/store" } : null,
+    // The trust card and the lower page (docs/open-store.md › Product page, items 9 and 12 to 18).
+    lower: { ...lower, quality },
+  };
+}
+
+export type LowerPage = {
+  trustStats: TrustStat[];
+  /** Null: no Trustpilot line anywhere (no score in settings). */
+  trustpilot: (TrustpilotSetting & { score: number }) | null;
+  howSteps: HowStep[];
+  wallPhotos: string[];
+  reviews: StoreReview[];
+  guarantees: Guarantee[];
+  faq: FaqItem[];
+};
+
+/** The store-wide words, numbers and photos of the product page's trust card and lower sections. */
+async function lowerPage(): Promise<LowerPage> {
+  const s = await getSettings(["open_store.trust_stats", "open_store.trustpilot", "open_store.how_steps", "open_store.wall_photos", "open_store.reviews", "open_store.guarantees", "open_store.faq"] as const);
+  const tp = s["open_store.trustpilot"] as TrustpilotSetting;
+  return {
+    trustStats: s["open_store.trust_stats"] as TrustStat[],
+    trustpilot: tp.score != null ? { ...tp, score: tp.score } : null,
+    howSteps: s["open_store.how_steps"] as HowStep[],
+    wallPhotos: s["open_store.wall_photos"],
+    reviews: s["open_store.reviews"] as StoreReview[],
+    guarantees: s["open_store.guarantees"] as Guarantee[],
+    faq: s["open_store.faq"] as FaqItem[],
   };
 }
 

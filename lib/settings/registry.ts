@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_SCENE_PRESETS, DEFAULT_SCENE_PRODUCTS, DEFAULT_SCENE_RULES, scenePresetsSchema, sceneProductsSchema } from "../shop/scene-presets.ts";
+import { GUARANTEE_ICONS, QUALITY_ICONS, type FaqItem, type Guarantee, type HowStep, type ProductQuality, type StoreReview, type TrustpilotSetting, type TrustStat } from "../open-store/lower.ts";
 
 /** IANA time zone check (kept here, not imported, so scripts/gen-seed.ts runs under plain Node). */
 const isTimeZone = (tz: string) => {
@@ -84,6 +85,40 @@ export type PromoBarSetting = { id: string; on: boolean; text: string; link_labe
 const httpUrl = () => z.string().max(2000).regex(/^https:\/\/[^\s]+$/, "Must be an https:// link");
 const numericId = z.string().regex(/^\d{6,20}$/);
 const host = z.string().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i);
+/** A picture's address: an https:// link or a path in the app (/…). */
+const imageRef = () => z.string().max(2000).regex(/^(https:\/\/[^\s]+|\/[^\s]+)$/, "An https:// link or a path like /store/photo.webp");
+
+// ---------- The product page's lower sections (docs/open-store.md › Product page, items 9 and 12 to 18) ----------
+export const qualitySchema = z
+  .object({
+    photo: imageRef(),
+    alt: z.string().max(200).default(""),
+    features: z.array(z.object({ icon: z.enum(QUALITY_ICONS).default("check"), title: z.string().min(1).max(40), sub: z.string().max(60).default("") }).strict()).min(1).max(4),
+  })
+  .strict()
+  .nullable();
+const trustStatsSchema = z.array(z.object({ value: z.string().min(1).max(14), label: z.string().min(1).max(24) }).strict()).max(3);
+const trustpilotSchema = z
+  .object({
+    score: z.number().min(1).max(5).multipleOf(0.1).nullable(),
+    label: z.string().max(20),
+    count: z.number().int().min(0).max(100_000_000).nullable(),
+    url: httpUrl().or(z.literal("")),
+  })
+  .strict();
+const howStepsSchema = z.array(z.object({ title: z.string().min(1).max(40), body: z.string().min(1).max(140), image: imageRef(), alt: z.string().max(200).default("") }).strict()).max(4);
+const reviewsSchema = z.array(z.object({ text: z.string().min(1).max(400), name: z.string().min(1).max(40), source: z.string().max(30).default("") }).strict()).max(6);
+const guaranteesSchema = z.array(z.object({ icon: z.enum(GUARANTEE_ICONS), title: z.string().min(1).max(40), body: z.string().min(1).max(100) }).strict()).max(4);
+const faqSchema = z.array(z.object({ q: z.string().min(1).max(120), a: z.string().min(1).max(600) }).strict()).max(8);
+/** The live site's files (magicportraits.ai). A link that stops working just isn't shown; replace it here. */
+const SITE = "https://magicportraits.ai/assets";
+const WALL_PHOTOS = [
+  // Row one, then row two, in the live site's order (a customer holding their tile every third or fourth photo).
+  "wall-05-JYluymdV.webp", "testimonial-1-BvznixIm.webp", "wall-10-B3_veUud.webp", "wall-01-CzRwxHdL.webp", "wall-16-BANtKXSg.webp", "testimonial-2-BqECf3Hw.webp", "wall-12-Bpbr_nxo.webp", "wall-09-Q0zcGDQe.webp", "wall-21-6I3wyX50.webp",
+  "testimonial-3-MTgh8B58.webp", "wall-13-CgRwNXZ8.webp", "wall-04-ClCB1rcc.webp", "wall-18-LZSmo2k0.webp", "testimonial-4-CILZ-QWm.webp", "wall-22-CulDDLdH.webp", "wall-08-BjSwnM6O.webp", "wall-14-1UCzCtLW.webp", "wall-27-DVdz9scS.webp",
+  "wall-02-DeQ8uuGW.webp", "testimonial-5-CpB4slQd.webp", "wall-11-BTTGrfhN.webp", "wall-19-BxAk5KJn.webp", "wall-03-CmzJ0eVj.webp", "testimonial-6-CauiieMx.webp", "wall-24-CiQRKNvi.webp", "wall-06-eCHl7KXj.webp", "wall-15-B97Jq1uU.webp",
+  "testimonial-7-B23gZ2p1.webp", "wall-20-Dk5dE7FN.webp", "wall-07-D3zzdAub.webp", "wall-26-Dtwusct7.webp", "testimonial-8-DOqAvAtF.webp", "wall-17-CGGJM_vj.webp", "wall-25-rRUw1X6F.webp", "testimonial-9-Cr_oYmS2.webp", "wall-23-CLdOCZe_.webp",
+].map((f) => `${SITE}/${f}`);
 
 export const REGISTRY = {
   // ---------- cards: the product ----------
@@ -359,7 +394,7 @@ export const REGISTRY = {
     description: "Product options (by name, any case) whose choices show a picture on the product page: the value's swatch in Shopify, else that variant's own first photo. Any option with Shopify swatches on every value shows them too.",
     max: 20,
   }),
-  "open_store.theme_category": text("open_store", "magicstore", { label: "Imagen themes: only this category", description: "The theme lists (here, on each product and in Shopify's dropdown) show only Imagen themes in this category, matched without case, spaces or dashes, plus any theme a product already uses. Empty: every theme.", max: 80 }),
+  "open_store.theme_category": text("open_store", "magicshop", { label: "Imagen themes: only this category", description: "The theme lists (here, on each product and in Shopify's dropdown) show only Imagen themes in this category, matched without case, spaces or dashes, plus any theme a product already uses. Empty: every theme.", max: 80 }),
   "open_store.menu_handle": text("open_store", "magic-store", { label: "Category menu (Shopify navigation handle)", description: "The category circles: each item of this menu links to a collection. Edited in Shopify admin › Online Store › Navigation.", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),
   "open_store.home_collection": text("open_store", "magic-store", { label: "Collection shown at /store (handle)", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),
   "open_store.storefront_publication_id": text("open_store", "", { label: "Storefront sales channel (publication id)", description: "The Shopify publication the Storefront token sells through (gid://shopify/Publication/…). Products not published to it are hidden, since carts can't add them. Empty: not checked.", pattern: /^(gid:\/\/shopify\/Publication\/\d{1,20})?$/, max: 60 }),
@@ -377,7 +412,68 @@ export const REGISTRY = {
     z.array(z.object({ icon: z.enum(["truck", "heart", "lock", "gift", "star", "clock"]), text: z.string().min(1).max(80) }).strict()).max(4) as unknown as z.ZodType<ReassuranceRow[]>,
     { label: "Shopping info rows", description: "Up to 4 short rows under the product, each with an icon (truck, heart, lock, gift, star or clock)." },
   ),
-  "open_store.how_it_works": list("open_store", ["Add a clear photo of your pet", "We paint them in about a minute", "We print it and send it to you"], { label: "How it works (steps)", max: 4, item: z.string().min(1).max(120) }),
+  // The lower page (docs/open-store.md › Product page). Every word and number here is shown as it is: keep it true.
+  "open_store.trust_stats": json(
+    "open_store",
+    [
+      { value: "1M+", label: "tiles shipped" },
+      { value: "6+ years", label: "making wall art" },
+      { value: "Baltimore", label: "our US facility" },
+    ] as TrustStat[],
+    trustStatsSchema as unknown as z.ZodType<TrustStat[]>,
+    { label: "Trust card: three numbers", description: "Under the main button: up to three short facts (value, then a few words). Empty: only the Trustpilot line." },
+  ),
+  "open_store.trustpilot": json(
+    "open_store",
+    { score: 4.1, label: "Great", count: 2474, url: "https://www.trustpilot.com/review/www.storyboards.io" } as TrustpilotSetting,
+    trustpilotSchema as unknown as z.ZodType<TrustpilotSetting>,
+    {
+      label: "Trustpilot score",
+      description: "Copied from Trustpilot exactly (TrustScore, its word, the number of reviews, the page's link) and shown as it is, so update it when Trustpilot changes. On 26 Nov 2026 Storyboards Photo Tiles had 4.1, “Great”, 2,474 reviews. No score: no Trustpilot line anywhere.",
+    },
+  ),
+  "open_store.how_steps": json(
+    "open_store",
+    [
+      { title: "Snap", body: "One clear photo of your pet, or your pet and you.", image: `${SITE}/how-snap-Ltg2mZ9g.jpg`, alt: "Taking a photo of a dog with a phone" },
+      { title: "See it, free", body: "We paint them in about a minute and show it on the product.", image: `${SITE}/how-choose-BC5eZl8-.jpg`, alt: "Choosing a photo on a phone" },
+      { title: "Meet your personalised product", body: "Love it? We make it to order and send it to you.", image: `${SITE}/how-meet-CblEZvAa.jpg`, alt: "A dog looking up at its painted portrait on the wall" },
+    ] as HowStep[],
+    howStepsSchema as unknown as z.ZodType<HowStep[]>,
+    { label: "How it works (before a picture)", description: "Up to 4 steps, each with a photo (an https:// link or a path in the app) and its description for screen readers. After their first picture, “On more gifts” takes this place." },
+  ),
+  "open_store.wall_photos": list("open_store", WALL_PHOTOS, {
+    label: "“Already in their homes”: customer photos",
+    description: "Photos of real customers' products at home, in order: the first half scrolls one way, the second half the other. Links to https:// or paths in the app. Empty: no section.",
+    item: imageRef(),
+    max: 60,
+  }),
+  "open_store.reviews": json("open_store", [] as StoreReview[], reviewsSchema as unknown as z.ZodType<StoreReview[]>, {
+    label: "Reviews (real ones only)",
+    description: "Up to 6 real reviews, copied word for word with the reviewer's first name and initial, and where they were left (e.g. Trustpilot). Never written by us. Empty: no reviews section (the Trustpilot line still links to Trustpilot).",
+  }),
+  "open_store.guarantees": json(
+    "open_store",
+    [
+      { icon: "shield", title: "Satisfaction guaranteed", body: "Not happy with it? We'll make it right." },
+      { icon: "sparkles", title: "Free preview", body: "You only pay if you fall in love." },
+      { icon: "heart", title: "Made just for you", body: "Printed to order from your picture." },
+      { icon: "lock", title: "Secure checkout", body: "Shop Pay, Apple Pay, Google Pay and cards." },
+    ] as Guarantee[],
+    guaranteesSchema as unknown as z.ZodType<Guarantee[]>,
+    { label: "“We've got you covered”", description: `Up to 4, each with an icon (${GUARANTEE_ICONS.join(", ")}), a title and a line. Empty: no section.` },
+  ),
+  "open_store.faq": json(
+    "open_store",
+    [
+      { q: "How long does it take?", a: "Your picture is ready in about a minute. We make your product to order, and the delivery estimate is on the page before you pay." },
+      { q: "What if I don't like the result?", a: "Try another photo before you order: every preview is free. If your order arrives damaged or not as shown, we'll replace it." },
+      { q: "Can I send it as a gift?", a: "Yes. Add it to your cart and enter their address at checkout." },
+      { q: "What photo works best?", a: "A sharp, well-lit photo with the face clearly visible. Eye level works better than looking down." },
+    ] as FaqItem[],
+    faqSchema as unknown as z.ZodType<FaqItem[]>,
+    { label: "“Quick questions”", description: "Up to 8 questions and answers. Empty: no section." },
+  ),
   "open_store.upload_max_px": num("open_store", 2048, { label: "Photos: shrunk to this longest side in the browser (px)", min: 512, max: 6000 }),
   "open_store.min_photo_px": num("open_store", 600, { label: "Photos: smallest short side (px)", min: 200, max: 4000 }),
   "open_store.more_gifts_step": num("open_store", 4, { label: "“On more gifts”: products shown at first and per “See more gifts”", description: "2 × 2 on phones, one row on desktop at 4.", min: 2, max: 12 }),
@@ -503,6 +599,7 @@ export const PRODUCT_FIELDS = {
   subject: pf<"pet" | "person" | "any">({ scope: "product", metafield: "generation", jsonKey: "subject", metafieldType: "json", type: "choice", options: ["pet", "person", "any"], store: "open_store", label: "Subject (changes the copy only)", schema: z.enum(["pet", "person", "any"]), fallback: "open_store.subject" }),
   images_to_show: pf<number>({ scope: "product", metafield: "generation", jsonKey: "images_to_show", metafieldType: "json", type: "number", store: "open_store", label: "Results to show", schema: z.number().int().min(1).max(8), fallback: "open_store.images_to_show" }),
   step_labels: pf<string[]>({ scope: "product", metafield: "generation", jsonKey: "step_labels", metafieldType: "json", type: "list", store: "open_store", label: "Progress steps", description: "{name} and {product} are filled in.", schema: z.array(z.string().min(1).max(80)).length(3), fallback: "open_store.step_labels" }),
+  quality: pf<ProductQuality>({ scope: "product", metafield: "generation", jsonKey: "quality", metafieldType: "json", type: "json", store: "open_store", label: "Real product, real quality", description: "A photo of the real product (an https:// link) and up to 4 features, each an icon, a title and a few words. Empty: the section is left out.", schema: qualitySchema as unknown as z.ZodType<ProductQuality>, default: null }),
   related: pf<string[]>({ scope: "product", metafield: "related", metafieldType: "list.product_reference", type: "list", store: "open_store", label: "More gifts", description: "The products under “On more gifts”, in order. Empty: chosen from the same collection.", schema: z.array(z.string().regex(/^gid:\/\/shopify\/Product\/\d{1,20}$/)).max(12), default: [] }),
   open_store_related: pf<boolean>({ scope: "product", metafield: "open_store_related", metafieldType: "boolean", type: "boolean", store: "open_store", label: "Related only", description: "Shown only under “On more gifts”, with the visitor's picture, never in the grid.", schema: z.boolean(), default: false }),
   details: pf<string>({ scope: "product", metafield: "details", metafieldType: "multi_line_text_field", type: "text", store: "open_store", label: "Size and materials", schema: z.string().max(2000), default: "" }),

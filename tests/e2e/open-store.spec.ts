@@ -112,19 +112,20 @@ test.describe("open store", () => {
       await expect(page.getByText("Linen-look cover, 12 × 12 in, zip closure. Insert included.")).toBeVisible();
       await page.getByRole("button", { name: "Shipping and returns" }).click();
       await expect(page.getByText(/Made to order and shipped/)).toBeVisible();
-      // More gifts: the product's own list (Mug, Puzzle), then the next in the collection.
-      // Four at a time (2 × 2 on phones), then See more gifts adds the rest (related-only products included).
-      const titles = page.getByTestId("store-related").getByTestId("store-card-title");
-      await expect(titles).toHaveText(["Magic Mug with Photo", "Magic Puzzle", "Magic Canvas", "Acrylic Block"]);
-      await expect(page.getByRole("heading", { name: "Also made from one photo" })).toBeVisible();
-      const first = await titles.first().boundingBox();
-      const third = await titles.nth(2).boundingBox();
-      if (test.info().project.name === "mobile") expect(Math.abs(third!.x - first!.x)).toBeLessThan(2);
-      else expect(Math.abs(third!.y - first!.y)).toBeLessThan(2);
-      await page.getByTestId("store-more-gifts").click();
-      await expect(titles.nth(4)).toHaveText("Magic Xmas Ornaments (set of 2)");
-      await expect(titles.nth(4).locator("xpath=ancestor::a")).toBeFocused();
-      await expect(page.getByTestId("store-more-gifts")).toHaveCount(0);
+      // Before a picture, How it works (with photos) sits where "On more gifts" comes after the first picture.
+      await expect(page.getByRole("heading", { name: "How it works" })).toBeVisible();
+      await expect(page.getByTestId("store-how").getByRole("listitem")).toHaveCount(3);
+      await expect(page.getByTestId("store-related")).toHaveCount(0);
+      // The trust card under the button, then the lower page from settings (docs/open-store.md › Product page).
+      await expect(page.getByTestId("store-trust")).toContainText("1M+");
+      await expect(page.getByTestId("store-trust")).toContainText("Great · 4.1 out of 5");
+      await expect(page.getByRole("heading", { name: "We've got you covered" })).toBeVisible();
+      // No reviews in settings, so no reviews section: nothing is ever made up.
+      await expect(page.getByTestId("store-reviews")).toHaveCount(0);
+      await page.getByText("Can I send it as a gift?").click();
+      await expect(page.getByText("Add it to your cart and enter their address at checkout.")).toBeVisible();
+      await expect(page.getByTestId("store-closing")).toContainText("See your pet on it, free");
+      await expect(page.getByTestId("store-closing-cta")).toHaveText("Generate");
     });
 
     test("size chips: the badge, the price and the address follow the chosen size", async ({ page }) => {

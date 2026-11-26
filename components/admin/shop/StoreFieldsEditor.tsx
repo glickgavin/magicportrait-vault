@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { QUALITY_ICONS, type QualityFeature } from "@/lib/open-store/lower";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,8 +25,23 @@ export type StoreFieldsValues = {
   related: string[];
   open_store_related: boolean;
   details: string;
+  /** "Real product, real quality": empty photo and features = none (the section is left out). */
+  quality: { photo: string; alt: string; features: QualityFeature[] };
   variants: { id: string; title: string; badge: string; lead_days: string }[];
 };
+
+const NO_FEATURE: QualityFeature = { icon: "check", title: "", sub: "" };
+/** The form's four feature rows, from what's stored. */
+export function qualityForm(q: { photo: string; alt?: string; features: QualityFeature[] } | null): StoreFieldsValues["quality"] {
+  const f = q?.features ?? [];
+  return { photo: q?.photo ?? "", alt: q?.alt ?? "", features: [0, 1, 2, 3].map((i) => ({ ...NO_FEATURE, ...f[i] })) };
+}
+/** What's saved: null when nothing is filled in. */
+function qualityValue(q: StoreFieldsValues["quality"]) {
+  const features = q.features.filter((f) => f.title.trim()).map((f) => ({ icon: f.icon, title: f.title.trim(), sub: f.sub.trim() }));
+  if (!q.photo.trim() && !features.length) return null;
+  return { photo: q.photo.trim(), alt: q.alt.trim(), features };
+}
 export type StoreFieldsDefaults = { photos: SlotWords[]; ask_name: boolean; name_max: number; photo_tips: string; subject: string; images_to_show: number; step_labels: string[] };
 export type ThemeOption = { slug: string; name: string; active: boolean; photos: number | null };
 
@@ -69,6 +85,9 @@ export function StoreFieldsEditor({
   const disagree = theme?.photos != null && v.photos != null && v.photos.length !== theme.photos;
   const problemFor = (k: string) => problems.find((p) => p.key === k)?.problem;
   const missingLabels = v.photos?.some((w) => !w.label) ?? false;
+  const q = qualityValue(v.quality);
+  const qualityHalf = q ? (!q.photo ? "Add the photo's link, or clear the features." : !q.features.length ? "Add at least one feature, or clear the photo." : null) : null;
+  const setFeature = (i: number, k: keyof QualityFeature, val: string) => set("quality", { ...v.quality, features: v.quality.features.map((f, n) => (n === i ? { ...f, [k]: val } : f)) });
 
   const body = useMemo(
     () => ({
@@ -86,6 +105,7 @@ export function StoreFieldsEditor({
           subject: v.subject || null,
           images_to_show: v.images_to_show,
           step_labels: v.step_labels && v.step_labels.some((s) => s.trim()) ? v.step_labels.map((s) => s.trim()) : null,
+          quality: qualityValue(v.quality),
         },
       },
       variants: v.variants.map((x) => ({ variantId: x.id, badge: x.badge.trim() || null, lead_days: x.lead_days.trim() || null })),
@@ -263,6 +283,45 @@ export function StoreFieldsEditor({
         <textarea id={id("details")} value={v.details} onChange={(e) => set("details", e.target.value)} className={area} />
       </div>
 
+      <fieldset className="flex flex-col gap-3 rounded-[14px] bg-black/[0.03] p-4" data-testid="store-quality">
+        <legend className="px-1 text-[15px] font-extrabold">Real product, real quality</legend>
+        <p className="text-[13px] text-ink-2">A photo of the real product and up to 4 features, shown on the product page under its own heading. Empty: the section is left out.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            {label("q-photo", "Photo (link)", "An https:// link, e.g. from Shopify Files")}
+            <input id={id("q-photo")} value={v.quality.photo} onChange={(e) => set("quality", { ...v.quality, photo: e.target.value })} className={input} placeholder="https://cdn.shopify.com/…" spellCheck={false} />
+          </div>
+          <div className="flex flex-col gap-1">
+            {label("q-alt", "What the photo shows", "For screen readers")}
+            <input id={id("q-alt")} value={v.quality.alt} onChange={(e) => set("quality", { ...v.quality, alt: e.target.value })} className={input} maxLength={200} />
+          </div>
+        </div>
+        {v.quality.features.map((f, i) => (
+          <div key={i} className="grid gap-3 sm:grid-cols-[140px_1fr_1fr]">
+            <div className="flex flex-col gap-1">
+              {label(`q-icon-${i}`, `Feature ${i + 1}: icon`)}
+              <select id={id(`q-icon-${i}`)} value={f.icon} onChange={(e) => setFeature(i, "icon", e.target.value)} className={input}>
+                {QUALITY_ICONS.map((x) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              {label(`q-title-${i}`, `Feature ${i + 1}: title`)}
+              <input id={id(`q-title-${i}`)} value={f.title} onChange={(e) => setFeature(i, "title", e.target.value)} className={input} maxLength={40} placeholder={i === 0 ? "e.g. Stick anywhere" : ""} />
+            </div>
+            <div className="flex flex-col gap-1">
+              {label(`q-sub-${i}`, `Feature ${i + 1}: a few words`)}
+              <input id={id(`q-sub-${i}`)} value={f.sub} onChange={(e) => setFeature(i, "sub", e.target.value)} className={input} maxLength={60} placeholder={i === 0 ? "e.g. Any wall, no nails" : ""} />
+            </div>
+          </div>
+        ))}
+        {flag("quality")}
+        {qualityHalf && <p className="text-[13px] font-bold text-[#a1251b]">{qualityHalf}</p>}
+      </fieldset>
+
       {v.variants.length > 0 && (
         <fieldset className="flex flex-col gap-2">
           <legend className="text-[15px] font-extrabold">Sizes</legend>
@@ -285,7 +344,7 @@ export function StoreFieldsEditor({
 
       {missingLabels && <p className="text-[13px] font-bold text-[#a1251b]">Each photo slot needs a label, or leave all of them empty to use the store default.</p>}
       <div className="flex flex-wrap items-center gap-3">
-        <Button disabled={!dirty || busy || missingLabels} onClick={() => void save()}>
+        <Button disabled={!dirty || busy || missingLabels || Boolean(qualityHalf)} onClick={() => void save()}>
           {busy ? "Saving…" : "Save Magic Store fields"}
         </Button>
         {dirty && (

@@ -157,6 +157,7 @@ export const EVENTS = {
   store_related_shown: ui,
   store_related_tapped: ui,
   store_more_gifts_shown: ui,
+  store_lower_cta_tapped: ui,
   store_added_to_cart: bizKlaviyo,
   store_cart_opened: ui,
   store_cart_changed: biz,

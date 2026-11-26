@@ -78,8 +78,20 @@ test.describe("open store pictures", () => {
     expect((await saved).status()).toBe(200);
     await expect(results.getByRole("radio", { name: "Picture 2" })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByRole("heading", { name: "Teddy on more gifts" })).toBeVisible();
+    await expect(page.getByTestId("store-how")).toHaveCount(0);
     const cards = page.getByTestId("store-related-card");
     await expect(cards.first().locator("canvas")).toBeVisible();
+    // Four at a time (2 × 2 on phones, one row on desktop); See more gifts adds the next ones and focuses the first.
+    const shown = await cards.count();
+    expect(shown).toBeLessThanOrEqual(4);
+    if (await page.getByTestId("store-more-gifts").count()) {
+      await page.getByTestId("store-more-gifts").click();
+      await expect(cards).not.toHaveCount(shown);
+      await expect(cards.nth(shown)).toBeFocused();
+    }
+    // The closing card's button adds to the cart like the main one.
+    await expect(page.getByTestId("store-closing")).toContainText("Teddy's personalised product is ready");
+    await expect(page.getByTestId("store-closing-cta")).toContainText("Add to cart · $59.99");
     await expectNoAxeViolations(page);
 
     // The saved row: the photo, the picture and the visitor, all ours.
