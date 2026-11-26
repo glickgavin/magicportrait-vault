@@ -7,13 +7,14 @@ import { STORE_HIDDEN_TEXT } from "@/lib/open-store/catalog";
 import { getSettings } from "@/lib/settings";
 import { productFieldDefaults } from "@/lib/settings/product";
 import { parseGeneration, productFieldProblems, readVariantField } from "@/lib/settings/product-fields";
-import type { PhotoSlotWords } from "@/lib/settings/registry";
+import type { ProductQuality } from "@/lib/open-store/lower";
+import { qualitySchema, type PhotoSlotWords } from "@/lib/settings/registry";
 import { rulesFor, shopOverview } from "@/lib/shop/admin";
 import { HIDDEN_REASON_TEXT } from "@/lib/shop/catalog";
 import { parseVariantRules } from "@/lib/shop/rules";
 import { ShopRulesEditor } from "@/components/admin/shop/ShopRulesEditor";
 import { ProductFieldsEditor } from "@/components/admin/shop/ShopEditors";
-import { ShortDescriptionEditor, StoreFieldsEditor, type StoreFieldsValues } from "@/components/admin/shop/StoreFieldsEditor";
+import { qualityForm, ShortDescriptionEditor, StoreFieldsEditor, type StoreFieldsValues } from "@/components/admin/shop/StoreFieldsEditor";
 import { TrackPageView } from "@/components/TrackPageView";
 import { Badge } from "@/components/ui/Badge";
 import { buttonClass } from "@/components/ui/Button";
@@ -91,6 +92,7 @@ export default async function ShopProductPage({ params, searchParams }: { params
     related: p.store?.related ?? [],
     open_store_related: p.store?.relatedOnly === "true",
     details: p.store?.details ?? "",
+    quality: qualityForm(goodOr<ProductQuality>("quality", (v) => qualitySchema.safeParse(v).success && v != null, null)),
     variants: p.variants.map((v) => ({ id: v.id, title: v.title, badge: readVariantField(v, "badge").state === "set" ? v.metafields.find((m) => m.key === "badge")!.value : "", lead_days: readVariantField(v, "lead_days").state === "set" ? v.metafields.find((m) => m.key === "lead_days")!.value : "" })),
   };
   const others = found.rows.filter((r) => r.store && r.product.id !== p.id).map((r) => ({ id: r.product.id, title: r.product.title }));

@@ -164,7 +164,7 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_product_tapped` | browser | A product in the grid | `product_id`, `collection`, `position` |
 | `page_view_store_product` | browser | Product page shown | `product_id`, `theme_slug`, `has_picture`, `from` (`grid` · `related` · `cart` · `email_link` · `direct`) |
 | `store_variant_selected` | browser | A size or option chip | `product_id`, `option`, `value`, `has_picture` |
-| `store_info_opened` | browser | An accordion opened | `product_id`, `section` |
+| `store_info_opened` | browser | An accordion or a "Quick questions" answer opened | `product_id`, `section` (`details`, `shipping`, or `faq-1` to `faq-8`) |
 | `store_photo_chosen` | browser | Photo accepted or refused in the browser | `product_id`, `ok`, `reason`, `slot`, `reused` |
 | `store_photo_uploaded` | server, business | Photo checked and saved | `ok`, `reason`, `width`, `height` |
 | `store_generation_started` | server, business | Imagen called | `product_id`, `theme_slug`, `session_id`, `photos`, `has_name`, `attempt` |
@@ -177,6 +177,7 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_try_again_tapped` | browser | The Change photo sheet opened (Change photo, or Choose another photo after a failure; the name is kept from before 26 Nov) | `product_id`, `after` (`photo` · `ready` · `failed`) |
 | `store_more_gifts_shown` | browser | **See more gifts** tapped | `product_id`, `shown` (how many cards now), `has_picture` |
 | `store_picture_kept` | browser | "Keep Teddy's picture" after changing the photo or name of a ready picture | `product_id` |
+| `store_lower_cta_tapped` | browser | The button on the closing card at the bottom of the product page (26 Nov) | `product_id`, `action` (`photo`, `generate` or `cart`) |
 | `store_email_ask_shown`, `store_email_ask_closed` | browser | The email box while painting | `product_id` |
 | `store_email_given` | server, business | Email given while painting | `product_id`, `marketing_consent` |
 | `store_picture_emailed` | server, business | "Your picture is ready" sent | `product_id`, `theme_slug` |

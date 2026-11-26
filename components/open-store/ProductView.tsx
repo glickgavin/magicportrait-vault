@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { ShopPreview } from "@/components/shop/ShopPreview";
 import { checkLayerValues, layerActive, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
 import { Personalise } from "./Personalise";
-import { ProductCard } from "./ProductCard";
+import { ClosingCard, Faq, Guarantees, Homes, HowItWorks, RealQuality, Reviews, TrustCard, TrustpilotTop } from "./ProductLower";
 import { Stars } from "./Stars";
 import { STORE_CART_EVENT, type StoreCartEvent } from "./StoreCart";
 import { fileUrl, usePicture, type PictureView, type SlotPhoto } from "./use-picture";
@@ -139,6 +139,7 @@ export function ProductView({
   const started = useRef<number | null>(null);
   const slowSent = useRef(false);
   const pid = data.product.legacyId;
+  const lower = data.lower;
 
   const { state, create, choose: pickResult, reset, restore } = usePicture({
     productId: pid,
@@ -542,11 +543,13 @@ export function ProductView({
             <h1 ref={titleRef} className="truncate font-serif text-[26px] font-normal leading-[1.15] text-[#1a1a1a] lg:text-[36px]" title={data.product.title}>
               {data.product.title}
             </h1>
-            {data.product.rating != null && data.product.ratingCount != null && (
+            {data.product.rating != null && data.product.ratingCount != null ? (
               <span className="flex items-center gap-1.5 text-[13px] text-[#6b6b6b]">
                 <Stars rating={data.product.rating} />
                 {tn("store.reviews", data.product.ratingCount)}
               </span>
+            ) : (
+              lower.trustpilot && (lower.reviews.length || lower.wallPhotos.length) > 0 && <TrustpilotTop tp={lower.trustpilot} href={lower.reviews.length ? "#store-reviews" : "#store-homes"} />
             )}
             {price && (
               <span className="flex flex-wrap items-baseline gap-2.5 pt-0.5" data-testid="store-price">
@@ -770,10 +773,7 @@ export function ProductView({
                   type="button"
                   disabled={!filled || creating}
                   data-testid="store-create"
-                  onClick={() => {
-                    setPhotoError(null);
-                    void create(photos as SlotPhoto[], names);
-                  }}
+                  onClick={generate}
                   className="bg-primary-gradient shadow-primary flex h-14 items-center justify-center gap-2 rounded-[12px] text-[17px] font-extrabold text-white disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#E7E3D8] disabled:text-[#6b6b6b] disabled:shadow-none"
                 >
                   {creating && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
@@ -813,7 +813,9 @@ export function ProductView({
             )}
           </section>
 
-          <section aria-label={t("store.shoppingInfo")} className="mx-4 mt-6 flex flex-col gap-3.5 rounded-[16px] bg-page p-4 lg:mx-0">
+          <TrustCard stats={lower.trustStats} tp={lower.trustpilot} />
+
+          <section aria-label={t("store.shoppingInfo")} className="mx-4 mt-[18px] flex flex-col gap-3.5 rounded-[16px] bg-page p-4 lg:mx-0">
             {data.reassurance.map((r, i) => {
               const Icon = ICONS[r.icon] ?? Truck;
               return (
@@ -830,36 +832,19 @@ export function ProductView({
 
           <section aria-label={t("store.more", { product: data.product.title })} className="mt-[22px] border-t border-[#EDEAE2] lg:mt-6">
             {accordion("details", t("store.details"), <Blocks blocks={data.details} />)}
-            {accordion(
-              "how",
-              t("store.howItWorks"),
-              <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[15px] leading-[1.55] text-[#4d4d4d]">
-                {data.howItWorks.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>,
-              "lg:hidden",
-            )}
             {data.shipping.length > 0 && accordion("shipping", t("store.shippingReturns"), <Blocks blocks={data.shipping} />)}
           </section>
         </div>
       </div>
 
-      {/* Desktop: How it works as a band. */}
-      <ol className="hidden bg-page lg:-mx-10 lg:grid lg:grid-cols-3 lg:gap-8 lg:px-10 lg:py-10">
-        {data.howItWorks.map((s, i) => (
-          <li key={i} className="flex items-start gap-3.5">
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-white text-[15px] font-extrabold text-[#8E047B]">{i + 1}</span>
-            <span className="pt-1.5 text-[15px] leading-[1.5]">{s}</span>
-          </li>
-        ))}
-      </ol>
+      {/* Before a picture: How it works. After their first picture, "On more gifts" takes its place (item 12). */}
+      {!result && <HowItWorks steps={lower.howSteps} />}
 
-      {related.length > 0 && (
+      {result && onShow && related.length > 0 && (
         <section
           ref={relatedRef}
           aria-labelledby={`${uid}-related`}
-          className="flex flex-col gap-3.5 px-4 pb-[30px] pt-7 lg:px-0 lg:pt-12"
+          className="mt-8 flex flex-col gap-3.5 bg-page px-4 pb-12 pt-12 lg:-mx-10 lg:mt-4 lg:px-10 lg:pb-14 lg:pt-14"
           onClick={(e) => {
             const a = (e.target as HTMLElement).closest("a");
             const n = a ? related.findIndex((r) => a.getAttribute("href")?.startsWith(r.href)) : -1;
@@ -867,13 +852,13 @@ export function ProductView({
           }}
         >
           <h2 id={`${uid}-related`} className="font-serif text-[24px] font-normal leading-[1.15] text-[#1a1a1a] lg:text-[32px]">
-            {result ? (petName ? t("store.onMoreGiftsNamed", { name: petName }) : t("store.onMoreGifts")) : t("store.alsoMade")}
+            {petName ? t("store.onMoreGiftsNamed", { name: petName }) : t("store.onMoreGifts")}
           </h2>
           {/* Four at a time: 2 × 2 on phones, one row on desktop; "See more gifts" adds the next ones. */}
           <div ref={giftGrid} className="grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-4 lg:gap-x-6 lg:gap-y-8" data-testid="store-related">
-            {result && onShow
-              ? related.map((r) => <RelatedWithPicture key={r.id} card={r} picture={onShow} result={result} currency={data.pricing.currency} />)
-              : related.map((r, i) => <ProductCard key={r.id} card={r} currency={data.pricing.currency} position={i + 1} collection="related" from="related" />)}
+            {related.map((r) => (
+              <RelatedWithPicture key={r.id} card={r} picture={onShow} result={result} currency={data.pricing.currency} />
+            ))}
           </div>
           {allRelated.length > related.length && (
             <button type="button" onClick={seeMoreGifts} data-testid="store-more-gifts" className="mx-auto mt-2 flex h-[52px] w-full max-w-[360px] items-center justify-center gap-2 rounded-[12px] border-[1.5px] border-[#1f1f1f] bg-white text-[16px] font-extrabold text-[#1f1f1f]">
@@ -882,6 +867,27 @@ export function ProductView({
             </button>
           )}
         </section>
+      )}
+
+      <RealQuality quality={lower.quality} />
+      <Homes photos={lower.wallPhotos} tp={lower.trustpilot} pet={data.subject === "pet"} reviewsUrl={lower.reviews.length ? null : lower.trustpilot?.url || null} />
+      <Reviews reviews={lower.reviews} tp={lower.trustpilot} />
+      <Guarantees items={lower.guarantees} />
+      <Faq items={lower.faq} onOpen={(n) => trackClient("store_info_opened", { product_id: pid, section: `faq-${n + 1}` })} />
+      {picture ? (
+        <ClosingCard title={petName ? t("store.closeReadyNamed", { name: petName }) : t("store.closeReady")} sub={t("store.closeReadySub")}>
+          <button type="button" data-testid="store-closing-cta" disabled={adding || !variant?.available} onClick={() => lowerCta("cart")} className="bg-primary-gradient shadow-primary flex h-14 items-center justify-center gap-2 rounded-[12px] text-[17px] font-extrabold text-white disabled:opacity-60">
+            {adding && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+            {adding ? t("store.adding") : price ? t("store.addToCartPrice", { price: formatMoney(Number(price) * qty, data.pricing.currency) }) : t("store.addToCart")}
+          </button>
+        </ClosingCard>
+      ) : (
+        <ClosingCard title={data.subject === "pet" ? t("store.closeStartPet") : t("store.closeStart")} sub={t("store.closeStartSub")}>
+          <button type="button" data-testid="store-closing-cta" disabled={creating} onClick={() => lowerCta(filled ? "generate" : "photo")} className="bg-primary-gradient shadow-primary flex h-14 items-center justify-center gap-2 rounded-[12px] text-[17px] font-extrabold text-white disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#E7E3D8] disabled:text-[#6b6b6b] disabled:shadow-none">
+            {creating && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+            {creating ? t("store.creating") : filled ? t("store.create") : t("store.closePhoto")}
+          </button>
+        </ClosingCard>
       )}
 
       <PhotoSheet
@@ -906,6 +912,21 @@ export function ProductView({
       />
     </div>
   );
+
+  function generate() {
+    setPhotoError(null);
+    void create(photos as SlotPhoto[], names);
+  }
+
+  /** The closing card's button: the same next step as the main one (a photo, Generate, or Add to cart). */
+  function lowerCta(action: "photo" | "generate" | "cart") {
+    trackClient("store_lower_cta_tapped", { product_id: pid, action });
+    if (action === "cart") return void addToCart();
+    if (action === "generate") return generate();
+    // No photo yet: open the camera roll for the first empty slot (the photo row above fills in).
+    const slot = Math.max(0, photos.findIndex((x) => !x));
+    document.getElementById(`${uid}-file-${slot}`)?.click();
+  }
 
   async function addToCart() {
     if (!picture || !variant) return;
