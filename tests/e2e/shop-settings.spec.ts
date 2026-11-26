@@ -248,6 +248,9 @@ test.describe("Settings › Shop", () => {
     await expect(page.getByRole("region", { name: "In Shopify now" }).getByText(/Collection magic-store: \d+ products/)).toBeVisible();
     await expect(page.getByRole("region", { name: "In Shopify now" }).getByText(/4 categories/)).toBeVisible();
     await expect(page.getByTestId("imagen-themes").getByText("Best friends")).toBeVisible();
+    // Only the Magic Store's category (open_store.theme_category): a theme in another category isn't listed.
+    await expect(page.getByTestId("imagen-themes-category")).toContainText("magicstore");
+    await expect(page.getByTestId("imagen-themes").getByText("Card style")).toHaveCount(0);
     await expectNoAxeViolations(page);
     await page.getByRole("button", { name: "Refresh themes from Imagen" }).press("Enter");
     await expect(page.getByText(/The theme dropdown in Shopify now has \d+ themes/)).toBeVisible();
