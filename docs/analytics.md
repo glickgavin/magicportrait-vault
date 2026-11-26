@@ -174,7 +174,9 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_generation_left` | browser | Page left while painting | `product_id`, `seconds` |
 | `store_result_picked` | browser | Another result chosen | `product_id`, `index`, `of` |
 | `store_layer_filled` | browser | Added to cart with the personalisation layer | `product_id`, `has_text1`, `has_text2`, `has_art` (never the words) |
-| `store_try_again_tapped` | browser | Try another photo | `product_id`, `after` (`ready` · `failed`) |
+| `store_try_again_tapped` | browser | The Change photo sheet opened (Change photo, or Choose another photo after a failure; the name is kept from before 26 Nov) | `product_id`, `after` (`photo` · `ready` · `failed`) |
+| `store_more_gifts_shown` | browser | **See more gifts** tapped | `product_id`, `shown` (how many cards now), `has_picture` |
+| `store_picture_kept` | browser | "Keep Teddy's picture" after changing the photo or name of a ready picture | `product_id` |
 | `store_email_ask_shown`, `store_email_ask_closed` | browser | The email box while painting | `product_id` |
 | `store_email_given` | server, business | Email given while painting | `product_id`, `marketing_consent` |
 | `store_picture_emailed` | server, business | "Your picture is ready" sent | `product_id`, `theme_slug` |

@@ -92,7 +92,7 @@ test.describe("open store", () => {
       await expectNoAxeViolations(page, { exclude: ["iframe"] });
 
       // A photo that's too small is refused in the browser; a good one turns Create on.
-      const input = page.getByLabel("Choose a photo: Add their photo");
+      const input = page.getByLabel("Choose a photo: Their photo");
       await input.setInputFiles({ name: "small.png", mimeType: "image/png", buffer: await png(300, 300) });
       await expect(page.getByText(/This photo is a little small/)).toHaveAttribute("role", "alert");
       await input.setInputFiles({ name: "teddy.png", mimeType: "image/png", buffer: await png(900, 900) });
@@ -104,8 +104,18 @@ test.describe("open store", () => {
       await page.getByRole("button", { name: "Shipping and returns" }).click();
       await expect(page.getByText(/Made to order and shipped/)).toBeVisible();
       // More gifts: the product's own list (Mug, Puzzle), then the next in the collection.
-      await expect(page.getByTestId("store-related").getByTestId("store-card-title")).toHaveText(["Magic Mug with Photo", "Magic Puzzle", "Magic Canvas"]);
+      // Four at a time (2 × 2 on phones), then See more gifts adds the rest (related-only products included).
+      const titles = page.getByTestId("store-related").getByTestId("store-card-title");
+      await expect(titles).toHaveText(["Magic Mug with Photo", "Magic Puzzle", "Magic Canvas", "Acrylic Block"]);
       await expect(page.getByRole("heading", { name: "Also made from one photo" })).toBeVisible();
+      const first = await titles.first().boundingBox();
+      const third = await titles.nth(2).boundingBox();
+      if (test.info().project.name === "mobile") expect(Math.abs(third!.x - first!.x)).toBeLessThan(2);
+      else expect(Math.abs(third!.y - first!.y)).toBeLessThan(2);
+      await page.getByTestId("store-more-gifts").click();
+      await expect(titles.nth(4)).toHaveText("Magic Xmas Ornaments (set of 2)");
+      await expect(titles.nth(4).locator("xpath=ancestor::a")).toBeFocused();
+      await expect(page.getByTestId("store-more-gifts")).toHaveCount(0);
     });
 
     test("size chips: the badge, the price and the address follow the chosen size", async ({ page }) => {

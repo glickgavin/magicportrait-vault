@@ -13,6 +13,7 @@ export type PictureView = {
   images: { file: string; width: number; height: number }[];
   chosen: number;
   photos: string[];
+  names: string[];
   emailAsked: boolean;
 };
 
@@ -149,5 +150,11 @@ export function usePicture(opts: { productId: string; uploadMaxPx: number; initi
     setState({ phase: "idle" });
   }, []);
 
-  return { state, create, choose, reset };
+  /** Puts back a picture they already had ("Keep Teddy's picture"); nothing is made or sent. */
+  const restore = useCallback((picture: PictureView) => {
+    if (timer.current) clearTimeout(timer.current);
+    setState({ phase: "ready", picture });
+  }, []);
+
+  return { state, create, choose, reset, restore };
 }
