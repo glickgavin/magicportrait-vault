@@ -172,6 +172,20 @@ describe("Settings › Shop as one area", () => {
     expect(await shopFixtures().setProductMetafields((await entry("fx-pillow")).product.id, "mmp_shop", { set: [{ key: "imagen_theme", type: "single_line_text_field", value: "retired-01" }], clear: [] })).toEqual({ ok: false, reason: "INCLUSION" });
   });
 
+  it("saving a theme Imagen added since the last Refresh adds it to Shopify's dropdown first, then saves", async () => {
+    // Shopify's dropdown as it was before Imagen gained journal-02 (an active Magic Shop theme).
+    await shopFixtures().setThemeChoices("mmp_shop", ["admiral-01", "royal-flush"]);
+    const pillow = (await entry("fx-pillow")).product;
+    expect(await updateStoreFields(actor, { productId: pillow.id, fields: { imagen_theme: "journal-02" }, variants: [] })).toEqual({ ok: true });
+    expect(shopFixtures().imagenThemeChoices()).toEqual(["admiral-01", "journal-02", "royal-flush"]);
+    expect((await entry("fx-pillow")).product.store?.imagenTheme).toBe("journal-02");
+    // An inactive theme is still refused by the app, and nothing is added for it.
+    expect(await updateStoreFields(actor, { productId: pillow.id, fields: { imagen_theme: "retired-01" }, variants: [] })).toMatchObject({ ok: false, status: 400 });
+    expect(shopFixtures().imagenThemeChoices()).not.toContain("retired-01");
+    // Put it back.
+    expect(await updateStoreFields(actor, { productId: pillow.id, fields: { imagen_theme: "admiral-01" }, variants: [] })).toEqual({ ok: true });
+  });
+
   it("print rules and templates work for a product only in the Magic Store", async () => {
     const all = await adminProducts();
     const canvas = all.find((p) => p.handle === "fx-canvas")!;

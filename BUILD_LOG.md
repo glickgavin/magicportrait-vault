@@ -789,6 +789,11 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 - **Dreamship shop list:** Settings › Printers and Data sources said Dreamship was "Connected (no shops)", though Dreamship has the Storyboards Shopify shop connected and active. `parseShops` only read a `results` list; it now reads `data` too, as the order lookup already did.
 - Removed the unused `store.howItWorks` copy.
 
+### 26 Nov: fix: saving a new Imagen theme on a product was refused
+- **Why:** Shopify's `mmp_shop.imagen_theme` dropdown only changes on "Refresh themes from Imagen". But the product page offers every active theme in the Magic Shop category, so a theme Imagen gained after the last Refresh was refused by Shopify. Live case: `store-pet-water-color` (created 13:22) and `store-mona-lisa-copy` (switched on 13:16), after the 13:13 Refresh, chosen for the Fleece Blanket.
+- **Fixed:** `updateStoreFields` adds a missing theme to Shopify's dropdown (`setThemeChoices`, allowed write 5) before saving it. `admin_shop_product_updated` then lists `imagen_theme_choices`. Inactive or unknown themes are still refused by the app.
+- **Tests:** unit `open-store-catalogue` (a theme missing from the dropdown is added, then saved; an inactive one is refused).
+
 ### 26 Nov: Dreamship sync fixed, and "Check all Dreamship products"
 - **Why new products came through without print settings:** Copy settings never copies print rules (by design); Sync from Dreamship failed on every product, because the app read the product in the shape Dreamship's connector shows (`variants`, `product_variant_id`, print areas with `width_px`) while the REST API returns `product_variants` (`id`, `item_variant`), `item.id`, and print areas with no pixel sizes; and Dreamship's listing updates rebuild a product's sizes in Shopify, dropping their `mmp_shop` fields.
 - **Fixed:** `lib/sources/dreamship.ts` reads the shapes in Dreamship's API reference (product, product list, item with `w`/`h`/`dpi`, order lines with `product_variant`), and still reads the old one. The undocumented `/items/{id}/print-areas/` and `/product-variants/{id}/` calls are gone.
