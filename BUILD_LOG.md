@@ -780,3 +780,6 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 ### 26 Nov: the Magic Store's Imagen category is `magicshop`
 - **Why themes were missing:** `open_store.theme_category` defaulted to `magicstore`, but Imagen's category for the store is "Magic Shop", slug `magicshop` (checked in Imagen's database, read only). No theme matched, so the lists showed only themes a product already uses, and new ones such as `store-the-morning-paper-copy` (active, one active scene, in Magic Shop) were left out.
 - **Done:** the default is now `magicshop` (registry, seed, fixtures, the `shop-settings` e2e and the spec). The live database has no row for this key yet, so the live site picks up the new default as soon as this is deployed.
+
+### 26 Nov: fix: Settings › Shop › product crashed
+- **Fixed:** since #44, every product page in Settings › Shop errored. The server page called `qualityForm()`, which lived in the client-only `StoreFieldsEditor.tsx`. It now lives in the plain `lib/open-store/quality-form.ts`, re-exported by the editor. Found when merging main; `shop-settings`, `shop-copy` and `store-layer` pass again.
