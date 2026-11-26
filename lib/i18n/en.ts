@@ -108,9 +108,6 @@ export const en = {
     linkExpired: "That link has expired. Enter your email and we'll send you a code instead.",
     orderEmailNote: "Came from your order email? Its button signs you in, no code needed.",
     fanLabel: "Sample greeting cards",
-    sampleTo: "Grandma Rose",
-    sampleFrom: "Sam",
-    sampleMessage: "Wishing you the happiest day. Thought you would love seeing Biscuit in his royal robes!",
   },
   shop: {
     gifts: "Gifts",

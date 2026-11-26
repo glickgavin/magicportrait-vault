@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { CardFan } from "@/components/CardFan";
+import { CardFanStatic } from "@/components/CardFanStatic";
 import { SignInForm } from "@/components/SignInForm";
 import { TrackPageView } from "@/components/TrackPageView";
 import { getSessionUser, safeNext } from "@/lib/auth/session";
@@ -22,7 +22,7 @@ export async function SignInScreen({ purpose, order, next, expired, legacyRedeem
   return (
     <div className="mx-auto max-w-[440px]">
       {legacyRedeem && <TrackPageView event="page_view_redeem" props={{ page_path: "/redeem", order_id_in_url: Boolean(order) }} />}
-      <CardFan />
+      <CardFanStatic label={t("signin.fanLabel")} />
       <h1 className="mt-6 text-center text-[28px] font-extrabold leading-tight tracking-tight">{title}</h1>
       <p className="mt-2 text-center text-[16px] leading-snug text-ink-2">{sub}</p>
       <div className="mt-5">

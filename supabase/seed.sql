@@ -107,6 +107,7 @@ insert into public.settings (key, value, type, section, label, description, opti
   ('links.main_site_url', '"https://magicportraits.ai"'::jsonb, 'text', 'links', 'Main site', null, null, 'seed', now()),
   ('links.start_portrait_url', '"https://magicportraits.ai/start"'::jsonb, 'text', 'links', 'Create a new portrait', null, null, 'seed', now()),
   ('links.order_session_url_template', '"https://magicportraits.ai/order?product_id=8471707222212&magicid=999&session={lptemp_session_id}"'::jsonb, 'text', 'links', 'Order as wall art link', null, null, 'seed', now()),
+  ('links.sample_cards', '["/sample-cards/merry-christmas.webp","/sample-cards/christmas-charm.webp","/sample-cards/snowy-window.webp"]'::jsonb, 'list', 'links', 'Sample cards (three images, left to right)', 'Finished greeting cards with a portrait, 5 × 7, shown fanned out on the sign-in page and on home. A path on this site or an https:// link.', null, 'seed', now()),
   ('links.menu_thumbnails', '[]'::jsonb, 'list', 'links', 'Menu thumbnails (six image URLs)', null, null, 'seed', now()),
   ('links.vip_login_url', '"https://shopify.com/4283367495/account"'::jsonb, 'text', 'links', 'VIP Login', null, null, 'seed', now()),
   ('tracking.entry_links', '["invoice"]'::jsonb, 'list', 'tracking', 'Tracked entry links', 'Names allowed in https://my.magicportraits.ai/from/<name> (e.g. the invoice email''s link). Each click is counted, then the person goes to the site; a sign-in that follows is credited to it.', null, 'seed', now()),
