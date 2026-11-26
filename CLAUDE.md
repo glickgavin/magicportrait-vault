@@ -56,7 +56,7 @@ tests/               unit + e2e; tests/fixtures/ fake data only
 
 **Data**
 - Shopify and Imagen are the sources of truth. Read them live; never copy orders, products or portraits into our database, except the cached session-id list, the copy of a portrait used on a card, the shop's carts and new uploads (`docs/shop.md`), and the open store's visitors, photos and pictures (`docs/open-store.md`).
-- Writes outside our database are allowed in exactly seven places:
+- Writes outside our database are allowed in exactly nine places:
   1. The mug choice on a Shopify order: `metafieldsSet` + `tagsAdd`, as in `docs/data.md`.
   2. Klaviyo events, profile properties and deletion jobs, and a marketing subscription that an open-store visitor ticked for, through the outbox only.
   3. The webhook-registration script, which a human runs.
@@ -64,6 +64,8 @@ tests/               unit + e2e; tests/fixtures/ fake data only
   5. Shop product fields: `metafieldsSet` on the `mmp_shop` namespace of products in the Store or Magic Store collection, and the `mmp_shop` metafield definitions, from Settings › Shop by a super user. Never any other product field.
   6. Open-store pictures: new Imagen sessions through Imagen's public API with this app's own key (`docs/open-store.md`).
   7. Dreamship orders: for a paid Shopify order line whose variant's maker is `dreamship`, upload the customer's picture as artwork and set it on that line of the Dreamship order imported for it, through Dreamship's API with this app's key (`docs/dreamship.md`). Never submit or cancel a Dreamship order, and never change any other Dreamship product, order or setting; order status is Shopify's and Dreamship's.
+  8. Dreamship products, clones only (approved by the owner, 26 Nov): Settings › Shop › Clone a product creates one new Dreamship product as a copy of a master's (same item, sizes, prices, artwork and shops, a new name), always as a marketplace draft, by a super user after a confirm (`docs/dreamship.md` › Clone a product). Never update or delete a Dreamship product.
+  9. The Magic Store collection, clones only: `collectionAddProducts` adds the Shopify product Dreamship made for a clone to the Magic Store collection. Never remove a product from a collection, and never change a product's status, title, price or photos.
   
   Never write to Imagen's database, the events mirror or the live site's databases.
 - The shop is hidden unless `shop.enabled` (customers) or `shop.super_user_preview` (super users) is on; hidden shop routes return 404 and shop UI doesn't render. Shop changes must leave every existing screen and test unchanged with both off.

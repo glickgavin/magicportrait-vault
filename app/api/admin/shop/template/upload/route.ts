@@ -61,7 +61,7 @@ export async function DELETE(req: Request) {
   const key = uploadKeyFor(entry.product.legacyId, mediaId);
   if (!key) return json({ error: "That isn't a photo uploaded for this product." }, 400);
   const saved = parseTemplate(entry.product.template?.value);
-  if (saved && (saved.background.media_id === mediaId || saved.overlay?.media_id === mediaId)) return json({ error: "The published template uses this photo. Publish one without it first." }, 409);
+  if (saved && (saved.background.media_id === mediaId || saved.overlay?.media_id === mediaId || Object.values(saved.scenes?.values ?? {}).some((x) => x.background.media_id === mediaId || x.overlay?.media_id === mediaId))) return json({ error: "The published template uses this photo. Publish one without it first." }, 409);
   await removeObjects("theme-assets", [key]);
   return json({ ok: true });
 }

@@ -101,7 +101,7 @@ async function themeNameMap(): Promise<Map<string, string>> {
 
 /** The store page for a collection (the home collection at /store), with filter, sort and "Show more" (docs/open-store.md › Store page). */
 export async function storePageData(opts: { handle: string | null; type: string | null; sort: StoreSort; page: number }) {
-  const s = await getSettings(["open_store.home_collection", "open_store.products_per_page"] as const);
+  const s = await getSettings(["open_store.home_collection", "open_store.products_per_page", "open_store.home_intro"] as const);
   const handle = opts.handle ?? s["open_store.home_collection"];
   const magic = await getStoreCatalog();
   let collection: StoreCollection | null = magic.collection && magic.collection.handle === handle ? magic.collection : null;
@@ -118,7 +118,8 @@ export async function storePageData(opts: { handle: string | null; type: string 
   const shownCount = Math.min(filtered.length, s["open_store.products_per_page"] * Math.max(1, opts.page));
   const [pricing, themeNames] = await Promise.all([storePricing(magic.collection?.id ?? null), themeNameMap()]);
   return {
-    collection: { handle: collection.handle, title: collection.title, description: collection.description },
+    // At /store the line under the heading is the store's own (open_store.home_intro), not the collection's description.
+    collection: { handle: collection.handle, title: collection.title, description: handle === s["open_store.home_collection"] && s["open_store.home_intro"].trim() ? s["open_store.home_intro"].trim() : collection.description },
     isHome: handle === s["open_store.home_collection"],
     types,
     type,
@@ -171,7 +172,7 @@ function drawInfo(e: StoreEntry): DrawInfo | null {
 
 /** Everything the product page needs before a picture (docs/open-store.md › Product page). Null: not in the store. */
 export async function productPageData(legacyId: string) {
-  const s = await getSettings(["open_store.shipping_days", "open_store.reassurance", "open_store.home_collection", "brand.timezone", "open_store.picture_options"] as const);
+  const s = await getSettings(["open_store.shipping_days", "open_store.reassurance", "open_store.home_collection", "brand.timezone", "open_store.picture_options", "open_store.hide_single_options"] as const);
   const magic = await getStoreCatalog();
   const entry = magic.entries.find((e) => e.product.legacyId === legacyId);
   if (!entry || entry.hidden.length) return null;
@@ -245,6 +246,8 @@ export async function productPageData(legacyId: string) {
     // Option chips with pictures (open_store.picture_options, or Shopify swatches on every value).
     optionSwatches: pictures.swatches,
     pictureOptions: s["open_store.picture_options"],
+    // An option with one value (Color: White on a blanket) has nothing to pick: not shown (open_store.hide_single_options).
+    hideSingleOptions: s["open_store.hide_single_options"],
     // No name box when the product doesn't ask for the name (e.g. its personalisation layer does).
     slots: photoSlots(theme?.photos ?? photos.length, photos, theme?.inputs?.map((i) => i.label) ?? []).map((sl) => (askName ? sl : { ...sl, nameLabel: null, namePlaceholder: null })),
     nameMax,

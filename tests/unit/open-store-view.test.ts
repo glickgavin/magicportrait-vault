@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canSeeOpenStore } from "@/lib/open-store/access";
-import { addWorkingDays, badgePct, categoryKey, chipColumns, chipImageUrl, chipPictures, listedThemes, deliveryWindow, fillStep, initialVariant, isSort, optionGroups, parseDays, photoSlots, shortDay, variantFor } from "@/lib/open-store/view";
+import { addWorkingDays, badgePct, categoryKey, chipColumns, chipImageUrl, chipPictures, listedThemes, deliveryWindow, fillStep, initialVariant, isSort, optionGroups, parseDays, shownOptionGroups, photoSlots, shortDay, variantFor } from "@/lib/open-store/view";
 import type { ShopVariant } from "@/lib/shop/sources/types";
 
 describe("open store: who sees it", () => {
@@ -59,6 +59,14 @@ describe("open store: page helpers", () => {
     expect(optionGroups(vs)).toEqual([{ name: "Size", values: ["S", "M"] }, { name: "Colour", values: ["Red", "Blue"] }]);
     expect(variantFor(vs, { Size: "M", Colour: "Blue" })?.id).toBe("c");
     expect(variantFor(vs, { Size: "S", Colour: "Blue" })).toBeNull();
+  });
+
+  it("an option with only one choice (Color: White on a blanket) isn't shown, unless the setting is off", () => {
+    const blanket = ["Small - 30x40in", "Medium - 50x60in", "Large - 60x80in"].map((size, i) => ({ id: `v${i}`, options: [{ name: "Color", value: "White" }, { name: "Size", value: size }] }));
+    expect(shownOptionGroups(blanket, true)).toEqual([{ name: "Size", values: ["Small - 30x40in", "Medium - 50x60in", "Large - 60x80in"] }]);
+    expect(shownOptionGroups(blanket, false).map((g) => g.name)).toEqual(["Color", "Size"]);
+    // The size still picks the right variant, with the hidden colour carried along.
+    expect(variantFor(blanket, { Color: "White", Size: "Large - 60x80in" })?.id).toBe("v2");
   });
 
   it("first variant: the one asked for, else the first available", () => {

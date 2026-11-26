@@ -1,8 +1,9 @@
 "use client";
 
+import { Move } from "lucide-react";
 import { useId } from "react";
 import { t } from "@/lib/i18n";
-import type { Layer, LayerTextId, LayerValues } from "@/lib/shop/layer";
+import type { Layer, LayerPosId, LayerTextId, LayerValues } from "@/lib/shop/layer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,8 +11,35 @@ import { cn } from "@/lib/utils";
  * product's template offers. The preview above redraws as they type; nothing is sent until Add to cart, where the
  * server checks it all again. The words are the customer's own: masked in session replay, never tracked.
  */
-export function Personalise({ layer, art, values, onChange, error }: { layer: Layer; art: { id: string; name: string; url: string }[]; values: LayerValues; onChange: (v: LayerValues) => void; error: { field: LayerTextId | "art"; text: string } | null }) {
+export function Personalise({
+  layer,
+  art,
+  values,
+  onChange,
+  error,
+  onReposition,
+  borderWidth = 0,
+}: {
+  layer: Layer;
+  art: { id: string; name: string; url: string }[];
+  values: LayerValues;
+  onChange: (v: LayerValues) => void;
+  error: { field: LayerTextId | "art"; text: string } | null;
+  /** When the template lets customers reposition: opens the editor on this item. */
+  onReposition?: (id: LayerPosId) => void;
+  /** The border's width for the chosen variant (0: no border offered for it). */
+  borderWidth?: number;
+}) {
   const uid = useId();
+  // "Reposition" sits on the label's line, at the end. Text boxes always have it (an empty one shows its example);
+  // the picture once one is chosen.
+  const move = (id: LayerPosId, label: string, has: boolean) =>
+    onReposition && has ? (
+      <button type="button" onClick={() => onReposition(id)} aria-label={t("store.repositionItem", { label })} className="-my-1 ml-auto flex h-8 flex-none items-center gap-1 rounded-full px-2.5 text-[13px] font-extrabold text-[#8E047B] underline-offset-2 hover:bg-pink-tint hover:underline" data-testid={`store-reposition-${id}`}>
+        <Move className="h-3.5 w-3.5" aria-hidden="true" />
+        {t("store.reposition")}
+      </button>
+    ) : null;
   const choices = layer.art ? layer.art.choices.map((id) => art.find((a) => a.id === id)).filter((a) => a !== undefined) : [];
   return (
     // No heading: the fields sit with the photo's own, so it's just "the pet's name" (or a picture) to fill in.
@@ -21,9 +49,12 @@ export function Personalise({ layer, art, values, onChange, error }: { layer: La
         const bad = error?.field === box.id;
         return (
           <div key={box.id} className="flex flex-col gap-2">
-            <label htmlFor={`${uid}-${box.id}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
-              {box.label} <span className="text-[13px] font-semibold text-[#6b6b6b]">({box.required ? t("store.required") : t("store.optional")})</span>
-            </label>
+            <div className="flex items-center gap-2">
+              <label htmlFor={`${uid}-${box.id}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
+                {box.label} <span className="text-[13px] font-semibold text-[#6b6b6b]">({box.required ? t("store.required") : t("store.optional")})</span>
+              </label>
+              {move(box.id, box.label, true)}
+            </div>
             <input
               id={`${uid}-${box.id}`}
               type="text"
@@ -49,10 +80,33 @@ export function Personalise({ layer, art, values, onChange, error }: { layer: La
           </div>
         );
       })}
+      {layer.border && borderWidth > 0 && (
+        <fieldset className="flex flex-col gap-2" data-testid="store-border">
+          <legend className="mb-2 text-[15px] font-extrabold text-[#1a1a1a]">{layer.border.label}</legend>
+          <div role="radiogroup" aria-label={layer.border.label} className="grid grid-cols-2 gap-2.5">
+            {([false, true] as const).map((on) => {
+              const picked = Boolean(values.border) === on;
+              return (
+                <label key={String(on)} className={cn("flex h-[60px] cursor-pointer items-center gap-3 rounded-[12px] px-3 text-[15px] focus-within:ring-2 focus-within:ring-[#DD07C4] focus-within:ring-offset-2", picked ? "border-2 border-[#DD07C4] bg-pink-tint font-extrabold text-[#8E047B]" : "border-[1.5px] border-[#D9D5CA] font-bold text-[#2b2b2b]")}>
+                  <input type="radio" className="sr-only" name={`${uid}-border`} checked={picked} onChange={() => onChange({ ...values, border: on })} />
+                  {/* A small print: edge to edge, or with a margin. */}
+                  <span className={cn("flex h-9 w-7 flex-none rounded-[3px] border border-black/15 bg-white shadow-sm", on ? "p-[3px]" : "p-0")} aria-hidden="true">
+                    <span className="block h-full w-full rounded-[1px] bg-gradient-to-br from-[#c98a52] to-[#2f3d55]" />
+                  </span>
+                  {on ? t("store.addBorder") : t("store.noBorder")}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
       {layer.art && choices.length > 0 && (
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-[15px] font-extrabold text-[#1a1a1a]">
-            {layer.art.label} <span className="text-[13px] font-semibold text-[#6b6b6b]">({layer.art.required ? t("store.required") : t("store.optional")})</span>
+          <legend className="mb-2 flex w-full items-center gap-2 text-[15px] font-extrabold text-[#1a1a1a]">
+            <span>
+              {layer.art.label} <span className="text-[13px] font-semibold text-[#6b6b6b]">({layer.art.required ? t("store.required") : t("store.optional")})</span>
+            </span>
+            {move("art", layer.art.label, Boolean(values.art))}
           </legend>
           <div role="radiogroup" aria-label={layer.art.label} className="flex flex-wrap gap-2.5">
             {!layer.art.required && (

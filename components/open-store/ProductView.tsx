@@ -4,23 +4,31 @@ import { storeFetch } from "./store-fetch";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Camera, Check, ChevronDown, Clock, Gift, Heart, Info, Loader2, Lock, Minus, MoveHorizontal, Plus, Star, Truck, X } from "lucide-react";
+import { Camera, Check, ChevronDown, Clock, Gift, Heart, Info, Loader2, Lock, Minus, MoveHorizontal, Pencil, Plus, Star, Truck, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ProductPageData, RelatedCard, VariantView } from "@/lib/open-store/pages";
-import { chipColumns, chipImageUrl, chipPictures, fillStep, optionGroups, variantFor } from "@/lib/open-store/view";
+import { chipColumns, chipImageUrl, chipPictures, fillStep, shownOptionGroups, variantFor } from "@/lib/open-store/view";
 import type { DescriptionBlock } from "@/lib/shop/description";
 import { defaultCrop, fitVariant } from "@/lib/shop/fit";
 import { formatMoney } from "@/lib/shop/money";
 import { t, tn } from "@/lib/i18n";
-import { trackClient } from "@/lib/track-client";
+import { trackClient as track } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 import { ShopPreview } from "@/components/shop/ShopPreview";
-import { checkLayerValues, layerActive, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
+import { templateFor } from "@/lib/shop/template";
+import { borderWidthFor, checkLayerValues, layerActive, type LayerPosId, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
 import { Personalise } from "./Personalise";
+import { Reposition, type RepositionPicture } from "./Reposition";
 import { ClosingCard, Faq, Guarantees, Homes, HowItWorks, RealQuality, Reviews, TrustCard, TrustpilotTop } from "./ProductLower";
 import { Stars } from "./Stars";
 import { STORE_CART_EVENT, type StoreCartEvent } from "./StoreCart";
 import { fileUrl, usePicture, type PictureView, type SlotPhoto } from "./use-picture";
+
+// The template editor's customer view (demo) tracks nothing.
+let muted = false;
+const trackClient: typeof track = (event, props) => {
+  if (!muted) track(event, props);
+};
 
 const ICONS = { truck: Truck, heart: Heart, lock: Lock, gift: Gift, star: Star, clock: Clock } as const;
 
@@ -83,6 +91,7 @@ export function ProductView({
   earlierPhotos,
   askEmail = true,
   moreGiftsStep = 4,
+  demo = false,
 }: {
   data: ProductPageData;
   initialVariantId: string | null;
@@ -95,10 +104,16 @@ export function ProductView({
   askEmail?: boolean;
   /** "On more gifts": how many show at first and per "See more gifts" (open_store.more_gifts_step). */
   moreGiftsStep?: number;
+  /** The template editor's customer view: a sample picture, nothing tracked, nothing made or added to a cart. */
+  demo?: boolean;
 }) {
   const router = useRouter();
   const uid = useId();
-  const groups = useMemo(() => optionGroups(data.variants), [data.variants]);
+  useEffect(() => {
+    muted = demo;
+  }, [demo]);
+  // The option rows; one with a single value is hidden when the store says so (the variant still carries it).
+  const groups = useMemo(() => shownOptionGroups(data.variants, data.hideSingleOptions !== false), [data.variants, data.hideSingleOptions]);
   const [variantId, setVariantId] = useState<string>(initialVariantId ?? data.variants.find((v) => v.available)?.id ?? data.variants[0]?.id);
   const variant: VariantView | undefined = data.variants.find((v) => v.id === variantId) ?? data.variants[0];
   const [shown, setShown] = useState(0);
@@ -178,11 +193,17 @@ export function ProductView({
   const onShow = picture ?? kept?.picture ?? null;
   const result = onShow ? (onShow.images[onShow.chosen] ?? onShow.images[0]) : null;
 
+  // The product photo for the chosen variant: a frame colour can have its own (the template's scenes).
+  const tpl = useMemo(() => (data.template ? templateFor(data.template, variant?.options) : null), [data.template, variant?.options]);
   // The personalisation layer (docs/open-store.md › Personalise): drawn on the preview as they type, a moment later.
   const layer = layerActive(data.template?.layer) ? data.template.layer : null;
-  const [layerVals, setLayerVals] = useState<LayerValues>(() => ({ art: layer?.art?.required ? (layer.art.choices[0] ?? null) : null }));
+  // The border's width for the chosen variant (0: none for it), drawn on every preview; the server works it out again.
+  const borderWidth = layer ? borderWidthFor(layer.border, variant?.options ?? []) : 0;
+  const [layerVals, setLayerVals] = useState<LayerValues>(() => ({ art: layer?.art?.required ? (layer.art.choices[0] ?? null) : null, border: layer?.border?.start === "border" }));
   const [drawVals, setDrawVals] = useState<LayerValues>(layerVals);
   const [layerError, setLayerError] = useState<{ field: LayerTextId | "art"; text: string } | null>(null);
+  // "Reposition": open on one item, when the template lets customers move things.
+  const [repositionAt, setRepositionAt] = useState<LayerPosId | null>(null);
   useEffect(() => {
     const id = window.setTimeout(() => setDrawVals(layerVals), 250);
     return () => window.clearTimeout(id);
@@ -439,11 +460,39 @@ export function ProductView({
     </>
   );
 
+  // Why a picture couldn't be made, under the photo row (where Generate is).
+  const statusBits = (
+    <>
+      {state.phase === "failed" && (
+        <div role="alert" className="flex flex-col items-start gap-2.5 rounded-[14px] bg-[#FDECEA] p-3.5 text-[14px] font-bold text-[#a1251b]" data-testid="store-failed">
+          {t("store.failed")}
+          <button type="button" onClick={() => openSheet(0)} className="h-10 rounded-[10px] border-[1.5px] border-[#a1251b] bg-white px-3 font-extrabold">
+            {t("store.chooseAnother")}
+          </button>
+        </div>
+      )}
+      {state.phase === "limited" && (
+        <p role="alert" className="rounded-[14px] bg-page p-3.5 text-[14px] font-bold text-[#2b2b2b]" data-testid="store-limited">
+          {state.count != null ? tn("store.limited", state.count) : t("store.limitedIp")}
+        </p>
+      )}
+      {state.phase === "busy" && (
+        <p role="alert" className="rounded-[14px] bg-page p-3.5 text-[14px] font-bold text-[#2b2b2b]">
+          {t("store.busy")}
+        </p>
+      )}
+    </>
+  );
+
+  // Reposition shows the print with their finished picture (its crop for this size), else the photo they added.
+  const repositionPicture: RepositionPicture | null =
+    result && variant?.aspect ? { url: fileUrl(result.file), crop: cropFor(result.width, result.height, variant.aspect, variant.placement), size: { width: result.width, height: result.height } } : photos[0]?.url ? { url: photos[0].url, crop: null, size: null } : null;
+
   const renderSlide = (slide: Slide | undefined) => {
-    if (slide?.kind === "drawn" && result && data.template && variant?.aspect)
+    if (slide?.kind === "drawn" && result && tpl && variant?.aspect)
       return (
         <ShopPreview
-          template={data.template}
+          template={tpl}
           pictureUrl={fileUrl(result.file)}
           crop={cropFor(result.width, result.height, variant.aspect, variant.placement)}
           pictureSize={{ width: result.width, height: result.height }}
@@ -451,7 +500,7 @@ export function ProductView({
           aspect={variant.aspect}
           background={variant.background}
           width={640}
-          layer={layer ? { values: drawVals, art: data.layerArt } : null}
+          layer={layer ? { values: { ...drawVals, border: Boolean(drawVals.border) && borderWidth > 0, borderWidth }, art: data.layerArt } : null}
           alt={t("store.yourPictureOn", { product: data.product.title })}
           className="rounded-none lg:rounded-[16px]"
         />
@@ -615,13 +664,28 @@ export function ProductView({
             const p = photos[i];
             const earlier = earlierPhotos.filter((e) => !photos.some((x) => x && "fileId" in x && x.fileId === e.fileId));
             const thumb = (cls: string) => (p?.url ? <img src={p.url} alt={t("store.yourPhoto")} className={cn("object-cover", cls)} /> : <span className={cn("block bg-page", cls)} aria-hidden="true" />);
+            // Generate sits in the photo's row (the last photo's, when there are two), next to the change button.
+            const generateHere = i === data.slots.length - 1;
             const change = (
-              <button type="button" disabled={creating} onClick={() => openSheet(i)} className="h-10 flex-none whitespace-nowrap rounded-[10px] border-[1.5px] border-[#1f1f1f] bg-white px-3.5 text-[14px] font-extrabold text-[#1f1f1f] disabled:opacity-50">
-                {t("store.changePhoto")}
+              <button type="button" disabled={creating} onClick={() => openSheet(i)} aria-label={t("store.changePhoto")} title={t("store.changePhoto")} className="flex h-11 w-11 flex-none items-center justify-center rounded-[10px] border-[1.5px] border-[#D9D5CA] bg-white text-[#1f1f1f] hover:border-[#1f1f1f] disabled:opacity-50" data-testid="store-change-photo">
+                <Pencil className="h-[18px] w-[18px]" aria-hidden="true" />
+              </button>
+            );
+            const generateButton = (
+              <button
+                type="button"
+                disabled={!filled || creating}
+                data-testid="store-create"
+                onClick={generate}
+                className="bg-primary-gradient shadow-primary flex h-11 flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-4 text-[15px] font-extrabold text-white disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#E7E3D8] disabled:text-[#6b6b6b] disabled:shadow-none"
+              >
+                {creating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {creating ? t("store.creating") : t("store.create")}
               </button>
             );
             return (
-              // Their photo, in the same place in every state: choose one, then the photo, the progress (phones) or "ready".
+              // Their photo, in the same place in every state: choose one; then the photo with change and Generate;
+              // the progress (phones); then "ready" with change.
               <section key={i} className="mx-4 mt-6 flex flex-col gap-2.5 lg:mx-0" aria-labelledby={`${uid}-slot-${i}`}>
                 <h2 id={`${uid}-slot-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
                   {slot.label}
@@ -646,8 +710,8 @@ export function ProductView({
                     {emailBits}
                   </div>
                 ) : picture && i === 0 ? (
-                  <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border-[1.5px] border-[#F2C6EA] bg-[#FFF8FD] py-2.5 pl-2.5 pr-3" data-testid="store-ready" data-ph-mask>
-                    <span className="relative h-[60px] w-[60px] flex-none">
+                  <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border-[1.5px] border-[#F2C6EA] bg-[#FFF8FD] py-2.5 pl-2.5 pr-2.5" data-testid="store-ready" data-ph-mask>
+                    <span className="relative h-[56px] w-[56px] flex-none">
                       {thumb("h-full w-full rounded-[10px]")}
                       <span className="absolute -bottom-1.5 -right-1.5 flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 border-white bg-[#8E047B]" aria-hidden="true">
                         <Check className="h-3 w-3 text-white" strokeWidth={3.4} />
@@ -660,13 +724,11 @@ export function ProductView({
                     {change}
                   </div>
                 ) : p ? (
-                  <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border-[1.5px] border-[#D9D5CA] py-2.5 pl-2.5 pr-3" data-testid="photo-added" data-ph-mask>
-                    {thumb("h-14 w-14 flex-none rounded-[10px]")}
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-[14px] font-extrabold text-[#1a1a1a]">{kept ? t("store.newPhotoAdded") : t("store.photoAdded")}</span>
-                      {kept && <span className="text-[13px] leading-[1.4] text-[#4d4d4d]">{t("store.newPhotoSub")}</span>}
-                    </span>
+                  <div className="ph-no-capture flex items-center gap-2.5 rounded-[14px] border-[1.5px] border-[#D9D5CA] py-2 pl-2 pr-2" data-testid="photo-added" data-ph-mask>
+                    {thumb("h-12 w-12 flex-none rounded-[10px]")}
+                    <span className="min-w-0 flex-1 text-[14px] font-extrabold leading-[1.25] text-[#1a1a1a]">{kept ? t("store.newPhotoAdded") : t("store.photoAdded")}</span>
                     {change}
+                    {generateHere && generateButton}
                   </div>
                 ) : (
                   <label htmlFor={`${uid}-file-${i}`} className="relative flex cursor-pointer flex-col items-center gap-2 rounded-[16px] border-2 border-dashed border-[#D9A6CF] bg-[#FFF8FD] px-[18px] py-6 text-center focus-within:ring-2 focus-within:ring-[#DD07C4]">
@@ -677,6 +739,17 @@ export function ProductView({
                     <span className="text-[13px] leading-[1.45] text-[#616161]">{t("store.photoFormats", { mb: maxMb })}</span>
                   </label>
                 )}
+                {generateHere && p && !picture && !creating && (
+                  <span className="text-[13px] leading-[1.45] text-[#616161]" data-testid="store-create-note">
+                    {kept ? t("store.newPhotoSub") : t("store.createNote")}
+                  </span>
+                )}
+                {generateHere && kept && !creating && (
+                  <button type="button" onClick={keepPicture} data-testid="store-keep" className="self-start px-0.5 py-1 text-[14px] font-extrabold text-[#8E047B] underline underline-offset-2">
+                    {kept.names[0]?.trim() ? t("store.keepPictureNamed", { name: kept.names[0].trim() }) : t("store.keepPicture")}
+                  </button>
+                )}
+                {generateHere && statusBits}
                 {!p && earlier.length > 0 && (
                   <div className="flex flex-col gap-2" data-testid="earlier-photos">
                     <span className="text-[13px] font-bold text-[#4d4d4d]">{t("store.usePhotoBefore")}</span>
@@ -736,74 +809,65 @@ export function ProductView({
                 // Show their picture on the product, where the words go.
                 if (canDraw) setShown(0);
               }}
+              onReposition={layer.reposition && data.template ? (id) => setRepositionAt(id) : undefined}
+              borderWidth={borderWidth}
+            />
+          )}
+          {layer?.reposition && data.template && (
+            <Reposition
+              open={repositionAt !== null}
+              onClose={() => setRepositionAt(null)}
+              layer={layer}
+              template={tpl ?? data.template}
+              values={{ ...layerVals, border: Boolean(layerVals.border) && borderWidth > 0, borderWidth }}
+              onSave={(pos) => {
+                setLayerVals((v) => ({ ...v, pos }));
+                if (canDraw) setShown(0);
+              }}
+              art={data.layerArt}
+              picture={repositionPicture}
+              placement={variant?.placement ?? "cover"}
+              background={variant?.background ?? null}
+              aspect={variant?.aspect ?? 1}
+              start={repositionAt ?? "t1"}
+              productId={pid}
             />
           )}
 
-          {!picture && (
-            <p className="mx-4 mt-3 text-[12px] leading-[1.5] text-[#616161] lg:mx-0">
-              {t("store.consent")}{" "}
-              <a href="https://magicportraits.ai/policies/privacy-policy" className="underline" target="_blank" rel="noreferrer">
-                {t("store.privacy")}
-              </a>
-            </p>
-          )}
-
-          <section className="mx-4 mt-3.5 flex flex-col gap-2.5 lg:mx-0">
-            {picture ? (
-              <div className="flex gap-2.5">
-                <div className="flex h-14 flex-none items-center rounded-[12px] border-[1.5px] border-[#D9D5CA]" role="group" aria-label={t("store.quantity")}>
-                  <button type="button" aria-label={t("store.less")} disabled={qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-full w-11 items-center justify-center disabled:opacity-40">
-                    <Minus className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <span className="w-6 text-center text-[16px] font-extrabold" aria-live="polite">
-                    {qty}
-                  </span>
-                  <button type="button" aria-label={t("store.moreQty")} disabled={qty >= 10} onClick={() => setQty((q) => Math.min(10, q + 1))} className="flex h-full w-11 items-center justify-center disabled:opacity-40">
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-                <button type="button" data-testid="store-add" disabled={adding || !variant?.available} onClick={() => void addToCart()} className="bg-primary-gradient shadow-primary flex h-14 flex-1 items-center justify-center gap-2 rounded-[12px] text-[17px] font-extrabold text-white disabled:opacity-60">
-                  {adding && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
-                  {adding ? t("store.adding") : price ? t("store.addToCartPrice", { price: formatMoney(Number(price) * qty, data.pricing.currency) }) : t("store.addToCart")}
+          {/* Add to cart is always here: greyed until their picture is ready (Generate is with their photo, above). */}
+          <section className="mx-4 mt-5 flex flex-col gap-2.5 lg:mx-0">
+            <div className="flex gap-2.5">
+              <div className={cn("flex h-14 flex-none items-center rounded-[12px] border-[1.5px] border-[#D9D5CA]", !picture && "opacity-50")} role="group" aria-label={t("store.quantity")}>
+                <button type="button" aria-label={t("store.less")} disabled={!picture || qty <= 1} onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-full w-11 items-center justify-center disabled:opacity-40">
+                  <Minus className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <span className="w-6 text-center text-[16px] font-extrabold" aria-live="polite">
+                  {qty}
+                </span>
+                <button type="button" aria-label={t("store.moreQty")} disabled={!picture || qty >= 10} onClick={() => setQty((q) => Math.min(10, q + 1))} className="flex h-full w-11 items-center justify-center disabled:opacity-40">
+                  <Plus className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={!filled || creating}
-                  data-testid="store-create"
-                  onClick={generate}
-                  className="bg-primary-gradient shadow-primary flex h-14 items-center justify-center gap-2 rounded-[12px] text-[17px] font-extrabold text-white disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#E7E3D8] disabled:text-[#6b6b6b] disabled:shadow-none"
-                >
-                  {creating && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
-                  {creating ? t("store.creating") : t("store.create")}
-                </button>
-                <span className="text-center text-[13px] text-[#616161]">{t("store.createNote")}</span>
-                {kept && !creating && (
-                  <button type="button" onClick={keepPicture} data-testid="store-keep" className="self-center px-2 py-1 text-[14px] font-extrabold text-[#8E047B] underline underline-offset-2">
-                    {kept.names[0]?.trim() ? t("store.keepPictureNamed", { name: kept.names[0].trim() }) : t("store.keepPicture")}
-                  </button>
+              <button
+                type="button"
+                data-testid="store-add"
+                disabled={!picture || adding || !variant?.available}
+                aria-describedby={!picture ? `${uid}-add-note` : undefined}
+                onClick={() => void addToCart()}
+                className={cn(
+                  "flex h-14 flex-1 items-center justify-center gap-2 rounded-[12px] text-[17px] font-extrabold",
+                  picture ? "bg-primary-gradient shadow-primary text-white disabled:opacity-60" : "cursor-not-allowed bg-[#E7E3D8] text-[#6b6b6b]",
                 )}
-              </>
-            )}
-            {picture && <p className="text-center text-[12px] text-[#616161]">{t("store.payments")}</p>}
-            {state.phase === "failed" && (
-              <div role="alert" className="flex flex-col items-start gap-2.5 rounded-[14px] bg-[#FDECEA] p-3.5 text-[14px] font-bold text-[#a1251b]" data-testid="store-failed">
-                {t("store.failed")}
-                <button type="button" onClick={() => openSheet(0)} className="h-10 rounded-[10px] border-[1.5px] border-[#a1251b] bg-white px-3 font-extrabold">
-                  {t("store.chooseAnother")}
-                </button>
-              </div>
-            )}
-            {state.phase === "limited" && (
-              <p role="alert" className="rounded-[14px] bg-page p-3.5 text-[14px] font-bold text-[#2b2b2b]" data-testid="store-limited">
-                {state.count != null ? tn("store.limited", state.count) : t("store.limitedIp")}
-              </p>
-            )}
-            {state.phase === "busy" && (
-              <p role="alert" className="rounded-[14px] bg-page p-3.5 text-[14px] font-bold text-[#2b2b2b]">
-                {t("store.busy")}
+              >
+                {adding && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+                {adding ? t("store.adding") : price ? t("store.addToCartPrice", { price: formatMoney(Number(price) * qty, data.pricing.currency) }) : t("store.addToCart")}
+              </button>
+            </div>
+            {picture ? (
+              <p className="text-center text-[12px] text-[#616161]">{t("store.payments")}</p>
+            ) : (
+              <p id={`${uid}-add-note`} className="text-center text-[13px] text-[#616161]" data-testid="store-add-note">
+                {t("store.addAfterPicture")}
               </p>
             )}
             {note && (
@@ -914,6 +978,7 @@ export function ProductView({
   );
 
   function generate() {
+    if (demo) return;
     setPhotoError(null);
     void create(photos as SlotPhoto[], names);
   }
@@ -929,7 +994,7 @@ export function ProductView({
   }
 
   async function addToCart() {
-    if (!picture || !variant) return;
+    if (!picture || !variant || demo) return;
     let layerBody: LayerValues | undefined;
     if (layer) {
       const c = checkLayerValues(layer, layerVals);
@@ -949,7 +1014,7 @@ export function ProductView({
       setNote(b?.error === "layer_invalid" && b.message ? b.message : t("store.addError"));
       return;
     }
-    if (layer && layerBody) trackClient("store_layer_filled", { product_id: pid, has_text1: Boolean(layerBody.t1), has_text2: Boolean(layerBody.t2), has_art: Boolean(layerBody.art) });
+    if (layer && layerBody) trackClient("store_layer_filled", { product_id: pid, has_text1: Boolean(layerBody.t1), has_text2: Boolean(layerBody.t2), has_art: Boolean(layerBody.art), has_border: Boolean(layerBody.border) });
     const body = (await r.json()) as { cart: StoreCartEvent["cart"] };
     window.dispatchEvent(new CustomEvent<StoreCartEvent>(STORE_CART_EVENT, { detail: { cart: body.cart, open: true } }));
   }

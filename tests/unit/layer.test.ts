@@ -2,9 +2,9 @@ import { createCanvas } from "@napi-rs/canvas";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { registerFonts } from "@/lib/render/render";
-import { checkLayerValues, cleanLayerText, containIn, defaultLayerText, drawLayer, layerAttributes, layerSchema, layerValuesFromProps, type Layer, type LayerCtx } from "@/lib/shop/layer";
+import { basePos, borderWidthFor, checkLayerValues, pictureRect, cleanLayerText, cleanPos, containIn, defaultLayerText, drawLayer, layerAttributes, layerSchema, layerValuesFromProps, placeBox, positionedLayer, type Layer, type LayerCtx } from "@/lib/shop/layer";
 import { flatPicture, type PreviewCtx } from "@/lib/shop/preview";
-import { defaultTemplate, templateSchema } from "@/lib/shop/template";
+import { defaultTemplate, templateFor, templateSchema } from "@/lib/shop/template";
 
 // The personalisation layer (docs/shop.md › Personalisation layer): schema, the customer's values, and drawing.
 
@@ -137,5 +137,146 @@ describe("drawing", () => {
     for (let y = 312; y < 360; y++) for (let x = 40; x < 360; x++) if (pixel(layered, x, y)[0] > 200) white++;
     expect(white).toBeGreaterThan(100);
     for (let y = 0; y < 300; y++) for (let x = 0; x < 400; x += 7) expect(pixel(layered, x, y)).toEqual(pixel(plain, x, y));
+  });
+});
+
+describe("repositioning (the template's switch, the customer's positions)", () => {
+  const movable: Layer = { ...layer, reposition: true };
+  const t1 = movable.texts[0];
+
+  it("is off unless the template turns it on; old templates parse with it off", () => {
+    expect(layerSchema.parse({ enabled: true, texts: [defaultLayerText("t1")] }).reposition).toBe(false);
+    expect(positionedLayer(layer, { t1: "Teddy", pos: { t1: { cx: 0.2, cy: 0.2, rotate: 30, scale: 2 } } })).toBe(layer);
+  });
+
+  it("starts from the template's box: its centre, its turn, size 1", () => {
+    expect(basePos(t1.box, 5)).toEqual({ cx: 0.5, cy: 0.84, rotate: 5, scale: 1 });
+  });
+
+  it("moves, turns and resizes a box about its centre, never past the print area", () => {
+    // Twice the size about the same centre.
+    expect(placeBox({ x: 0.4, y: 0.4, w: 0.2, h: 0.1 }, { cx: 0.5, cy: 0.45, rotate: 10, scale: 2 })).toEqual({ box: { x: 0.3, y: 0.35, w: 0.4, h: 0.2 }, rotate: 10, scale: 2 });
+    // Dragged off the edge: the box stops at it.
+    expect(placeBox({ x: 0.4, y: 0.4, w: 0.2, h: 0.1 }, { cx: 1.5, cy: -1, rotate: 0, scale: 1 }).box).toEqual({ x: 0.8, y: 0, w: 0.2, h: 0.1 });
+    // A box as wide as the print area can't grow; a turn past 180° wraps round.
+    expect(placeBox({ x: 0.1, y: 0.78, w: 0.8, h: 0.12 }, { cx: 0.5, cy: 0.84, rotate: 190, scale: 2.5 })).toMatchObject({ scale: 1.25, rotate: -170 });
+  });
+
+  it("the text's size grows with its box, and its turn follows", () => {
+    const l = positionedLayer(movable, { t1: "Teddy", pos: { t1: { cx: 0.5, cy: 0.3, rotate: -15, scale: 1.25 } } });
+    expect(l.texts[0]).toMatchObject({ rotate: -15, size: t1.size * 1.25 });
+    expect(l.texts[0].box.y + l.texts[0].box.h / 2).toBeCloseTo(0.3, 4);
+    // The other box is untouched.
+    expect(l.texts[1]).toEqual(movable.texts[1]);
+  });
+
+  it("is checked on the server: only with the switch on, only for what's filled in, kept inside the limits", () => {
+    const pos = { t1: { cx: 2, cy: 0.5, rotate: 400, scale: 9 }, t2: { cx: 0.5, cy: 0.5, rotate: 0, scale: 1 }, art: { cx: 0.1, cy: 0.1, rotate: 0, scale: 1 } };
+    const ok = checkLayerValues(movable, { t1: "Teddy", pos });
+    expect(ok).toEqual({ ok: true, values: { t1: "Teddy", art: null, pos: { t1: { cx: 1, cy: 0.5, rotate: 40, scale: 2.5 } } } });
+    expect(checkLayerValues(layer, { t1: "Teddy", pos })).toEqual({ ok: true, values: { t1: "Teddy", art: null } });
+    expect(cleanPos({ cx: "x", cy: 0, rotate: 0, scale: 1 })).toBeNull();
+    expect(cleanPos({ cx: Number.NaN, cy: 0, rotate: 0, scale: 1 })).toBeNull();
+  });
+
+  it("goes on the order line as one short property and comes back", () => {
+    const values = { t1: "Teddy", pos: { t1: { cx: 0.5, cy: 0.3, rotate: -15, scale: 1.25 } } };
+    const attrs = layerAttributes(values);
+    expect(attrs).toEqual([
+      { key: "_shop_layer_t1", value: "Teddy" },
+      { key: "_shop_layer_pos", value: '{"t1":[0.5,0.3,-15,1.25]}' },
+    ]);
+    expect(layerValuesFromProps(Object.fromEntries(attrs.map((a) => [a.key, a.value])))).toEqual(values);
+    // A bad position property is ignored; positions alone (no words) put nothing on the line.
+    expect(layerValuesFromProps({ _shop_layer_t1: "Teddy", _shop_layer_pos: "{nope" })).toEqual({ t1: "Teddy" });
+    expect(layerAttributes({ pos: values.pos })).toEqual([]);
+  });
+
+  it("is drawn where the customer put it: moved and turned", () => {
+    const { ctx, calls } = fakeCtx();
+    drawLayer(ctx, 1000, 1000, { layer: movable, values: { t1: "Teddy", pos: { t1: { cx: 0.5, cy: 0.3, rotate: 90, scale: 1 } } }, art: new Map(), family: (f) => f });
+    const turn = calls.find((c) => c.op === "rotate");
+    expect(turn?.args[0]).toBeCloseTo(Math.PI / 2, 6);
+    const at = calls.find((c) => c.op === "translate");
+    expect(at?.args).toEqual([500, 300]);
+  });
+});
+
+describe("the border (No border / Add border)", () => {
+  const border = layerSchema.parse({ enabled: true, texts: [], border: { option: "Size", width: 0.04, widths: { '8x10"': 0.03, '24x36"': 0.06, "Mini": 0 } } }).border!;
+  const withBorder: Layer = { ...layer, border };
+
+  it("is a layer on its own, starts as No border and white", () => {
+    expect(border).toMatchObject({ label: "Border", color: "#FFFFFF", start: "none" });
+    expect(layerSchema.parse({ enabled: true, texts: [], border: {} }).border).toBeTruthy();
+  });
+
+  it("takes its width from the variant's value of the chosen option, else the border's own", () => {
+    expect(borderWidthFor(border, [{ name: "Frame", value: "Black" }, { name: "Size", value: '24x36"' }])).toBe(0.06);
+    expect(borderWidthFor(border, [{ name: "Size", value: '12x16"' }])).toBe(0.04);
+    expect(borderWidthFor(border, [{ name: "Size", value: "Mini" }])).toBe(0);
+    expect(borderWidthFor({ ...border, option: null }, [{ name: "Size", value: '24x36"' }])).toBe(0.04);
+    expect(borderWidthFor(null, [])).toBe(0);
+  });
+
+  it("the customer sends only yes or no; it's kept only when the template offers it", () => {
+    expect(checkLayerValues(withBorder, { t1: "Teddy", border: true, borderWidth: 0.2 })).toEqual({ ok: true, values: { t1: "Teddy", art: null, border: true } });
+    expect(checkLayerValues(layer, { t1: "Teddy", border: true })).toEqual({ ok: true, values: { t1: "Teddy", art: null } });
+    expect(checkLayerValues(withBorder, { t1: "Teddy", border: "yes" })).toEqual({ ok: true, values: { t1: "Teddy", art: null } });
+  });
+
+  it("goes on the order line as its width, even with no words, and comes back", () => {
+    const attrs = layerAttributes({ border: true, borderWidth: 0.05 });
+    expect(attrs).toEqual([{ key: "_shop_layer_border", value: "0.05" }]);
+    expect(layerValuesFromProps({ _shop_layer_border: "0.05" })).toEqual({ border: true, borderWidth: 0.05 });
+    expect(layerValuesFromProps({ _shop_layer_border: "nope" })).toBeNull();
+    expect(layerAttributes({ border: false, borderWidth: 0.05 })).toEqual([]);
+  });
+
+  it("puts the picture inside an even margin of the shorter side", () => {
+    expect(pictureRect(1200, 1600, { border: true, borderWidth: 0.05 })).toEqual({ x: 60, y: 60, w: 1080, h: 1480 });
+    expect(pictureRect(1200, 1600, { border: false, borderWidth: 0.05 })).toEqual({ x: 0, y: 0, w: 1200, h: 1600 });
+    expect(pictureRect(1200, 1600, null)).toEqual({ x: 0, y: 0, w: 1200, h: 1600 });
+  });
+
+  it("on a real canvas: the margin is the border's colour and the picture fills the rest", async () => {
+    const pic = createCanvas(400, 400);
+    const p = pic.getContext("2d");
+    p.fillStyle = "#336699";
+    p.fillRect(0, 0, 400, 400);
+    const make = (w: number, h: number) => {
+      const c = createCanvas(w, h);
+      return { canvas: c, ctx: c.getContext("2d") as unknown as PreviewCtx };
+    };
+    const tpl = defaultTemplate({ media_id: "m", url: "u", w: 400, h: 400 });
+    const lay: Layer = { ...withBorder, texts: [], border: { ...border, color: "#FF0000" } };
+    const f = flatPicture({ picture: pic, crop: { x: 0, y: 0, w: 400, h: 400 }, placement: "cover", backgroundColour: null, targetAspect: 1, makeCanvas: make, flatMax: 400, template: tpl, layer: { layer: lay, values: { border: true, borderWidth: 0.05 }, art: new Map(), family: (x) => `"${x}"` } });
+    const d = (await sharp((f.canvas as unknown as { toBuffer(m: "image/png"): Buffer }).toBuffer("image/png")).raw().toBuffer({ resolveWithObject: true })).data;
+    const pixel = (x: number, y: number) => [...d.subarray((y * 400 + x) * 4, (y * 400 + x) * 4 + 3)];
+    expect(pixel(5, 5)).toEqual([255, 0, 0]);
+    expect(pixel(395, 200)).toEqual([255, 0, 0]);
+    expect(pixel(25, 25)).toEqual([0x33, 0x66, 0x99]);
+    expect(pixel(200, 200)).toEqual([0x33, 0x66, 0x99]);
+  });
+});
+
+describe("a photo per option (frame colours)", () => {
+  const main = { media_id: "m", url: "/black.jpg", w: 100, h: 100 };
+  const white = { media_id: "w", url: "/white.jpg", w: 100, h: 100 };
+  const base = defaultTemplate(main);
+  const t = templateSchema.parse({ ...base, scenes: { option: "Frame", values: { White: { background: white } } } });
+
+  it("swaps the photo for the chosen value and leaves everything else (the zone, the layer) alone", () => {
+    const w = templateFor(t, [{ name: "Frame", value: "White" }, { name: "Size", value: "8x10" }]);
+    expect(w.background).toEqual(white);
+    expect(w.overlay).toBeNull();
+    expect(w.zone).toEqual(t.zone);
+  });
+
+  it("keeps the main photo for a value without its own, another option, or no options", () => {
+    expect(templateFor(t, [{ name: "Frame", value: "Black" }])).toBe(t);
+    expect(templateFor(t, [{ name: "Size", value: "White" }])).toBe(t);
+    expect(templateFor(t, null)).toBe(t);
+    expect(templateFor(base, [{ name: "Frame", value: "White" }])).toBe(base);
   });
 });

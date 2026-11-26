@@ -98,6 +98,12 @@ export function optionGroups(variants: WithOptions[]): { name: string; values: s
   return out;
 }
 
+/** The option rows to show: with `hideSingle`, an option with only one value is left out (there's nothing to pick). */
+export function shownOptionGroups(variants: WithOptions[], hideSingle: boolean): { name: string; values: string[] }[] {
+  const groups = optionGroups(variants);
+  return hideSingle ? groups.filter((g) => g.values.length > 1) : groups;
+}
+
 /** The variant with these option values (null when that combination doesn't exist). */
 export function variantFor<V extends WithOptions>(variants: V[], chosen: Record<string, string>): V | null {
   return variants.find((v) => v.options.every((o) => chosen[o.name] === o.value)) ?? null;

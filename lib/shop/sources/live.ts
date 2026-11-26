@@ -197,6 +197,20 @@ export class ShopCatalogLive implements ShopCatalogSource {
     return { ok: true };
   }
 
+  async addToCollection(collectionId: string, productId: string): Promise<WriteResult> {
+    if (!/^gid:\/\/shopify\/Product\/\d+$/.test(productId)) return { ok: false, reason: "bad_product_id" };
+    const id = /^\d+$/.test(collectionId) ? `gid://shopify/Collection/${collectionId}` : collectionId;
+    if (!/^gid:\/\/shopify\/Collection\/\d+$/.test(id)) return { ok: false, reason: "bad_collection_id" };
+    const d = await this.gql<{ collectionAddProducts: { userErrors: { message: string }[] } }>(
+      `mutation AddToCollection($id: ID!, $productIds: [ID!]!) { collectionAddProducts(id: $id, productIds: $productIds) { userErrors { message } } }`,
+      { id, productIds: [productId] },
+    );
+    const errs = d.collectionAddProducts.userErrors;
+    // Already in the collection is fine: the clone's "finish" can be run again.
+    if (errs.length && !errs.every((e) => /already/i.test(e.message))) return { ok: false, reason: errs.map((e) => e.message).join(",").slice(0, 200) };
+    return { ok: true };
+  }
+
   async setThemeChoices(namespace: string, choices: string[]): Promise<WriteResult> {
     const d = await this.gql<{ metafieldDefinitionUpdate: { userErrors: { message: string; code?: string }[] } }>(M_DEF_UPDATE, {
       definition: { namespace, key: "imagen_theme", ownerType: "PRODUCT", validations: [{ name: "choices", value: JSON.stringify(choices) }] },
