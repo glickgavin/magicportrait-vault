@@ -406,6 +406,7 @@ export const REGISTRY = {
     label: "Default photo slots' words",
     description: "Slot 1 uses the first entry's label and name label, slot 2 the second, and so on. How many photos a product takes comes from its Imagen theme.",
   }),
+  "open_store.admin_group_prefix": text("open_store", "magic", { label: "Product groups in Settings: collection handles starting with", description: "Settings › Shop › Products groups products by every Shopify collection whose handle starts with this (the Magic Store collection itself and empty ones are left out).", pattern: /^[a-z0-9-]{1,40}$/, max: 40 }),
   "open_store.ask_name": bool("open_store", true, { label: "Ask for the pet's name by default", description: "The name next to the photo, used by Imagen to make the picture. A product can turn it off (e.g. when its personalisation layer asks for the name)." }),
   "open_store.name_max": num("open_store", 14, { label: "Default name length (characters)", min: 1, max: 40 }),
   "open_store.photo_tips": text("open_store", "Best results: one pet, facing the camera, in good light, with the whole head in the picture.", { label: "Default photo tips", max: 300 }),

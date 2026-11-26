@@ -273,6 +273,8 @@ The SHOP group in the Settings menu:
 | **Magic Store** | `/settings/shop/magic-store` | That store's own settings: who sees it (switches), its collection (`open_store.collection`, default `magic-store`), the menu, the home collection, the discount, the reassurance rows, the limits, timings, photo sizes, the visitor cookie, the email ask, how many "On more gifts" products show per step (`open_store.more_gifts_step`), and the store defaults for every product field. **Imagen themes**: only those in Imagen's category `open_store.theme_category` (default `magicstore`, matched without case, spaces or dashes; empty lists them all), plus any theme a product already uses; the same filter applies to the theme dropdown on each product and to Shopify's dropdown (26 Nov). It only shortens the lists: a product's theme outside the category keeps working. **Refresh themes from Imagen**. The numbers (Settings › Shop › Magic Store numbers, below) and the PostHog dashboard link |
 | **Photo library**, **AI room photos** | as today | Unchanged |
 
+**The Products page is grouped** (26 Nov). It opens on one card per Shopify collection whose handle starts with `open_store.admin_group_prefix` (default `magic`). The Magic Store collection itself and empty collections are left out, and the card shows the title after "Magic Store · ". Each card shows how many products, hidden and warnings it has. Clicking one (`?group=<handle>`) lists its products in the collection's order, with the same filters. A product in two collections is in both groups. Products in none are under **Not in a group**, and **All products** (`?group=all`, or any `?filter=`) is the full list as before.
+
 **One product page** (re-laid out 26 Nov: a header, then tabs):
 
 1. **Header:**

@@ -6,7 +6,7 @@ import { signInWithLink } from "./auth";
 test("an uploaded template photo can be removed with its ×", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "one viewport is enough");
   await signInWithLink(page, "super@example.com", "/");
-  await page.goto("/settings/shop");
+  await page.goto("/settings/shop?group=all");
   const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
   const product = await tile.getByRole("link", { name: "Open Magic Portrait Tile →" }).getAttribute("href");
   await page.goto(product!);
@@ -33,7 +33,7 @@ test("an uploaded template photo can be removed with its ×", async ({ page }, i
 test("a photo the live template uses is removed at once and deleted when you publish", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "one viewport is enough");
   await signInWithLink(page, "super@example.com", "/");
-  await page.goto("/settings/shop");
+  await page.goto("/settings/shop?group=all");
   const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
   const product = await tile.getByRole("link", { name: "Open Magic Portrait Tile →" }).getAttribute("href");
   await page.goto(product!);

@@ -41,6 +41,8 @@ export interface OpenStoreSource {
   storeProducts(handle: string, namespace: string): Promise<{ collection: StoreCollection; products: ShopProduct[] } | null>;
   /** A collection's title, description, image and product ids (a category, or the home collection). */
   collection(handle: string): Promise<StoreCollection | null>;
+  /** Every collection whose handle starts with `prefix` (Settings › Shop › Products groups), with its product ids. */
+  collectionsByPrefix(prefix: string): Promise<StoreCollection[]>;
   /** The navigation menu with each item's collection (null when there's no such menu). */
   menu(handle: string): Promise<StoreMenu | null>;
   policies(): Promise<StorePolicies>;

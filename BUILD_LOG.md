@@ -763,3 +763,8 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 ### 26 Nov: "Start again as a new visitor" (testing)
 - **Done:** Settings › Magic Store › Testing. It removes the super user's own state: this browser's visitor plus the visitors linked to their email (rows, photos, pictures, previews), their Gifts & Products cart and uploads, the visitor, first-touch and entry cookies, and the store's notes in the browser. Sign-in is kept. `POST /api/admin/test-reset` (404 for anyone else), `lib/admin/test-reset.ts`, new event `admin_test_reset`.
 - **Tests:** e2e `test-reset.spec.ts` (a picture and a cart, reset, fresh visitor and still signed in; others get 404).
+
+### 26 Nov: Settings › Shop › Products in groups
+- **Done:** the page opens on one card per collection whose handle starts with `open_store.admin_group_prefix` (new setting, default `magic`, on Settings › Magic Store › Collection and menu). The Magic Store collection and empty ones are left out. A card opens its products (`?group=`) with the same filters; "Not in a group" and "All products" (`?group=all`) cover the rest. New read `collectionsByPrefix` on the open-store source (live: `collections(query: "handle:<prefix>*")`; fixtures: four groups plus an empty one), pure `lib/open-store/groups.ts`.
+- **Live today:** Wall art 8, Acrylic 3, Pillows & blankets 2, Puzzles 1, Mugs 1, Ornaments 1. Framed posters are in Wall art; a "Magic Store · Framed posters" collection in Shopify would become its own group.
+- **Tests:** unit `shop-groups.test.ts` (3); e2e `shop-groups.spec.ts`; `shop-settings`, `shop-template-remove` now open `?group=all`.

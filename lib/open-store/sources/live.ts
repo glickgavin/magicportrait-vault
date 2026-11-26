@@ -48,6 +48,7 @@ const Q_COLLECTION = `query OpenStoreCollection($handle: String!, $after: String
   }
 }`;
 
+const Q_COLLECTION_HANDLES = `query OpenStoreCollectionHandles($q: String!) { collections(first: 50, query: $q, sortKey: TITLE) { nodes { handle } } }`;
 const Q_MENUS = `query OpenStoreMenus { menus(first: 50) { nodes { handle title items { title type resourceId } } } }`;
 const Q_NODES = `query OpenStoreMenuCollections($ids: [ID!]!) { nodes(ids: $ids) { ... on Collection { id handle title image { url width height altText } } } }`;
 const Q_POLICIES = `query OpenStorePolicies { shop { shopPolicies { type body } } }`;
@@ -190,6 +191,17 @@ export class OpenStoreLive implements OpenStoreSource {
     }
     if (!head) return null;
     return { id: head.id, handle: head.handle, title: head.title, description: head.description ?? "", descriptionHtml: head.descriptionHtml, image: image(head.image), productIds: ids };
+  }
+
+  async collectionsByPrefix(prefix: string): Promise<StoreCollection[]> {
+    // Shopify's search: handle:<prefix>* (only letters, digits and dashes are passed through).
+    const clean = prefix.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (!clean) return [];
+    type R = { collections: { nodes: { handle: string }[] } };
+    const d: R = await this.shop.adminQuery<R>(Q_COLLECTION_HANDLES, { q: `handle:${clean}*` });
+    const handles = d.collections.nodes.map((n) => n.handle).filter((h) => h.startsWith(clean));
+    const out = await Promise.all(handles.map((h) => this.collection(h)));
+    return out.filter((c): c is StoreCollection => Boolean(c));
   }
 
   async menu(handle: string): Promise<StoreMenu | null> {
