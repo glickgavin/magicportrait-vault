@@ -731,3 +731,7 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 ### 26 Nov: text boxes at an angle
 - **Done:** each layer text box has `rotate` (degrees, −180 to 180, default 0, so older templates are unchanged). `drawLayer` turns the text about the box's centre, so the preview, the mockup and the print file all match. The editor has an angle slider (±90°), a number box (±180°) and **Level**, and the box on the print area turns with it.
 - **Tests:** unit (turns about the centre; level boxes don't turn; missing angle reads as 0; out-of-range refused); e2e `layer-editor` sets −15°, publishes and reads it back.
+
+### 26 Nov: no "Your free gift" pill on /create
+- **Done:** the pill above "We made you a card" on the first-card screen (`FirstCard`) is gone, with its `builder.yourFreeGift` string. The home page's first-panel badge (`home.freeGiftBadge`) is unchanged.
+- **Tests:** unit (471) pass. `builder.spec` passes except "another person's card image is a 404", which also fails on main without this change (already in the known list).

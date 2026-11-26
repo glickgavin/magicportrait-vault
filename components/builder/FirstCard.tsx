@@ -97,8 +97,7 @@ export function FirstCard({ data, entryPoint }: { data: BuilderData; entryPoint:
   return (
     <div className="mx-auto max-w-[520px] pb-36" data-testid="first-card">
       <div className="text-center">
-        <span className="rounded-full bg-pink-tint px-3 py-1 text-[13px] font-extrabold uppercase tracking-wide text-pink-dark">{t("builder.yourFreeGift")}</span>
-        <h1 className="mt-3 text-[28px] font-extrabold tracking-tight">{t("builder.madeYouACard")}</h1>
+        <h1 className="text-[28px] font-extrabold tracking-tight">{t("builder.madeYouACard")}</h1>
         <p className="text-[16px] text-ink-2">{t("builder.madeYouACardBody")}</p>
       </div>
       <div className="mx-auto mt-4 w-[52%] max-w-[260px]">
