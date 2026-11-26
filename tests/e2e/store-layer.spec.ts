@@ -58,7 +58,7 @@ test.describe("Personalise in the Magic Store", () => {
     await page.goto(`/store/product/${PILLOW}`);
     await expect(page.getByLabel("Their name (optional, shown on the picture)")).toHaveCount(0);
     await expect(page.getByTestId("store-personalise").getByLabel(/Pet's name/)).toBeVisible();
-    await page.getByLabel("Choose a photo: Add their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
+    await page.getByLabel("Choose a photo: Their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
     await page.getByTestId("store-create").click();
     await expect(page.getByTestId("store-ready")).toBeVisible({ timeout: 20_000 });
     const gen = (await admin().from("store_generations").select("names").eq("product_id", `gid://shopify/Product/${PILLOW}`).order("created_at", { ascending: false }).limit(1).single()).data!;
@@ -79,7 +79,7 @@ test.describe("Personalise in the Magic Store", () => {
     await expect(step.getByLabel(/Pet's name/)).toBeVisible();
     await expect(page.getByText("Personalise it")).toHaveCount(0);
     await step.getByLabel(/Pet's name/).fill("Bis");
-    await page.getByLabel("Choose a photo: Add their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
+    await page.getByLabel("Choose a photo: Their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
     await page.getByTestId("store-create").click();
     await expect(page.getByTestId("store-ready")).toBeVisible({ timeout: 20_000 });
 

@@ -27,7 +27,7 @@ const unique = (who: string) => `${who}-${Date.now().toString(36)}@example.com`;
 
 async function makePicture(page: Page, product = PILLOW, name = "Teddy") {
   await page.goto(`/store/product/${product}`);
-  await page.getByLabel("Choose a photo: Add their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
+  await page.getByLabel("Choose a photo: Their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
   await page.getByLabel("Their name (optional, shown on the picture)").fill(name);
   await page.getByTestId("store-create").click();
 }

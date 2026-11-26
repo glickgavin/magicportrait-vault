@@ -28,14 +28,14 @@ export default async function StoreProduct({ params, searchParams }: { params: P
   const user = await requireStoreVisible();
   const { productId } = await params;
   if (!/^\d{1,20}$/.test(productId)) notFound();
-  const [data, sp, s] = await Promise.all([productPageData(productId), searchParams, getSettings(["open_store.min_photo_px", "shop.upload_max_mb", "open_store.upload_max_px", "open_store.ask_email_while_painting"] as const)]);
+  const [data, sp, s] = await Promise.all([productPageData(productId), searchParams, getSettings(["open_store.min_photo_px", "shop.upload_max_mb", "open_store.upload_max_px", "open_store.ask_email_while_painting", "open_store.more_gifts_step"] as const)]);
   if (!data) notFound();
   const initial = data.variants.find((v) => v.legacyId === sp.variant && v.available)?.id ?? null;
   const restored = await pictureForPage(data.product.id, typeof sp.g === "string" ? sp.g : null);
   const from = (FROM as readonly string[]).includes(sp.from ?? "") ? sp.from! : "direct";
   return (
     <StoreFrame user={user} active={null}>
-      <ProductView data={data} initialVariantId={initial} minPhotoPx={s["open_store.min_photo_px"]} maxMb={s["shop.upload_max_mb"]} uploadMaxPx={s["open_store.upload_max_px"]} from={from} initialPicture={restored.picture} earlierPhotos={restored.photos} askEmail={s["open_store.ask_email_while_painting"]} />
+      <ProductView data={data} initialVariantId={initial} minPhotoPx={s["open_store.min_photo_px"]} maxMb={s["shop.upload_max_mb"]} uploadMaxPx={s["open_store.upload_max_px"]} from={from} initialPicture={restored.picture} earlierPhotos={restored.photos} askEmail={s["open_store.ask_email_while_painting"]} moreGiftsStep={s["open_store.more_gifts_step"]} />
     </StoreFrame>
   );
 }

@@ -214,8 +214,8 @@ export async function productPageData(legacyId: string) {
     }),
   );
   // "Also made from one photo": related-only products are allowed here (and only here).
-  // Up to 8 candidates: the page shows the first 3, or with a picture, the first 3 that suit it.
-  const related: RelatedCard[] = relatedEntries(p, magic.entries, 8).map((e) => ({ ...card(e, pricing, themeNames), href: `/store/product/${e.product.legacyId}`, draw: drawInfo(e) }));
+  // Every candidate (up to 24): the page shows them a step at a time (open_store.more_gifts_step), with a picture only the ones it suits.
+  const related: RelatedCard[] = relatedEntries(p, magic.entries, 24).map((e) => ({ ...card(e, pricing, themeNames), href: `/store/product/${e.product.legacyId}`, draw: drawInfo(e) }));
   const details: DescriptionBlock[] = [...descriptionBlocks(p.descriptionHtml, p.description), ...(p.store?.details ? descriptionBlocks(null, p.store.details) : [])];
   const homeTitle = magic.collection?.handle === s["open_store.home_collection"] ? magic.collection.title : null;
   // The personalisation layer's pictures (from the art library), when the template offers any.

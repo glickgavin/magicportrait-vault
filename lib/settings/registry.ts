@@ -368,6 +368,7 @@ export const REGISTRY = {
   "open_store.how_it_works": list("open_store", ["Add a clear photo of your pet", "We paint them in about a minute", "We print it and send it to you"], { label: "How it works (steps)", max: 4, item: z.string().min(1).max(120) }),
   "open_store.upload_max_px": num("open_store", 2048, { label: "Photos: shrunk to this longest side in the browser (px)", min: 512, max: 6000 }),
   "open_store.min_photo_px": num("open_store", 600, { label: "Photos: smallest short side (px)", min: 200, max: 4000 }),
+  "open_store.more_gifts_step": num("open_store", 4, { label: "“On more gifts”: products shown at first and per “See more gifts”", description: "2 × 2 on phones, one row on desktop at 4.", min: 2, max: 12 }),
   "open_store.slow_after_s": num("open_store", 90, { label: "“Still painting” after (s)", min: 10, max: 600 }),
   "open_store.timeout_s": num("open_store", 240, { label: "Give up on a picture after (s)", min: 30, max: 1800 }),
   "open_store.generations_per_visitor_per_day": num("open_store", 5, { label: "Pictures per visitor per day", min: 1, max: 1000000 }),
@@ -389,7 +390,7 @@ export const REGISTRY = {
   "dreamship.api_url": text("printers", "https://api.dreamship.com/v1", { label: "Dreamship API address", pattern: /^https:\/\/[a-z0-9.-]+(\/[A-Za-z0-9._-]+)*$/, max: 200 }),
   "open_store.posthog_dashboard_url": text("open_store", "", { label: "PostHog dashboard link", description: "The “Magic Store” dashboard, linked from this page.", pattern: /^(https:\/\/[^\s]+)?$/, max: 300 }),
   // Store defaults for the product fields (PRODUCT_FIELDS below): a product's own value wins.
-  "open_store.photos": json("open_store", [{ label: "Add their photo", name_label: "Their name (optional, shown on the picture)", name_placeholder: "Teddy" }] as PhotoSlotWords[], photoSlotsSchema as unknown as z.ZodType<PhotoSlotWords[]>, {
+  "open_store.photos": json("open_store", [{ label: "Their photo", name_label: "Their name (optional, shown on the picture)", name_placeholder: "Teddy" }] as PhotoSlotWords[], photoSlotsSchema as unknown as z.ZodType<PhotoSlotWords[]>, {
     label: "Default photo slots' words",
     description: "Slot 1 uses the first entry's label and name label, slot 2 the second, and so on. How many photos a product takes comes from its Imagen theme.",
   }),
