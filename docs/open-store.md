@@ -19,7 +19,7 @@ Shopify stays the source of truth: products, variants, prices, categories (colle
 | Generate with the Imagen API, settings per product. Art styles are Imagen themes; each product has one | Each product names its one Imagen theme and its options in `mmp_shop` metafields. The server calls Imagen's API with this app's own key, sending the photo (or photos, when the theme needs more than one) and the pet's name |
 | A spinner while it generates | Progress steps around their photo, about a minute: on phones where they added the photo (the page scrolls there, then up to the finished picture); on desktop over the gallery beside the form (26 Nov) |
 | The result replaces the placeholder | Their picture is drawn onto the product with the product's template and becomes the first gallery image |
-| Shopping info, product info, and 3 more products with the picture | Delivery and returns, product details, and "Teddy on more gifts": three products drawn with their picture |
+| Shopping info, product info, and more products with the picture | Delivery and returns, product details, and "Teddy on more gifts": four products drawn with their picture (2 × 2 on phones), and **See more gifts** for the next four |
 
 Customer-facing name: **Magic Store**, as in the Black Friday "Introducing the Magic Store" emails. In code and settings it is the **open store** (`open_store.*`), so it isn't confused with the signed-in shop (`shop.*`) or the Shopify **Store** collection.
 
@@ -37,7 +37,7 @@ The same rules as the signed-in shop (`docs/shop.md` › Keeping today's app unc
 1. **Store page** (`/store`, `/store/c/<collection>`). Category circles, collection heading and intro, Filter and Sort, product grid. Tapping a product opens its page.
 2. **Product page** (`/store/product/<product id>`). They pick the variant (size etc.), upload a photo, optionally type a name, and tap **Create their picture**.
 3. **Creating** (same page). The picture area shows progress steps; the rest of the page stays usable.
-4. **Ready** (same page). Their picture is on the product. They can pick another of the results, try another photo, change the variant, and **Add to cart**. Below: shopping info, product details and three more products with their picture.
+4. **Ready** (same page). Their picture is on the product. They can pick another of the results, change the photo (in the same place they added it), change the variant, and **Add to cart**. Below: shopping info, product details and three more products with their picture.
 5. **Cart** (a drawer from the right on every store page). Lines with previews, quantities, Shopify's prices and discounts, **Checkout**.
 6. **Shopify checkout**, then Shopify's thank-you page as usual.
 
@@ -71,30 +71,36 @@ Top to bottom, mobile first:
 3. **Bullets** from `mmp_shop.short_description` (as in the shop), e.g. "Your pet as The Admiral in about a minute".
 4. **Delivery estimate**: "Delivery approx. 27 Nov – 30 Nov": today plus the variant's `mmp_shop.lead_days` (e.g. `4-6`, working days) plus `open_store.shipping_days` (e.g. `2-3`), skipping weekends. Hidden when either is missing.
 5. **Variant chips**, one group per Shopify option (Size, Colour). A variant can carry a badge from `mmp_shop.badge` (e.g. "Bestseller"). Sold-out variants show but can't be chosen.
-6. **Your photo** (required): a tap target that opens the camera roll, with tips from the product's settings ("A clear, front-facing photo works best"). After choosing: the thumbnail, "Photo added" and **Change**. When the product's theme takes more than one photo (two pets, say), one slot per photo, each with its own label (Photos and names, below).
-7. **Name** (optional, only when the product's settings define it): label, placeholder and limit from settings, e.g. "Their name (optional, shown on the picture)", 14 characters. One per photo slot. It goes to Imagen with the photo, for themes that print the name.
-8. **Create their picture** (gradient button, "Free to try. Takes about a minute." under it) until there's a picture; while creating it turns grey with a small spinner. When ready, a pink "Teddy is ready" note with **Try another photo** sits above the chips, and the button becomes a quantity stepper plus **Add to cart · $24.00** (gradient), with the accepted payment methods under it.
+6. **Their photo** (required). It stays in the same place in every state, under the variant chips and above the main button, so the visitor always finds their photo where they added it (26 Nov: it used to disappear once the picture was ready, with "Try another photo" in a note above the title instead):
+   - **No photo yet:** a tap target, **Choose a photo**, that opens the camera roll, with tips from the product's settings ("A clear, front-facing photo works best"). A visitor with earlier photos also sees "Or use a photo you've added before" with them as thumbnails.
+   - **Photo chosen:** the thumbnail, "Photo added" and **Change photo**.
+   - **Creating:** on phones the progress (their photo in the spinning ring, the steps, then the email offer) takes this spot (26 Nov); on desktop the progress sits over the gallery and the row stays here, with **Change photo** turned off until the picture is ready or fails.
+   - **Ready:** the same row, "Teddy is ready" (or "Your picture is ready" without a name) with a check on the thumbnail, and **Change photo**. This row is the only way to change the photo; there's no separate "Try another photo" note or link.
+   - **Change photo** opens a sheet from the bottom on phones (a dialog on desktop), "Choose another photo": **Upload a new photo** (the camera roll), and "Or use a photo you've added before", their saved photos newest first, the one in use marked "In use". Picking one closes the sheet and fills the row ("New photo added"). The main button goes back to **Create their picture**, with **Keep Teddy's picture** under it to undo the change; the picture they had stays on show until they create a new one, and stays saved either way. Real buttons, so it works with a keyboard; Escape and the close button shut it with nothing changed.
+   - When the product's theme takes more than one photo (two pets, say), there's one such row per photo, each with its own label (Photos and names, below).
+7. **Name** (optional, only when the product's settings define it): label, placeholder and limit from settings, e.g. "Their name (optional, shown on the picture)", 14 characters. One per photo slot, right under its photo row in every state. It goes to Imagen with the photo, for themes that print the name. Changing it once the picture is ready works like changing the photo: the button goes back to **Create their picture**, with **Keep Teddy's picture** under it.
+8. **Create their picture** (gradient button, "Free to try. Takes about a minute." under it) until there's a picture; while creating it turns grey with a small spinner. When ready, the photo row says so (item 6) and the button becomes a quantity stepper plus **Add to cart · $24.00** (gradient), with the accepted payment methods under it.
 9. **Shopping info**: three short rows from settings (`open_store.reassurance`, e.g. "Free shipping until 1 Dec" with the delivery estimate, "Printed to order, just for you", "Secure checkout with Shopify"), each with an icon, on a cream panel.
 10. **Product details**: accordions. "Product details" (the Shopify description, then `mmp_shop.details` when set), "How it works" (three steps from settings), "Shipping and returns" (Shopify's shipping and refund policies).
-11. **On more gifts**: "Teddy on more gifts" (or "Your picture on more gifts" without a name): three products drawn with their picture (below). Before a picture, the same slot is "Also made from one photo" with the products' sample pictures.
+11. **On more gifts**: "Teddy on more gifts" (or "Your picture on more gifts" without a name): four products drawn with their picture, 2 × 2 on phones, with **See more gifts** for the next four (below). Before a picture, the same slot is "Also made from one photo" with the products' sample pictures.
 12. **Reviews**: the reviews app's block, once one is chosen (open question).
 13. The app's footer.
 
-Mockups: the "Open store mockups" design canvas (store page, product page before a photo, creating, ready, cart drawer; store and product pages on desktop).
+Mockups: the "Open store mockups" design canvas (store page, product page before a photo, creating, ready, the Change photo sheet, another photo chosen, cart drawer; store and product pages on desktop; the full product page with its State switch).
 
 ### Creating the picture
 
 | Step | What the visitor sees | What happens |
 |---|---|---|
-| Photo chosen | The thumbnail under **Your photo**; **Create their picture** turns on once every required photo slot is filled | The browser shrinks it to `open_store.upload_max_px` (default 2048) if bigger. Nothing is sent yet |
+| Photo chosen | The thumbnail in the **Their photo** row; **Create their picture** turns on once every required photo slot is filled | The browser shrinks it to `open_store.upload_max_px` (default 2048) if bigger. Nothing is sent yet |
 | Create their picture | The picture area dims and shows three steps: "Uploading your photo", "Painting {name} as The Admiral", "Putting it on your pillow", around their photo in a spinning ring. The button reads "Creating their picture…" and is disabled. The page below stays usable | `POST /api/store/generations` with the photo(s), the product and the name(s). The server checks each photo (as `docs/shop.md` › Images: type by content, up to 20 MB, at least `open_store.min_photo_px`, default 600, on the short side), the bot check and the limits; creates the visitor row if it's their first action; saves each photo in `store-uploads` as a `store_photos` row (JPEG, location and camera data removed); then calls Imagen |
 | Waiting | The steps tick as Imagen's status moves (`pending` → `preprocessing` → `generating` → `done`) | The browser asks `GET /api/store/generations/<id>` every 2 s; the server asks Imagen |
 | Ready | The picture fades in on the product; a strip of the results to choose from ("Pick your favourite") when Imagen returned more than one; **Add to cart** | The server copies Imagen's results into `store-uploads` and records them on the `store_generations` row |
 | Slow | After `open_store.slow_after_s` (default 90): "Still painting. This one's taking a little longer." | |
-| Failed or timed out | "We couldn't make this one. Try a different photo, ideally a clear, front-facing one." with **Try another photo**. A failure doesn't count toward their limit | After `open_store.timeout_s` (default 240), or Imagen's `failed`, `cancelled` or `awaiting_face_selection` (themes for the open store must not ask to pick faces) |
+| Failed or timed out | "We couldn't make this one. Try a different photo, ideally a clear, front-facing one." with **Choose another photo**, which opens the same sheet as **Change photo**. A failure doesn't count toward their limit | After `open_store.timeout_s` (default 240), or Imagen's `failed`, `cancelled` or `awaiting_face_selection` (themes for the open store must not ask to pick faces) |
 | Limit reached | "You've made {n} pictures today. Come back tomorrow, or add one you've made to your cart." | Per visitor and per IP, below |
 
-Changing the variant redraws the picture at once (same picture, new template and crop); it never calls Imagen again. Changing the name or photo needs a new picture. A visitor's earlier photos are offered again ("Use a photo you've added before") so they don't have to upload twice on the next product.
+Changing the variant redraws the picture at once (same picture, new template and crop); it never calls Imagen again. Changing the name or photo needs a new picture. A visitor's earlier photos are offered again ("Or use a photo you've added before", under **Choose a photo** and in the **Change photo** sheet) so they don't have to upload twice, on this product or the next.
 
 ### Personalise (25 Nov)
 
@@ -144,7 +150,7 @@ Product fields are declared in `lib/settings/registry.ts` next to the store's se
 ```json
 {
   "photos": [
-    { "label": "Add their photo", "name_label": "Their name (optional, shown on the picture)", "name_placeholder": "Teddy" }
+    { "label": "Their photo", "name_label": "Their name (optional, shown on the picture)", "name_placeholder": "Teddy" }
   ],
   "name_max": 14,
   "photo_tips": "Best results: one pet, facing the camera, in good light, with the whole head in the picture.",
@@ -222,13 +228,15 @@ The same template module as the shop (`lib/shop/preview.ts`): the chosen image i
 
 ## On more gifts
 
-Three products drawn with the visitor's picture, under the product details:
+Products drawn with the visitor's picture, under the product details, four at a time (26 Nov: it was three):
 
 1. Products set in the current product's `mmp_shop.related` (a list of product references), if any, in that order.
 2. Then the other open-store products in the same collection, in collection order, skipping the current one.
-3. Only products whose rules pass for this image (`docs/shop.md` › Product rules); the first three that pass.
+3. Only products whose rules pass for this image (`docs/shop.md` › Product rules).
 
-Each card shows the product drawn with their picture, its title and "From" price, and **See it**. Tapping it opens that product's page with the same picture already on it (no new generation, the session carries over), where they choose the variant and add to cart. Before a picture exists, the section shows the same three products with their placeholders and the title "Also made from one photo".
+**Layout:** a 2 × 2 grid on phones, one row of four on desktop. Under it, **See more gifts** (an outline button, full width on phones) adds the next four from the same list, drawn the same way, and moves focus to the first new card. When nothing is left, the button goes away; with four or fewer products there's no button. The number per step is `open_store.more_gifts_step` (default 4). Each tap is tracked as `store_more_gifts_shown`.
+
+Each card shows the product drawn with their picture, its title and "From" price, and **See it**. Tapping it opens that product's page with the same picture already on it (no new generation, the session carries over), where they choose the variant and add to cart. Before a picture exists, the section shows the same products, four at a time, with their placeholders and the title "Also made from one photo".
 
 ## Cart and checkout
 
@@ -261,7 +269,7 @@ The SHOP group in the Settings menu:
 | **One product** | `/settings/shop/products/<product id>` | Every field of that product, for both stores, on one page (below) |
 | **Template editor** | `/settings/shop/template/<product id>` | As today; used by both stores |
 | **Gifts & Products pages** | `/settings/shop/pages` | That store's own settings: who sees it (switches), discount codes and labels, the VIP tag, the occasion list. They move here from today's Settings › Shop page |
-| **Magic Store** | `/settings/shop/magic-store` | That store's own settings: who sees it (switches), its collection (`open_store.collection`, default `magic-store`), the menu, the home collection, the discount, the reassurance rows, the limits, timings, photo sizes, the visitor cookie, the email ask, and the store defaults for every product field. **Refresh themes from Imagen**. The numbers (Settings › Shop › Magic Store numbers, below) and the PostHog dashboard link |
+| **Magic Store** | `/settings/shop/magic-store` | That store's own settings: who sees it (switches), its collection (`open_store.collection`, default `magic-store`), the menu, the home collection, the discount, the reassurance rows, the limits, timings, photo sizes, the visitor cookie, the email ask, how many "On more gifts" products show per step (`open_store.more_gifts_step`), and the store defaults for every product field. **Refresh themes from Imagen**. The numbers (Settings › Shop › Magic Store numbers, below) and the PostHog dashboard link |
 | **Photo library**, **AI room photos** | as today | Unchanged |
 
 **One product page** (re-laid out 26 Nov: a header, then tabs):
@@ -358,7 +366,7 @@ The store's settings stay the defaults; a flag only overrides them for its test 
 ### Privacy in analytics
 
 - **Never in an event, person property or log:** the photo, the picture or its URL, the pet's name, or an email address (typed or proven). Send `has_name`, `photos`, `marketing_consent` instead.
-- **Session replay:** masks every input (name and email). The photo slots, the picture area, the circle with their photo, the cart and order previews, and the "On more gifts" pictures carry `ph-no-capture`. Product sample pictures may show.
+- **Session replay:** masks every input (name and email). The photo slots, the Change photo sheet, the picture area, the circle with their photo, the cart and order previews, and the "On more gifts" pictures carry `ph-no-capture`. Product sample pictures may show.
 - **Addresses:** `before_send` drops query strings on `/store` pages except `utm_*` and `variant`, and the path token on `/g/`.
 - **Bots:** requests Vercel BotID flags as bots send no server events.
 - **Super users:** preview sessions carry `preview: true` and sit in the test-account cohort, so they never count.
