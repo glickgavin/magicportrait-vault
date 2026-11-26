@@ -389,6 +389,7 @@ export const REGISTRY = {
   "open_store.enabled": bool("open_store", false, { label: "Magic Store on for everyone", description: "Off: /store and /api/store are 404 for everyone (except super users with the preview on). Turning it on is the store's launch." }),
   "open_store.super_user_preview": bool("open_store", false, { label: "Magic Store preview for super users", description: "On: super users see /store on the live site while it is still off for everyone else." }),
   "open_store.collection": text("open_store", "magic-store", { label: "Magic Store collection (handle)", description: "Only products in this Shopify collection appear anywhere in the store, and only they use the Magic Store fields. A product joins or leaves the store by being added to or removed from it in Shopify.", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),
+  "open_store.hide_single_options": bool("open_store", true, { label: "Hide options with only one choice", description: "On: an option with a single value across the product's sizes (say Color: White on a blanket) isn't shown on the product page, since there's nothing to pick. Off: every option shows." }),
   "open_store.picture_options": list("open_store", ["Frame", "Color", "Colour"], {
     label: "Options shown with pictures",
     description: "Product options (by name, any case) whose choices show a picture on the product page: the value's swatch in Shopify, else that variant's own first photo. Any option with Shopify swatches on every value shows them too.",

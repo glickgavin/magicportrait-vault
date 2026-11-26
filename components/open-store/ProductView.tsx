@@ -7,7 +7,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Camera, Check, ChevronDown, Clock, Gift, Heart, Info, Loader2, Lock, Minus, MoveHorizontal, Pencil, Plus, Star, Truck, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ProductPageData, RelatedCard, VariantView } from "@/lib/open-store/pages";
-import { chipColumns, chipImageUrl, chipPictures, fillStep, optionGroups, variantFor } from "@/lib/open-store/view";
+import { chipColumns, chipImageUrl, chipPictures, fillStep, shownOptionGroups, variantFor } from "@/lib/open-store/view";
 import type { DescriptionBlock } from "@/lib/shop/description";
 import { defaultCrop, fitVariant } from "@/lib/shop/fit";
 import { formatMoney } from "@/lib/shop/money";
@@ -99,7 +99,8 @@ export function ProductView({
 }) {
   const router = useRouter();
   const uid = useId();
-  const groups = useMemo(() => optionGroups(data.variants), [data.variants]);
+  // The option rows; one with a single value is hidden when the store says so (the variant still carries it).
+  const groups = useMemo(() => shownOptionGroups(data.variants, data.hideSingleOptions !== false), [data.variants, data.hideSingleOptions]);
   const [variantId, setVariantId] = useState<string>(initialVariantId ?? data.variants.find((v) => v.available)?.id ?? data.variants[0]?.id);
   const variant: VariantView | undefined = data.variants.find((v) => v.id === variantId) ?? data.variants[0];
   const [shown, setShown] = useState(0);

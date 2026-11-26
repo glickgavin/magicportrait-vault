@@ -172,7 +172,7 @@ function drawInfo(e: StoreEntry): DrawInfo | null {
 
 /** Everything the product page needs before a picture (docs/open-store.md › Product page). Null: not in the store. */
 export async function productPageData(legacyId: string) {
-  const s = await getSettings(["open_store.shipping_days", "open_store.reassurance", "open_store.home_collection", "brand.timezone", "open_store.picture_options"] as const);
+  const s = await getSettings(["open_store.shipping_days", "open_store.reassurance", "open_store.home_collection", "brand.timezone", "open_store.picture_options", "open_store.hide_single_options"] as const);
   const magic = await getStoreCatalog();
   const entry = magic.entries.find((e) => e.product.legacyId === legacyId);
   if (!entry || entry.hidden.length) return null;
@@ -246,6 +246,8 @@ export async function productPageData(legacyId: string) {
     // Option chips with pictures (open_store.picture_options, or Shopify swatches on every value).
     optionSwatches: pictures.swatches,
     pictureOptions: s["open_store.picture_options"],
+    // An option with one value (Color: White on a blanket) has nothing to pick: not shown (open_store.hide_single_options).
+    hideSingleOptions: s["open_store.hide_single_options"],
     // No name box when the product doesn't ask for the name (e.g. its personalisation layer does).
     slots: photoSlots(theme?.photos ?? photos.length, photos, theme?.inputs?.map((i) => i.label) ?? []).map((sl) => (askName ? sl : { ...sl, nameLabel: null, namePlaceholder: null })),
     nameMax,
