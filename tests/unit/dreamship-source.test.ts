@@ -93,6 +93,7 @@ describe("Dreamship responses", () => {
     expect(parseShops({ count: 1, results: [{ id: 15218, name: "Storyboards", channel: "Shopify" }] })).toEqual({ businessName: "Storyboards (Shopify)", plan: null, settings: { autoImportOrders: null, autoSubmitImportOrders: null, autoSubmitApiOrders: null } });
     expect(parseShops([{ id: 1, shop_name: "Etsy shop" }]).businessName).toBe("Etsy shop");
     expect(parseShops({ results: [] }).businessName).toBe("Connected (no shops)");
+    expect(parseShops({ data: [{ id: 15218, name: "Storyboards", channel: "shopify" }] }).businessName).toBe("Storyboards (shopify)");
   });
   it("a refusal is a DreamshipError with a code", () => {
     expect(new DreamshipError("x", "not_editable", 400)).toMatchObject({ code: "not_editable", status: 400 });

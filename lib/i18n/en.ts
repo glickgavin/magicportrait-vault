@@ -369,7 +369,6 @@ export const en = {
     shoppingInfo: "Shopping info",
     more: "More about this {product}",
     details: "Product details",
-    howItWorks: "How it works",
     shippingReturns: "Shipping and returns",
     seeMoreGifts: "See more gifts",
     seeIt: "See it",
