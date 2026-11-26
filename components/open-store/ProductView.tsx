@@ -375,8 +375,8 @@ export function ProductView({
     : data.gallery.map((g, i) => ({ kind: "media" as const, url: g.url, alt: g.alt, example: i > 0 }));
   const slide = slides[Math.min(shown, slides.length - 1)];
 
-  // The name on one line: the type gets smaller until it fits (down to 18 px), then the end is cut with "…".
-  const titleRef = useFitText<HTMLHeadingElement>(data.product.title, 18);
+  // The name on one line: the type gets smaller until it fits (down to 15 px), then the end is cut with "…".
+  const titleRef = useFitText<HTMLHeadingElement>(data.product.title, 15);
 
   // Phones: the pictures in a row to swipe through, with dots under them (no thumbnails). Desktop keeps the thumbnails.
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -479,7 +479,7 @@ export function ProductView({
               {wide || slides.length < 2 ? (
                 renderSlide(slide)
               ) : (
-                <div ref={railRef} onScroll={onRailScroll} tabIndex={0} aria-label={t("store.swipeLabel")} className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#DD07C4] [&::-webkit-scrollbar]:hidden" data-testid="store-rail">
+                <div ref={railRef} onScroll={onRailScroll} tabIndex={0} onMouseDown={(e) => e.preventDefault()} aria-label={t("store.swipeLabel")} className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain outline-none [scrollbar-width:none] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-[#DD07C4] [&::-webkit-scrollbar]:hidden" data-testid="store-rail">
                   {slides.map((s, i) => (
                     <div key={i} className="w-full flex-none snap-center snap-always" aria-hidden={i !== shown ? true : undefined}>
                       {renderSlide(s)}
@@ -489,8 +489,8 @@ export function ProductView({
               )}
             </div>
             {!wide && !swiped && !creating && slides.length > 1 && (
-              <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[12px] font-bold text-white" aria-hidden="true">
-                <MoveHorizontal className="h-3.5 w-3.5" />
+              <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-[#2b2b2b] shadow-[0_1px_3px_rgba(0,0,0,0.12)]" aria-hidden="true">
+                <MoveHorizontal className="h-3 w-3" strokeWidth={2} />
                 {t("store.swipe")}
               </span>
             )}
