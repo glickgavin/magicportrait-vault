@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getDef, validateSetting } from "@/lib/settings/registry";
-import { DreamshipError, DreamshipFixtures, DreamshipLive, PATHS, parseAccount, parseOrder, parseProduct, parseProductPage, parseShops } from "@/lib/sources/dreamship";
+import { DreamshipError, DreamshipFixtures, DreamshipLive, PATHS, createProductBody, parseAccount, parseCloneSource, parseListing, parseOrder, parseProduct, parseProductPage, parseShops } from "@/lib/sources/dreamship";
 
 describe("Dreamship source: fixtures", () => {
   it("reads the account and Dreamship's own order settings", async () => {
@@ -62,7 +62,74 @@ describe("Dreamship source: never submits, cancels or changes status (CLAUDE.md 
     expect(paths.filter((p) => forbidden.test(p))).toEqual([]);
     const src = readFileSync("lib/sources/dreamship.ts", "utf8");
     const writes = [...src.matchAll(/method: "(POST|PUT|PATCH|DELETE)"/g)].map((m) => m[1]);
-    expect(writes.sort()).toEqual(["PATCH", "POST"]);
+    // The line's artwork (PATCH), the artwork upload (POST) and, since 26 Nov, a cloned product (POST; allowed write 8).
+    expect(writes.sort()).toEqual(["PATCH", "POST", "POST"]);
+    expect(src).not.toMatch(/method: "DELETE"/);
+  });
+});
+
+describe("cloning a product (allowed write 8)", () => {
+  const body = {
+    id: 9986009,
+    name: "Fleece Blanket Master",
+    description: "Soft fleece.",
+    item: { id: 18, name: "Fleece Blanket" },
+    primary_color: { id: 7, name: "White" },
+    product_tags: ["blanket"],
+    personalized: false,
+    product_variants: [
+      { id: 45392982, item_variant: 746, price: "49.9" },
+      { id: 45392983, item_variant: 747, price: "69.99" },
+    ],
+    print_areas: [
+      { key: "30x40", url: "https://cdn.example/a.png", resize: "fill", position: "center_center", rotate: 0, ai_upscale: true },
+      { key: "bad", url: "javascript:alert(1)" },
+    ],
+    shop_products: [{ marketplace_id: 8914933874884, publish_status: "published", shop: { key: "shop_abc", channel: "shopify" } }],
+  };
+
+  it("reads what a copy needs from the master", () => {
+    const src = parseCloneSource(body, 9986009)!;
+    expect(src).toMatchObject({ itemId: 18, primaryColorId: 7, shopKeys: ["shop_abc"], tags: ["blanket"] });
+    expect(src.variants).toEqual([
+      { itemVariantId: 746, price: "49.90" },
+      { itemVariantId: 747, price: "69.99" },
+    ]);
+    // Only artwork at an https address is carried over.
+    expect(src.printAreas.map((a) => a.key)).toEqual(["30x40"]);
+    expect(parseCloneSource({ name: "no item" }, 1)).toBeNull();
+  });
+
+  it("makes the new product a draft in the same shops, with the same sizes, prices and artwork", () => {
+    const out = createProductBody(parseCloneSource(body, 9986009)!, 'Fleece Blanket "Watercolor"');
+    expect(out).toEqual({
+      item: 18,
+      name: 'Fleece Blanket "Watercolor"',
+      description: "Soft fleece.",
+      primary_color: 7,
+      product_tags: ["blanket"],
+      item_variants: [
+        { id: 746, price: "49.90" },
+        { id: 747, price: "69.99" },
+      ],
+      print_areas: [{ key: "30x40", url: "https://cdn.example/a.png", resize: "fill", position: "center_center", ai_upscale: true }],
+      shops: ["shop_abc"],
+      personalized: false,
+      marketplace_draft: true,
+    });
+  });
+
+  it("knows when Dreamship has listed it in Shopify", () => {
+    expect(parseListing(body)).toEqual({ shopifyProductId: "8914933874884", status: "published", error: null });
+    expect(parseListing({ process_status: "processing", shop_products: [] })).toEqual({ shopifyProductId: null, status: "processing", error: null });
+    expect(parseListing({ shop_products: [{ publish_status: "failed", error_reason: "shop_disconnected", shop: {} }] })).toEqual({ shopifyProductId: null, status: "failed", error: "shop_disconnected" });
+  });
+
+  it("the fixtures list a new product in Shopify on the second look", async () => {
+    const ds = new DreamshipFixtures();
+    const { id } = await ds.createProduct((await ds.cloneSource(9972256))!, "Copy");
+    expect((await ds.shopifyIdOf(id))!.shopifyProductId).toBeNull();
+    expect((await ds.shopifyIdOf(id))!.shopifyProductId).toBe("8710000000");
   });
 });
 

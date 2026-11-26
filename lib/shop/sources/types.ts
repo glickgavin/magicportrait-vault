@@ -129,6 +129,8 @@ export interface ShopCatalogSource {
    * from Settings › Shop's one product page. The caller allows only known keys.
    */
   setProductMetafields(productId: string, namespace: string, change: ProductMetafieldChange): Promise<WriteResult>;
+  /** Allowed write 9: adds one product (a clone made from Settings › Shop › Clone a product) to the Magic Store collection. */
+  addToCollection(collectionId: string, productId: string): Promise<WriteResult>;
   /** Allowed write 5: the Imagen theme dropdown (the `mmp_shop.imagen_theme` definition's choices), from Settings › Shop › Magic Store. */
   setThemeChoices(namespace: string, choices: string[]): Promise<WriteResult>;
   /** Allowed write 5: creates whichever `mmp_shop` definitions are missing. */

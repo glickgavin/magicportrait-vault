@@ -467,7 +467,8 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
     type:
       | "metafieldsSet"
       | "metafieldDefinitionUpdate"
-      | "metafieldDefinitionCreate";
+      | "metafieldDefinitionCreate"
+      | "collectionAddProducts";
     target: string;
     payload: unknown;
   }[] = [];
@@ -604,6 +605,13 @@ export class ShopCatalogFixtures implements ShopCatalogSource {
       payload: { namespace, template: templateJson },
     });
     p.template = { value: templateJson, updatedAt: new Date().toISOString() };
+    return { ok: true };
+  }
+
+  async addToCollection(collectionId: string, productId: string): Promise<WriteResult> {
+    const fail = this.takeFailure();
+    if (fail) return fail;
+    this.writes.push({ type: "collectionAddProducts", target: productId, payload: { collectionId } });
     return { ok: true };
   }
 

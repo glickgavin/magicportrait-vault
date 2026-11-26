@@ -143,6 +143,18 @@ A new Settings page, `/settings/printers` (404 unless super user, like every Set
 - How many products and sizes use each maker.
 - "Orders go to the existing print system straight from Shopify." No settings yet. The cards are there so a printer's settings have one home when they're added.
 
+## Clone a product (26 Nov; allowed writes 8 and 9)
+
+Settings › Shop › **Clone a product** (`/settings/shop/clone`, also linked from a master's settings page) makes a new product from a **master**: a Magic Store product linked to its Dreamship product. The form takes the master, the new name and the Imagen theme. Everything else is copied.
+
+- **Step 1, Clone product** (after a confirm): reads the master from Dreamship (`GET /products/{id}/`) and creates a new product (`POST /products/`) with the same item, item variants and prices, print areas (the artwork's URL and placement), primary colour, tags and shops, the new `name`, and `marketplace_draft: true`. Dreamship then lists it in Shopify as a **draft**, in its own time.
+- **Step 2, Finish setting up** (on the "Being set up" list; safe to press again): once Dreamship reports the Shopify product (`shop_products[].marketplace_id`), the app adds it to the Magic Store collection (`collectionAddProducts`), copies the master's settings with Copy settings (template with its layer, Magic Store fields, badges and making times, pages), sets `imagen_theme`, links `dreamship_product_id` and saves the print rules from Dreamship. Anything that didn't go through is listed, and the rest is still done.
+- **Going live** is the owner's step in Shopify: set the product to Active (and available to the storefront channel). Until then the store hides it (`not_active`). The app never changes a product's status.
+- **The photos** are Dreamship's mock-ups with the master's sample artwork, until the artwork is replaced in Dreamship. Photos per option (frame colours) aren't copied: set them on the new product's template.
+- **The record** of a clone is its events in `activity_log` (`admin_product_clone_started` / `_finished` / `_dismissed`), read by `lib/db/clones.ts`; there's no table. "Remove from this list" only records a dismissal.
+- **Code:** `lib/shop/clone.ts`, `lib/sources/dreamship.ts` (`cloneSource`, `createProduct`, `shopifyIdOf`), `addToCollection` on the shop source, `/api/admin/shop/clone`.
+- **Not verified against the live API** (the build session has no Dreamship key): the first real clone is the test. If Dreamship refuses the request, the screen shows its reason and nothing else has been written.
+
 ## Dreamship's public API (checked 24 Nov)
 
 From docs.dreamship.com (its `llms.txt` index) after the first live connection check failed. Base `https://api.dreamship.com/v1`, `Authorization: Bearer <key>`.

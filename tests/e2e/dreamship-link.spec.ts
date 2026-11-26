@@ -83,6 +83,20 @@ test.describe("Dreamship link and sync", () => {
     expect(ev[0].props).toMatchObject({ products: 1, fields_changed: 14, linked: 1, failed: 0 });
   });
 
+  test("Clone a product: the screen explains itself when no product can be a master, and is a 404 for customers", async ({ page, browser }) => {
+    await page.request.post("/api/test/reset-fixtures?shop=1");
+    await signInWithLink(page, "super@example.com", "/settings/shop/clone");
+    await expect(page.getByRole("heading", { level: 1, name: "Clone a product" })).toBeVisible();
+    // No fixture product is linked to Dreamship after a reset, so there's no master yet.
+    await expect(page.getByTestId("clone-no-masters")).toContainText("No product can be a master yet");
+    await expectNoAxeViolations(page);
+    // The API refuses a bad form before anything is created.
+    expect((await page.request.post("/api/admin/shop/clone", { data: { action: "start", masterId: "8710000000", name: "x", theme: "admiral-01" } })).status()).toBe(400);
+    const anon = await browser.newContext();
+    expect((await anon.request.post("/api/admin/shop/clone", { data: { action: "start", masterId: "8710000000", name: "A copy", theme: "admiral-01" } })).status()).toBe(404);
+    await anon.close();
+  });
+
   test("a wrong id is refused and nothing is written", async ({ page }) => {
     await signInWithLink(page, "super@example.com", `/settings/shop/products/${FLUSH}`);
     await page.getByRole("tab", { name: "Print rules" }).click();
