@@ -10,12 +10,16 @@ import { SourceNotConfigured } from "./index";
  * line of the Dreamship order imported for a paid Shopify order. There is deliberately **no submit, cancel or
  * status change** here: order status is Shopify's and Dreamship's. A test checks this interface has none.
  *
- * Field names follow what Dreamship returns for this account (read through Dreamship's connector, 24 Nov): the
- * business settings (`auto_submit_order_import_orders`, `auto_submit_api_orders`), a product's design (variants
- * with `product_variant_id`, `item_variant_id`, `retail_price`, `cost`; print areas with `key`, `width_px`,
- * `height_px`, `min_dpi`, `ai_upscale`, `artwork_id`) and a catalog item (`production_days_min`/`_max`). The REST
- * paths in `PATHS` and the two write bodies couldn't be read from the schema; they're listed under Blocked in
- * BUILD_LOG.md and live in one place so confirming them is a small change.
+ * Field names (checked against Dreamship's API reference, docs.dreamship.com/reference, 26 Nov):
+ * - `GET /products/{id}/`: `item` {id, name}; `product_variants` [{id, item_variant, size, color, price, cost}];
+ *   `print_areas` [{key, name, url, …}] without pixel sizes (those are the catalog item's).
+ * - `GET /products/?page&limit`: `{ paging: {count, next, previous}, data: [product…] }`, each with
+ *   `shop_products` [{marketplace_id (the Shopify product id), shop}].
+ * - `GET /items/{id}/`: `production_days_min`/`_max`; `print_areas` [{key, w, h, dpi}] (pixels).
+ * - `GET /orders/{id}/`, `GET /orders/?reference_id=`: line items with `product_variant` and `item_variant` (integers).
+ * The older shape read through Dreamship's connector (24 Nov: `variants` with `product_variant_id`, print areas with
+ * `width_px`/`height_px`) is still read, so either works. The two write paths (artwork upload, a line's artwork) aren't
+ * in the public reference; they're listed under Blocked in BUILD_LOG.md.
  */
 
 export type DreamshipAccount = {
@@ -64,6 +68,11 @@ export interface DreamshipSource {
   catalogItem(itemId: number): Promise<DreamshipCatalogItem | null>;
   /** The product a product variant belongs to (Dreamship's Shopify app sets a size's SKU to that variant's id). */
   productForVariant(productVariantId: number): Promise<number | null>;
+  /**
+   * The Dreamship product published as a Shopify product: listed on it (`shop_products.marketplace_id`), or owning
+   * one of its SKUs (= Dreamship product variant ids). Null when none. Reads Dreamship's product list.
+   */
+  findProduct(by: { shopifyProductId?: string | null; variantIds?: number[] }): Promise<number | null>;
   /** The order Dreamship imported for a Shopify order, by its reference id (null until it's imported). */
   orderByReference(referenceId: string): Promise<DreamshipOrder | null>;
   order(orderId: number): Promise<DreamshipOrder | null>;
@@ -179,6 +188,12 @@ export class DreamshipFixtures implements DreamshipSource {
   async productForVariant(productVariantId: number) {
     return FX_PRODUCT.variants.some((v) => v.productVariantId === productVariantId) ? FX_PRODUCT.id : null;
   }
+  /** The fixture product is listed on the fixture Shopify product "Flush" (tests/fixtures). */
+  shopifyIdOfProduct = "8710000000";
+  async findProduct(by: { shopifyProductId?: string | null; variantIds?: number[] }) {
+    if (by.shopifyProductId && by.shopifyProductId === this.shopifyIdOfProduct) return FX_PRODUCT.id;
+    return (by.variantIds ?? []).some((id) => FX_PRODUCT.variants.some((v) => v.productVariantId === id)) ? FX_PRODUCT.id : null;
+  }
   async orderByReference(referenceId: string) {
     const o = this.orders.get(referenceId);
     if (!o) return null;
@@ -221,34 +236,46 @@ export function dreamshipFixtures(): DreamshipFixtures {
 
 // ------------------------------------------------------------------------------------------------ live
 
-/** The REST paths, in one place. To confirm against https://api.dreamship.com/v1/schema/ (BUILD_LOG › Blocked). */
+/** The REST paths, in one place (docs.dreamship.com/reference; the two write paths aren't documented: BUILD_LOG › Blocked). */
 export const PATHS = {
   // Dreamship's public API has no account or settings endpoint (docs.dreamship.com/llms.txt, 24 Nov): the
   // shop list proves the key works and names the account.
   shops: "/shops/?limit=20",
   product: (id: number) => `/products/${id}/`,
-  productVariant: (id: number) => `/product-variants/${id}/`,
+  products: (page: number) => `/products/?limit=100&page=${page}`,
   item: (id: number) => `/items/${id}/`,
-  itemPrintAreas: (id: number) => `/items/${id}/print-areas/`,
   ordersByReference: (ref: string) => `/orders/?reference_id=${encodeURIComponent(ref)}`,
   order: (id: number) => `/orders/${id}/`,
   artworks: "/artworks/",
   lineItem: (orderId: number, lineId: number) => `/orders/${orderId}/line-items/${lineId}/`,
 } as const;
 
-const area = z.object({ key: z.string(), width_px: z.number(), height_px: z.number(), dpi: z.number().nullable().optional(), min_dpi: z.number().nullable().optional() }).passthrough();
+const idOf = (v: unknown): number | null => (v && typeof v === "object" ? num((v as { id?: unknown }).id) : num(v));
 const productSchema = z
   .object({
     id: z.number().optional(),
     product_id: z.number().optional(),
-    name: z.string().default(""),
+    name: z.string().nullable().optional(),
     item_id: z.number().optional(),
-    item: z.union([z.number(), z.object({ id: z.number() }).passthrough(), z.string()]).optional(),
+    item: z.unknown().optional(),
     status: z.string().nullable().optional(),
-    variants: z.array(z.object({ product_variant_id: z.number().optional(), id: z.number().optional(), item_variant_id: z.number().optional(), size: z.string().nullable().optional(), color: z.string().nullable().optional(), retail_price: z.union([z.string(), z.number()]).nullable().optional(), price: z.union([z.string(), z.number()]).nullable().optional(), cost: z.union([z.string(), z.number()]).nullable().optional() }).passthrough()).default([]),
-    print_areas: z.array(area.extend({ artwork_id: z.number().nullable().optional(), ai_upscale: z.boolean().optional() })).default([]),
+    process_status: z.string().nullable().optional(),
+    // The REST shape (product_variants) and the connector's (variants); each entry is read on its own below.
+    product_variants: z.array(z.unknown()).optional(),
+    variants: z.array(z.unknown()).optional(),
+    print_areas: z.array(z.unknown()).optional(),
   })
   .passthrough();
+/** A print area's pixel size: `w`/`h` (an item's, in the REST API) or `width_px`/`height_px` (the connector's). */
+function areaOf(a: unknown): (DreamshipPrintArea & { artworkId: number | null; aiUpscale: boolean }) | null {
+  if (!a || typeof a !== "object") return null;
+  const o = a as Record<string, unknown>;
+  const key = typeof o.key === "string" && o.key.trim() ? o.key.trim() : null;
+  const w = num(o.width_px ?? o.w);
+  const h = num(o.height_px ?? o.h);
+  if (!key || !w || !h) return null;
+  return { key, widthPx: w, heightPx: h, dpi: num(o.dpi), minDpi: num(o.min_dpi), artworkId: num(o.artwork_id), aiUpscale: o.ai_upscale === true };
+}
 const orderSchema = z
   .object({
     id: z.number(),
@@ -260,7 +287,9 @@ const orderSchema = z
           .object({
             id: z.number(),
             product_variant_id: z.number().nullable().optional(),
+            product_variant: z.unknown().optional(),
             item_variant_id: z.number().nullable().optional(),
+            item_variant: z.unknown().optional(),
             quantity: z.number().default(1),
             print_areas: z.array(z.object({ key: z.string(), artwork_id: z.number().nullable().optional() }).passthrough()).default([]),
           })
@@ -274,19 +303,56 @@ export function parseProduct(body: unknown, id: number): DreamshipProduct | null
   const r = productSchema.safeParse(body);
   if (!r.success) return null;
   const p = r.data;
-  const itemId = p.item_id ?? (typeof p.item === "number" ? p.item : typeof p.item === "object" ? p.item.id : 0);
+  const itemId = p.item_id ?? idOf(p.item) ?? 0;
+  const pid = p.id ?? p.product_id ?? id;
+  const money = (v: unknown) => (v == null || v === "" ? null : String(v));
+  const variants = (p.product_variants ?? p.variants ?? []).flatMap((x) => {
+    if (!x || typeof x !== "object") return [];
+    const v = x as Record<string, unknown>;
+    const pv = num(v.product_variant_id) ?? num(v.id);
+    const iv = num(v.item_variant_id) ?? idOf(v.item_variant);
+    const str = (k: string) => (typeof v[k] === "string" && (v[k] as string).trim() ? (v[k] as string) : null);
+    return pv && iv ? [{ productVariantId: pv, itemVariantId: iv, size: str("size"), color: str("color"), price: money(v.retail_price ?? v.price), cost: money(v.cost) }] : [];
+  });
   return {
-    id: p.id ?? p.product_id ?? id,
-    name: p.name,
+    id: pid,
+    name: p.name ?? "",
     itemId,
-    status: p.status ?? null,
-    url: designerUrl(p.id ?? p.product_id ?? id),
-    variants: p.variants.flatMap((v) => {
-      const pv = v.product_variant_id ?? v.id;
-      return pv && v.item_variant_id ? [{ productVariantId: pv, itemVariantId: v.item_variant_id, size: v.size ?? null, color: v.color ?? null, price: v.retail_price != null ? String(v.retail_price) : v.price != null ? String(v.price) : null, cost: v.cost != null ? String(v.cost) : null }] : [];
+    status: p.status ?? p.process_status ?? null,
+    url: designerUrl(pid),
+    variants,
+    // The REST product's print areas carry no pixel sizes (the catalog item's do); only sized ones are kept.
+    printAreas: (p.print_areas ?? []).flatMap((a) => {
+      const x = areaOf(a);
+      return x ? [x] : [];
     }),
-    printAreas: p.print_areas.map((a) => ({ key: a.key, widthPx: a.width_px, heightPx: a.height_px, dpi: a.dpi ?? null, minDpi: a.min_dpi ?? null, artworkId: a.artwork_id ?? null, aiUpscale: Boolean(a.ai_upscale) })),
   };
+}
+
+/** A page of Dreamship's product list: the products, and whether there's another page. */
+export function parseProductPage(body: unknown): { products: { id: number; shopifyIds: string[]; variantIds: number[] }[]; next: boolean } {
+  const b = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const list = Array.isArray(body) ? body : Array.isArray(b.data) ? b.data : Array.isArray(b.results) ? b.results : [];
+  const paging = b.paging && typeof b.paging === "object" ? (b.paging as Record<string, unknown>) : null;
+  const products = (list as unknown[]).flatMap((x) => {
+    if (!x || typeof x !== "object") return [];
+    const o = x as Record<string, unknown>;
+    const id = num(o.id ?? o.product_id);
+    if (!id) return [];
+    const shops = Array.isArray(o.shop_products) ? o.shop_products : [];
+    const shopifyIds = shops.flatMap((sp) => {
+      if (!sp || typeof sp !== "object") return [];
+      const m = num((sp as Record<string, unknown>).marketplace_id);
+      return m ? [String(m)] : [];
+    });
+    const vs = Array.isArray(o.product_variants) ? o.product_variants : Array.isArray(o.variants) ? o.variants : [];
+    const variantIds = vs.flatMap((v) => {
+      const n = v && typeof v === "object" ? (num((v as Record<string, unknown>).product_variant_id) ?? num((v as Record<string, unknown>).id)) : null;
+      return n ? [n] : [];
+    });
+    return [{ id, shopifyIds, variantIds }];
+  });
+  return { products, next: Boolean(paging?.next) || Boolean(b.next) };
 }
 
 export function parseOrder(body: unknown): DreamshipOrder | null {
@@ -298,7 +364,7 @@ export function parseOrder(body: unknown): DreamshipOrder | null {
     referenceId: o.reference_id ?? null,
     status: o.status,
     url: orderUrl(o.id),
-    lineItems: o.line_items.map((l) => ({ id: l.id, productVariantId: l.product_variant_id ?? null, itemVariantId: l.item_variant_id ?? null, quantity: l.quantity, printAreas: l.print_areas.map((a) => ({ key: a.key, artworkId: a.artwork_id ?? null })) })),
+    lineItems: o.line_items.map((l) => ({ id: l.id, productVariantId: l.product_variant_id ?? idOf(l.product_variant), itemVariantId: l.item_variant_id ?? idOf(l.item_variant), quantity: l.quantity, printAreas: l.print_areas.map((a) => ({ key: a.key, artworkId: a.artwork_id ?? null })) })),
   };
 }
 
@@ -375,20 +441,40 @@ export class DreamshipLive implements DreamshipSource {
     return body ? parseProduct(body, productId) : null;
   }
   async catalogItem(itemId: number) {
-    const [item, areas] = await Promise.all([this.get(PATHS.item(itemId)), this.get(PATHS.itemPrintAreas(itemId))]);
+    const item = await this.get(PATHS.item(itemId));
     if (!item) return null;
     const i = item as Record<string, unknown>;
-    const list = (Array.isArray(areas) ? areas : ((areas as Record<string, unknown> | null)?.print_areas ?? (areas as Record<string, unknown> | null)?.data ?? i.print_areas ?? [])) as unknown[];
-    const printAreas = list.flatMap((a) => {
-      const r = area.safeParse(a);
-      return r.success ? [{ key: r.data.key, widthPx: r.data.width_px, heightPx: r.data.height_px, dpi: r.data.dpi ?? null, minDpi: r.data.min_dpi ?? null }] : [];
+    // The item's own print areas, with their pixel size as `w` and `h`.
+    const printAreas = (Array.isArray(i.print_areas) ? i.print_areas : []).flatMap((a) => {
+      const x = areaOf(a);
+      return x ? [{ key: x.key, widthPx: x.widthPx, heightPx: x.heightPx, dpi: x.dpi, minDpi: x.minDpi }] : [];
     });
     return { id: itemId, name: String(i.name ?? ""), productionDaysMin: num(i.production_days_min), productionDaysMax: num(i.production_days_max), printAreas };
   }
   async productForVariant(productVariantId: number) {
-    const body = (await this.get(PATHS.productVariant(productVariantId))) as { product_id?: unknown; product?: unknown } | null;
-    const id = num(body?.product_id ?? (typeof body?.product === "object" && body?.product ? (body.product as { id?: unknown }).id : body?.product));
-    return id && id > 0 ? id : null;
+    return this.findProduct({ variantIds: [productVariantId] });
+  }
+  /** Dreamship's product list, read once per request (a few pages for this account), then matched. */
+  private listed: Promise<{ id: number; shopifyIds: string[]; variantIds: number[] }[]> | null = null;
+  private async allProducts() {
+    this.listed ??= (async () => {
+      const out: { id: number; shopifyIds: string[]; variantIds: number[] }[] = [];
+      for (let page = 1; page <= 20; page++) {
+        const r = parseProductPage(await this.req(PATHS.products(page)));
+        out.push(...r.products);
+        if (!r.next || !r.products.length) break;
+      }
+      return out;
+    })();
+    return this.listed;
+  }
+  async findProduct(by: { shopifyProductId?: string | null; variantIds?: number[] }) {
+    const list = await this.allProducts();
+    const shopify = by.shopifyProductId?.trim();
+    const byShop = shopify ? list.find((p) => p.shopifyIds.includes(shopify)) : undefined;
+    if (byShop) return byShop.id;
+    const ids = new Set(by.variantIds ?? []);
+    return list.find((p) => p.variantIds.some((v) => ids.has(v)))?.id ?? null;
   }
   async orderByReference(referenceId: string) {
     const body = (await this.get(PATHS.ordersByReference(referenceId))) as { data?: unknown[]; results?: unknown[] } | unknown[] | null;

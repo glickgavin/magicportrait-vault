@@ -58,7 +58,7 @@ export function DreamshipCard({ initial, productId }: { initial: Card; productId
           </label>
           {card.suggestion && (
             <p className="text-[13px] text-ink-2" data-testid="dreamship-suggestion">
-              Suggested: {card.suggestion}. Every size&apos;s SKU is a variant of that Dreamship product.
+              Found on Dreamship: {card.suggestion} (listed on this product, or its sizes&apos; SKUs are that product&apos;s variants). Link it, then Sync from Dreamship.
             </p>
           )}
           <div className="flex flex-wrap gap-2">

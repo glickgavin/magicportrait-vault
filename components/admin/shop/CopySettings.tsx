@@ -74,7 +74,7 @@ export function CopySettings({ productId, products }: { productId: string; produ
           </label>
         ))}
       </fieldset>
-      <p className="text-[13px] text-ink-2">Never copied: the Imagen theme, the Dreamship link and the print rules (Dreamship&apos;s Sync fills those).</p>
+      <p className="text-[13px] text-ink-2">Never copied: the Imagen theme, the Dreamship link and the print rules. For those, use the Dreamship card below (Link, then Sync from Dreamship and Save to Shopify), or Settings › Printers › Check all Dreamship products.</p>
       <div className="flex flex-wrap items-center gap-3">
         {!confirming ? (
           <Button variant="secondary" disabled={!from || !parts.length || busy} onClick={() => setConfirming(true)}>

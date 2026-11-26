@@ -21,7 +21,7 @@ test.describe("Dreamship link and sync", () => {
     // The Dreamship card is on the Print rules tab; ?tab=print opens it.
     await signInWithLink(page, "super@example.com", `/settings/shop/products/${FLUSH}?tab=print`);
     const card = page.getByRole("region", { name: "Dreamship" });
-    await expect(card.getByTestId("dreamship-suggestion")).toContainText("Suggested: 9972256");
+    await expect(card.getByTestId("dreamship-suggestion")).toContainText("Found on Dreamship: 9972256");
     await expect(card.getByLabel("Dreamship product id or designer link")).toHaveValue("9972256");
     await card.getByRole("button", { name: "Link" }).click();
     await expect(card.getByText("Linked to Dreamship product")).toBeVisible();
@@ -61,6 +61,26 @@ test.describe("Dreamship link and sync", () => {
     await page.waitForURL(/\/settings\/shop\/products\/\d+\?tab=print/);
     await expect(page.getByRole("tab", { name: "Print rules" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("region", { name: "Dreamship", exact: true })).toBeVisible();
+  });
+
+  test("Check all Dreamship products finds the unlinked Flush poster; Save all links it and writes what differs", async ({ page }) => {
+    await signInWithLink(page, "super@example.com", "/settings/printers");
+    const panel = page.getByTestId("dreamship-check-all");
+    await panel.getByRole("button", { name: "Check all Dreamship products" }).click();
+    const flush = panel.getByTestId("dreamship-check-rows").getByRole("listitem").filter({ hasText: "Flush" }).first();
+    await expect(flush).toHaveAttribute("data-status", "unlinked_found");
+    await expect(flush).toContainText("Dreamship 9972256");
+    await expect(flush).toContainText("FOUND, NOT LINKED");
+    await expectNoAxeViolations(page);
+
+    await panel.getByRole("button", { name: "Save all to Shopify" }).click();
+    await expect(panel.getByTestId("dreamship-save-all-confirm")).toContainText("link 1 product to Dreamship");
+    await panel.getByRole("button", { name: "Yes, save all" }).click();
+    await expect(panel.getByTestId("dreamship-save-all-result")).toContainText("Saved 14 fields on 1 product, linked 1.");
+    await expect(flush).toHaveAttribute("data-status", "up_to_date");
+
+    const ev = (await admin().from("activity_log").select("props").eq("event", "admin_dreamship_saved_all").order("occurred_at", { ascending: false }).limit(1)).data!;
+    expect(ev[0].props).toMatchObject({ products: 1, fields_changed: 14, linked: 1, failed: 0 });
   });
 
   test("a wrong id is refused and nothing is written", async ({ page }) => {
