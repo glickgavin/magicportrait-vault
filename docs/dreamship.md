@@ -47,13 +47,18 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
 
 - **Link.** New product metafield `mmp_shop.dreamship_product_id` (number_integer): the Dreamship product the Shopify product was published from.
   - Settings › Shop › a product gets a **Dreamship** card where a super user pastes the id or the designer link.
-  - The card suggests the id when every variant is stocked at the Dreamship location and its SKU is a Dreamship product variant id. Dreamship's app sets SKU = product variant id.
+  - The card finds the id when it isn't linked: the Dreamship product listed on this Shopify product (`shop_products[].marketplace_id` in Dreamship's product list), else the one owning its SKUs (Dreamship's app sets SKU = product variant id).
 - **Sync from Dreamship** (button on the card; also a daily `/api/cron/dreamship-sync` when `dreamship.sync_enabled` is on).
   - Reads the Dreamship product (variants, print areas used, costs, prices), the catalog item's print areas and its production days.
   - Matches Shopify variants by SKU = `product_variant_id`.
   - Proposes, per size: `maker` = dreamship, `maker_sku` = item variant id, `print_px` = print area width x height, `extra` as above, and `lead_days` = production days min–max.
   - Shows a diff. **Save to Shopify** writes only what changed, through the same `metafieldsSet` path as the rules editor (allowed write 5, no new write).
   - The daily run never writes. It records what differs and shows it as a warning on Settings › Shop › Products.
+- **Check all Dreamship products** (Settings › Printers, added 26 Nov): the same check for every product made by Dreamship at once.
+  - A product is checked when it's linked, has a size made by Dreamship, or every SKU looks like a Dreamship variant id.
+  - An unlinked one is found on Dreamship as on the card ("found, not linked"); one that can't be found is listed as such.
+  - Checking writes nothing. **Save all to Shopify** (with a confirm) links each found product and writes what differs on every product, worked out again on the server. Event `admin_dreamship_saved_all`.
+  - Why it's needed: Copy settings never copies print rules, and Dreamship's listing updates rebuild a product's sizes in Shopify, which drops their `mmp_shop` fields. Run it after making or editing a product in Dreamship.
 - **Shown, never written:**
   - Cost and price per size.
   - The margin at full price and at `dreamship.sale_pct` (default 60, the Black Friday sale).
@@ -65,8 +70,8 @@ Dreamship is a new printer (24 Nov). Products are designed in Dreamship's design
   - the theme's pictures below the size's minimum dpi;
   - the template's background photo no longer among the product's media. Dreamship's listing updates are on, so editing the Dreamship product can replace the Shopify photos.
 - **Source:** `lib/sources/dreamship.ts`, with an interface, `live` and `fixtures` as for every source.
-  - Dreamship REST API (`https://api.dreamship.com/v1`, schema at `/v1/schema/`) with `DREAMSHIP_API_KEY` (Vercel only, never `NEXT_PUBLIC_`).
-  - Confirm the field names against the schema when building. The schema couldn't be read from the design session.
+  - Dreamship REST API (`https://api.dreamship.com/v1`) with `DREAMSHIP_API_KEY` (Vercel only, never `NEXT_PUBLIC_`).
+  - Field names checked against Dreamship's API reference on 26 Nov (Dreamship's public API, below).
 - **Settings:** listed under Part C; they're edited on Settings › Printers.
 - **Analytics:** new business events `admin_dreamship_linked` and `admin_dreamship_synced`, props `product_id` and `fields_changed` (added to `docs/analytics.md` when built).
 
@@ -163,6 +168,11 @@ From docs.dreamship.com (its `llms.txt` index) after the first live connection c
   - The order stays where Dreamship put it; a draft waits for a person.
   - This creates one Dreamship product per personalised line, so allowed write 7 needs rewording first.
 - **Part A:** reading a product works (`/products/{id}/`). Print areas come from the product's design. The item print-areas and product-variant paths it also tries may 404, and it falls back without them.
+- **Fixed 26 Nov (Sync from Dreamship):** the app read the product in the connector's shape (`variants` with `product_variant_id`, print areas with `width_px`), but the REST API returns another, so every sync failed with "Dreamship has no product with that id". It now reads the documented shapes, and still reads the old one:
+  - `GET /products/{id}/`: `item.id`; `product_variants[]` with `id`, `item_variant`, `size`, `color`, `cost`, `price`; `print_areas[]` without pixel sizes.
+  - `GET /items/{id}/`: `production_days_min`/`_max`; `print_areas[]` with `key`, `w`, `h`, `dpi` (the pixel sizes `print_px` comes from). The `/items/{id}/print-areas/` and `/product-variants/{id}/` calls are gone.
+  - `GET /products/?limit=100&page=N`: `{paging: {next}, data: [...]}`, each with `shop_products[].marketplace_id`. Read once per check to find unlinked products.
+  - Orders: line items carry `product_variant` and `item_variant` (Part B reads either).
 
 ## Build parts
 
