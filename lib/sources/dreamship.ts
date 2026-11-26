@@ -307,7 +307,9 @@ export function parseOrder(body: unknown): DreamshipOrder | null {
  * own order settings aren't in its API, so they stay null ("Not reported"): check them in Dreamship.
  */
 export function parseShops(body: unknown): DreamshipAccount {
-  const list = Array.isArray(body) ? body : body && typeof body === "object" && Array.isArray((body as { results?: unknown }).results) ? (body as { results: unknown[] }).results : [];
+  // A bare list, or a page of them under `results` or `data` (Dreamship's list endpoints use both).
+  const page = body && typeof body === "object" && !Array.isArray(body) ? (body as { results?: unknown; data?: unknown }) : null;
+  const list = Array.isArray(body) ? body : Array.isArray(page?.results) ? (page.results as unknown[]) : Array.isArray(page?.data) ? (page.data as unknown[]) : [];
   const names = list.flatMap((x) => {
     if (!x || typeof x !== "object") return [];
     const o = x as Record<string, unknown>;

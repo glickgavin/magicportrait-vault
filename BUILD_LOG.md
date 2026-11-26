@@ -783,3 +783,8 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 
 ### 26 Nov: fix: Settings › Shop › product crashed
 - **Fixed:** since #44, every product page in Settings › Shop errored. The server page called `qualityForm()`, which lived in the client-only `StoreFieldsEditor.tsx`. It now lives in the plain `lib/open-store/quality-form.ts`, re-exported by the editor. Found when merging main; `shop-settings`, `shop-copy` and `store-layer` pass again.
+
+### 26 Nov: health check follow-ups
+- **Checked:** no other server file calls a value exported from a `"use client"` file (scripted scan; only unit tests import two, which is fine).
+- **Dreamship shop list:** Settings › Printers and Data sources said Dreamship was "Connected (no shops)", though Dreamship has the Storyboards Shopify shop connected and active. `parseShops` only read a `results` list; it now reads `data` too, as the order lookup already did.
+- Removed the unused `store.howItWorks` copy.
