@@ -229,7 +229,7 @@ test.describe("open store pictures", () => {
   test("a two-photo theme sends both photos and returns three results", async ({ page }) => {
     await page.goto(`/store/product/${ACRYLIC}`);
     await addPhoto(page, "First pet's photo");
-    await expect(page.getByTestId("store-create")).toBeDisabled();
+    await expect(page.getByTestId("store-create")).toHaveCount(0);
     await addPhoto(page, "Second pet's photo");
     await page.getByTestId("store-create").click();
     await expect(page.getByTestId("store-ready")).toBeVisible({ timeout: 20_000 });

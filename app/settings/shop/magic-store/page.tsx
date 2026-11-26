@@ -24,7 +24,7 @@ const CARD = "rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]";
 /** The store's own settings, grouped as on the page (docs/open-store.md › Settings: one area for both stores). */
 const GROUPS: [string, string, string[]][] = [
   ["store-who", "Who sees the Magic Store", ["open_store.enabled", "open_store.super_user_preview"]],
-  ["store-catalogue", "Collection and menu", ["open_store.collection", "open_store.home_collection", "open_store.menu_handle", "open_store.admin_group_prefix", "open_store.theme_category", "open_store.storefront_publication_id", "open_store.products_per_page"]],
+  ["store-catalogue", "Collection and menu", ["open_store.collection", "open_store.home_collection", "open_store.home_intro", "open_store.menu_handle", "open_store.admin_group_prefix", "open_store.theme_category", "open_store.storefront_publication_id", "open_store.products_per_page"]],
   ["store-prices", "Discount", ["open_store.discount_code", "open_store.discount_label"]],
   ["store-page", "Product page", ["open_store.reassurance", "open_store.shipping_days", "open_store.more_gifts_step", "open_store.picture_options"]],
   ["store-lower", "Product page: trust and the lower page", ["open_store.trust_stats", "open_store.trustpilot", "open_store.how_steps", "open_store.wall_photos", "open_store.reviews", "open_store.guarantees", "open_store.faq"]],

@@ -177,6 +177,8 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_try_again_tapped` | browser | The Change photo sheet opened (Change photo, or Choose another photo after a failure; the name is kept from before 26 Nov) | `product_id`, `after` (`photo` · `ready` · `failed`) |
 | `store_more_gifts_shown` | browser | **See more gifts** tapped | `product_id`, `shown` (how many cards now), `has_picture` |
 | `store_picture_kept` | browser | "Keep Teddy's picture" after changing the photo or name of a ready picture | `product_id` |
+| `store_reposition_opened` | browser | "Reposition" opened on a product whose template lets customers move the text and picture | `product_id`, `item` (`t1`, `t2` or `art`) |
+| `store_reposition_saved` | browser | Done in Reposition (never the words) | `product_id`, `items` (how many were moved) |
 | `store_lower_cta_tapped` | browser | The button on the closing card at the bottom of the product page (26 Nov) | `product_id`, `action` (`photo`, `generate` or `cart`) |
 | `store_email_ask_shown`, `store_email_ask_closed` | browser | The email box while painting | `product_id` |
 | `store_email_given` | server, business | Email given while painting | `product_id`, `marketing_consent` |

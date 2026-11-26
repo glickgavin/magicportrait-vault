@@ -1,8 +1,9 @@
 "use client";
 
+import { Move } from "lucide-react";
 import { useId } from "react";
 import { t } from "@/lib/i18n";
-import type { Layer, LayerTextId, LayerValues } from "@/lib/shop/layer";
+import type { Layer, LayerPosId, LayerTextId, LayerValues } from "@/lib/shop/layer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -10,8 +11,32 @@ import { cn } from "@/lib/utils";
  * product's template offers. The preview above redraws as they type; nothing is sent until Add to cart, where the
  * server checks it all again. The words are the customer's own: masked in session replay, never tracked.
  */
-export function Personalise({ layer, art, values, onChange, error }: { layer: Layer; art: { id: string; name: string; url: string }[]; values: LayerValues; onChange: (v: LayerValues) => void; error: { field: LayerTextId | "art"; text: string } | null }) {
+export function Personalise({
+  layer,
+  art,
+  values,
+  onChange,
+  error,
+  onReposition,
+}: {
+  layer: Layer;
+  art: { id: string; name: string; url: string }[];
+  values: LayerValues;
+  onChange: (v: LayerValues) => void;
+  error: { field: LayerTextId | "art"; text: string } | null;
+  /** When the template lets customers reposition: opens the editor on this item. */
+  onReposition?: (id: LayerPosId) => void;
+}) {
   const uid = useId();
+  // "Reposition" sits on the label's line, at the end. Text boxes always have it (an empty one shows its example);
+  // the picture once one is chosen.
+  const move = (id: LayerPosId, label: string, has: boolean) =>
+    onReposition && has ? (
+      <button type="button" onClick={() => onReposition(id)} aria-label={t("store.repositionItem", { label })} className="-my-1 ml-auto flex h-8 flex-none items-center gap-1 rounded-full px-2.5 text-[13px] font-extrabold text-[#8E047B] underline-offset-2 hover:bg-pink-tint hover:underline" data-testid={`store-reposition-${id}`}>
+        <Move className="h-3.5 w-3.5" aria-hidden="true" />
+        {t("store.reposition")}
+      </button>
+    ) : null;
   const choices = layer.art ? layer.art.choices.map((id) => art.find((a) => a.id === id)).filter((a) => a !== undefined) : [];
   return (
     // No heading: the fields sit with the photo's own, so it's just "the pet's name" (or a picture) to fill in.
@@ -21,9 +46,12 @@ export function Personalise({ layer, art, values, onChange, error }: { layer: La
         const bad = error?.field === box.id;
         return (
           <div key={box.id} className="flex flex-col gap-2">
-            <label htmlFor={`${uid}-${box.id}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
-              {box.label} <span className="text-[13px] font-semibold text-[#6b6b6b]">({box.required ? t("store.required") : t("store.optional")})</span>
-            </label>
+            <div className="flex items-center gap-2">
+              <label htmlFor={`${uid}-${box.id}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
+                {box.label} <span className="text-[13px] font-semibold text-[#6b6b6b]">({box.required ? t("store.required") : t("store.optional")})</span>
+              </label>
+              {move(box.id, box.label, true)}
+            </div>
             <input
               id={`${uid}-${box.id}`}
               type="text"
@@ -51,8 +79,11 @@ export function Personalise({ layer, art, values, onChange, error }: { layer: La
       })}
       {layer.art && choices.length > 0 && (
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-[15px] font-extrabold text-[#1a1a1a]">
-            {layer.art.label} <span className="text-[13px] font-semibold text-[#6b6b6b]">({layer.art.required ? t("store.required") : t("store.optional")})</span>
+          <legend className="mb-2 flex w-full items-center gap-2 text-[15px] font-extrabold text-[#1a1a1a]">
+            <span>
+              {layer.art.label} <span className="text-[13px] font-semibold text-[#6b6b6b]">({layer.art.required ? t("store.required") : t("store.optional")})</span>
+            </span>
+            {move("art", layer.art.label, Boolean(values.art))}
           </legend>
           <div role="radiogroup" aria-label={layer.art.label} className="flex flex-wrap gap-2.5">
             {!layer.art.required && (

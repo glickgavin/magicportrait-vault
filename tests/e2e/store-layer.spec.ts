@@ -11,7 +11,7 @@ test.describe.configure({ mode: "serial" });
 const PILLOW = "8703000000";
 const PAW = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><circle cx="50" cy="50" r="40" fill="#c33"/></svg>';
 
-async function setUpLayer(page: Page, art: string) {
+async function setUpLayer(page: Page, art: string, opts: { reposition?: boolean } = {}) {
   await signInWithLink(page, "super@example.com", `/settings/shop/template/${PILLOW}`);
   const editor = page.getByTestId("layer-editor");
   await editor.getByLabel("Let customers personalise this product").check();
@@ -22,6 +22,7 @@ async function setUpLayer(page: Page, art: string) {
   await editor.getByLabel("What to ask the customer (picture)").fill("Add a badge");
   await editor.getByLabel("Upload a picture to the art library").setInputFiles({ name: `${art}.svg`, mimeType: "image/svg+xml", buffer: Buffer.from(PAW) });
   await expect(editor.getByText("Pictures offered (1 of 3), from the art library")).toBeVisible();
+  if (opts.reposition) await editor.getByLabel(/Let customers reposition it/).check();
   await page.getByRole("button", { name: "Publish to Shopify" }).click();
   await expect(page.getByText("Published to Shopify.")).toBeVisible();
 }
@@ -114,6 +115,57 @@ test.describe("Personalise in the Magic Store", () => {
     const ev = (await admin().from("activity_log").select("props").eq("event", "store_added_to_cart").order("occurred_at", { ascending: false }).limit(1)).data!;
     expect(ev[0].props).toMatchObject({ personalised: true });
     expect(JSON.stringify(ev[0].props)).not.toContain("Biscuit");
+    if (test.info().project.name === "mobile") expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  });
+
+  test("Reposition (when the template allows it): move and turn the name; the preview and the cart line follow", async ({ page }) => {
+    await page.request.post("/api/test/reset-fixtures?shop=1");
+    const art = `e2e-badge3-${test.info().project.name}`;
+    await setUpLayer(page, art, { reposition: true });
+
+    await page.goto(`/store/product/${PILLOW}`);
+    const step = page.getByTestId("store-personalise");
+    await step.getByRole("textbox", { name: /Pet's name/ }).fill("Biscuit");
+    await page.getByLabel("Choose a photo: Their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
+    await page.getByTestId("store-create").click();
+    await expect(page.getByTestId("store-ready")).toBeVisible({ timeout: 20_000 });
+
+    const preview = page.getByRole("img", { name: /Your picture on/ }).first();
+    const pixels = () => preview.evaluate((c: HTMLCanvasElement) => c.toDataURL("image/png").length);
+    await expect.poll(pixels).toBeGreaterThan(1000);
+    const before = await pixels();
+
+    // The link is on the name's line; the editor shows the print with the name, to drag (or arrow keys) and turn.
+    await step.getByRole("button", { name: "Reposition Pet's name" }).click();
+    const editor = page.getByTestId("store-reposition");
+    await expect(editor.getByRole("heading", { name: "Reposition" })).toBeVisible();
+    await expect(editor.getByRole("radio", { name: "Pet's name" })).toBeChecked();
+    await expectNoAxeViolations(page);
+    await editor.getByTestId("store-reposition-handle").focus();
+    await page.keyboard.press("Shift+ArrowUp");
+    await page.keyboard.press("Shift+ArrowUp");
+    await editor.getByTestId("store-reposition-turn").fill("20");
+    await expect(editor.getByText("20°", { exact: true })).toBeVisible();
+    // Cancel keeps nothing; Done keeps it.
+    await editor.getByRole("button", { name: "Cancel" }).click();
+    await expect(editor).toHaveCount(0);
+    await step.getByRole("button", { name: "Reposition Pet's name" }).click();
+    await expect(editor.getByText("0°", { exact: true })).toBeVisible();
+    await editor.getByTestId("store-reposition-handle").focus();
+    await page.keyboard.press("Shift+ArrowUp");
+    await editor.getByTestId("store-reposition-turn").fill("20");
+    await editor.getByTestId("store-reposition-done").click();
+    await expect(editor).toHaveCount(0);
+    await expect.poll(pixels, { timeout: 5_000 }).not.toBe(before);
+
+    await page.getByTestId("store-add").click();
+    await expect(page.getByRole("dialog", { name: "Your cart" })).toBeVisible();
+    const visitor = (await admin().from("store_visitors").select("shopify_cart_id").not("shopify_cart_id", "is", null).order("updated_at", { ascending: false }).limit(1).single()).data!;
+    const cart = (await (await page.request.get(`/api/test/cart?id=${encodeURIComponent(visitor.shopify_cart_id)}`)).json()) as { lines: { attributes: { key: string; value: string }[] }[] };
+    const attrs = Object.fromEntries(cart.lines.at(-1)!.attributes.map((a) => [a.key, a.value]));
+    const pos = JSON.parse(attrs._shop_layer_pos) as { t1: [number, number, number, number] };
+    expect(pos.t1[2]).toBe(20);
+    expect(pos.t1[3]).toBe(1);
     if (test.info().project.name === "mobile") expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 });

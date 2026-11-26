@@ -103,7 +103,7 @@ export function LayerEditor({
   const uid = useId();
   const layer = template.layer;
   const on = Boolean(layer?.enabled);
-  const setLayer = (fn: (l: Layer) => Layer) => setTemplate((p) => ({ ...p, layer: fn(p.layer ?? { enabled: true, texts: [], art: null }) }));
+  const setLayer = (fn: (l: Layer) => Layer) => setTemplate((p) => ({ ...p, layer: fn(p.layer ?? { enabled: true, texts: [], art: null, reposition: false }) }));
   const setText = (id: LayerTextId, patch: Partial<LayerText>) => setLayer((l) => ({ ...l, texts: l.texts.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
   const setArtSlot = (patch: Partial<LayerArt>) => setLayer((l) => (l.art ? { ...l, art: { ...l.art, ...patch } } : l));
   const setBox = (t: Target, b: LayerBox) => (t.kind === "art" ? setArtSlot({ box: fitBox(b) }) : setText(t.id, { box: fitBox(b) }));
@@ -184,9 +184,18 @@ export function LayerEditor({
         <p className="text-[13px] text-ink-2">Text and a picture the customer adds on top of their portrait, in the Magic Store. It&apos;s shown on the previews and printed exactly where you place it.</p>
       </div>
       <label className="flex items-center gap-2 text-[14px] font-bold">
-        <input type="checkbox" checked={on} onChange={(e) => setTemplate((p) => ({ ...p, layer: { ...(p.layer ?? { texts: [defaultLayerText("t1")], art: null }), enabled: e.target.checked } }))} />
+        <input type="checkbox" checked={on} onChange={(e) => setTemplate((p) => ({ ...p, layer: { ...(p.layer ?? { texts: [defaultLayerText("t1")], art: null, reposition: false }), enabled: e.target.checked } }))} />
         Let customers personalise this product
       </label>
+      {on && layer && (
+        <label className="-mt-2 flex items-start gap-2 text-[14px] font-bold" data-testid="layer-reposition">
+          <input type="checkbox" className="mt-1" checked={Boolean(layer.reposition)} onChange={(e) => setLayer((l) => ({ ...l, reposition: e.target.checked }))} />
+          <span>
+            Let customers reposition it
+            <span className="block text-[13px] font-normal text-ink-2">Adds “Reposition” to the product page: they can move, turn and resize the text and the picture on their print. What they set is what&apos;s printed.</span>
+          </span>
+        </label>
+      )}
 
       {on && layer && askName && layer.texts.length > 0 && (
         <p role="note" className="rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[13px] text-[#7a4a00]" data-testid="layer-name-twice">

@@ -149,6 +149,8 @@ export const EVENTS = {
   store_layer_filled: ui,
   store_try_again_tapped: ui,
   store_picture_kept: ui,
+  store_reposition_opened: ui,
+  store_reposition_saved: ui,
   store_email_ask_shown: ui,
   store_email_ask_closed: ui,
   store_email_given: biz,

@@ -2,7 +2,7 @@ import { createCanvas } from "@napi-rs/canvas";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { registerFonts } from "@/lib/render/render";
-import { checkLayerValues, cleanLayerText, containIn, defaultLayerText, drawLayer, layerAttributes, layerSchema, layerValuesFromProps, type Layer, type LayerCtx } from "@/lib/shop/layer";
+import { basePos, checkLayerValues, cleanLayerText, cleanPos, containIn, defaultLayerText, drawLayer, layerAttributes, layerSchema, layerValuesFromProps, placeBox, positionedLayer, type Layer, type LayerCtx } from "@/lib/shop/layer";
 import { flatPicture, type PreviewCtx } from "@/lib/shop/preview";
 import { defaultTemplate, templateSchema } from "@/lib/shop/template";
 
@@ -137,5 +137,67 @@ describe("drawing", () => {
     for (let y = 312; y < 360; y++) for (let x = 40; x < 360; x++) if (pixel(layered, x, y)[0] > 200) white++;
     expect(white).toBeGreaterThan(100);
     for (let y = 0; y < 300; y++) for (let x = 0; x < 400; x += 7) expect(pixel(layered, x, y)).toEqual(pixel(plain, x, y));
+  });
+});
+
+describe("repositioning (the template's switch, the customer's positions)", () => {
+  const movable: Layer = { ...layer, reposition: true };
+  const t1 = movable.texts[0];
+
+  it("is off unless the template turns it on; old templates parse with it off", () => {
+    expect(layerSchema.parse({ enabled: true, texts: [defaultLayerText("t1")] }).reposition).toBe(false);
+    expect(positionedLayer(layer, { t1: "Teddy", pos: { t1: { cx: 0.2, cy: 0.2, rotate: 30, scale: 2 } } })).toBe(layer);
+  });
+
+  it("starts from the template's box: its centre, its turn, size 1", () => {
+    expect(basePos(t1.box, 5)).toEqual({ cx: 0.5, cy: 0.84, rotate: 5, scale: 1 });
+  });
+
+  it("moves, turns and resizes a box about its centre, never past the print area", () => {
+    // Twice the size about the same centre.
+    expect(placeBox({ x: 0.4, y: 0.4, w: 0.2, h: 0.1 }, { cx: 0.5, cy: 0.45, rotate: 10, scale: 2 })).toEqual({ box: { x: 0.3, y: 0.35, w: 0.4, h: 0.2 }, rotate: 10, scale: 2 });
+    // Dragged off the edge: the box stops at it.
+    expect(placeBox({ x: 0.4, y: 0.4, w: 0.2, h: 0.1 }, { cx: 1.5, cy: -1, rotate: 0, scale: 1 }).box).toEqual({ x: 0.8, y: 0, w: 0.2, h: 0.1 });
+    // A box as wide as the print area can't grow; a turn past 180° wraps round.
+    expect(placeBox({ x: 0.1, y: 0.78, w: 0.8, h: 0.12 }, { cx: 0.5, cy: 0.84, rotate: 190, scale: 2.5 })).toMatchObject({ scale: 1.25, rotate: -170 });
+  });
+
+  it("the text's size grows with its box, and its turn follows", () => {
+    const l = positionedLayer(movable, { t1: "Teddy", pos: { t1: { cx: 0.5, cy: 0.3, rotate: -15, scale: 1.25 } } });
+    expect(l.texts[0]).toMatchObject({ rotate: -15, size: t1.size * 1.25 });
+    expect(l.texts[0].box.y + l.texts[0].box.h / 2).toBeCloseTo(0.3, 4);
+    // The other box is untouched.
+    expect(l.texts[1]).toEqual(movable.texts[1]);
+  });
+
+  it("is checked on the server: only with the switch on, only for what's filled in, kept inside the limits", () => {
+    const pos = { t1: { cx: 2, cy: 0.5, rotate: 400, scale: 9 }, t2: { cx: 0.5, cy: 0.5, rotate: 0, scale: 1 }, art: { cx: 0.1, cy: 0.1, rotate: 0, scale: 1 } };
+    const ok = checkLayerValues(movable, { t1: "Teddy", pos });
+    expect(ok).toEqual({ ok: true, values: { t1: "Teddy", art: null, pos: { t1: { cx: 1, cy: 0.5, rotate: 40, scale: 2.5 } } } });
+    expect(checkLayerValues(layer, { t1: "Teddy", pos })).toEqual({ ok: true, values: { t1: "Teddy", art: null } });
+    expect(cleanPos({ cx: "x", cy: 0, rotate: 0, scale: 1 })).toBeNull();
+    expect(cleanPos({ cx: Number.NaN, cy: 0, rotate: 0, scale: 1 })).toBeNull();
+  });
+
+  it("goes on the order line as one short property and comes back", () => {
+    const values = { t1: "Teddy", pos: { t1: { cx: 0.5, cy: 0.3, rotate: -15, scale: 1.25 } } };
+    const attrs = layerAttributes(values);
+    expect(attrs).toEqual([
+      { key: "_shop_layer_t1", value: "Teddy" },
+      { key: "_shop_layer_pos", value: '{"t1":[0.5,0.3,-15,1.25]}' },
+    ]);
+    expect(layerValuesFromProps(Object.fromEntries(attrs.map((a) => [a.key, a.value])))).toEqual(values);
+    // A bad position property is ignored; positions alone (no words) put nothing on the line.
+    expect(layerValuesFromProps({ _shop_layer_t1: "Teddy", _shop_layer_pos: "{nope" })).toEqual({ t1: "Teddy" });
+    expect(layerAttributes({ pos: values.pos })).toEqual([]);
+  });
+
+  it("is drawn where the customer put it: moved and turned", () => {
+    const { ctx, calls } = fakeCtx();
+    drawLayer(ctx, 1000, 1000, { layer: movable, values: { t1: "Teddy", pos: { t1: { cx: 0.5, cy: 0.3, rotate: 90, scale: 1 } } }, art: new Map(), family: (f) => f });
+    const turn = calls.find((c) => c.op === "rotate");
+    expect(turn?.args[0]).toBeCloseTo(Math.PI / 2, 6);
+    const at = calls.find((c) => c.op === "translate");
+    expect(at?.args).toEqual([500, 300]);
   });
 });

@@ -8,7 +8,7 @@ import { fitVariant, target } from "@/lib/shop/fit";
 import { getShopCartSource } from "@/lib/shop/sources";
 import type { RemoteCart } from "@/lib/shop/sources/cart";
 import { parseTemplate } from "@/lib/shop/template";
-import { checkLayerValues, layerActive, type LayerValues } from "@/lib/shop/layer";
+import { checkLayerValues, layerActive, layerPosSchema, type LayerValues } from "@/lib/shop/layer";
 import { getObject, putObject, signedUrl } from "@/lib/storage";
 import { aliasPerson } from "@/lib/track";
 import { storeTrack } from "./analytics";
@@ -28,7 +28,16 @@ export const addSchema = z.object({
   quantity: z.number().int().min(1).max(100),
   from: z.enum(["product", "related"]).default("product"),
   /** The personalisation layer (text boxes t1, t2 and a picture id); checked against the product's template. */
-  layer: z.object({ t1: z.string().max(400).optional(), t2: z.string().max(400).optional(), art: z.string().max(40).nullable().optional() }).strict().optional(),
+  layer: z
+    .object({
+      t1: z.string().max(400).optional(),
+      t2: z.string().max(400).optional(),
+      art: z.string().max(40).nullable().optional(),
+      /** Where the customer put each item (Reposition); used only when the template allows it. */
+      pos: z.object({ t1: layerPosSchema.optional(), t2: layerPosSchema.optional(), art: layerPosSchema.optional() }).strict().optional(),
+    })
+    .strict()
+    .optional(),
 });
 
 export type CartFail = { ok: false; status: number; error: string; message?: string };
