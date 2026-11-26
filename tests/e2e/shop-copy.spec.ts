@@ -18,6 +18,7 @@ test.describe("Copy settings from…", () => {
 
   test("copy the canvas's settings onto the poster, then see them on the page", async ({ page }) => {
     await signInWithLink(page, "super@example.com", `/settings/shop/products/${POSTER}`);
+    await page.getByText("Copy settings from…").click();
     const card = page.getByTestId("copy-settings");
     await card.getByLabel("Copy from").selectOption({ label: "Magic Canvas" });
     await card.getByRole("button", { name: "Copy settings" }).click();
@@ -39,6 +40,7 @@ test.describe("Copy settings from…", () => {
   test("at phone width the card fits", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await signInWithLink(page, "super@example.com", `/settings/shop/products/${POSTER}`);
+    await page.getByText("Copy settings from…").click();
     const card = page.getByTestId("copy-settings");
     await expect(card.getByLabel("Copy from")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);

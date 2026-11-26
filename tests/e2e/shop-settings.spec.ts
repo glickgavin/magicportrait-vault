@@ -5,6 +5,12 @@ import { expectNoAxeViolations } from "./helpers";
 import type { Page } from "@playwright/test";
 
 /** Settings › Shop › one product, opened from the Products list. */
+/** Opens one of the product page's tabs (Magic Store, Gifts & Products pages, Print rules). */
+async function openTab(page: Page, name: string) {
+  await page.getByRole("tab", { name }).click();
+  await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
+}
+
 async function openProduct(page: Page, title: string) {
   await page.goto("/settings/shop");
   const row = page.getByTestId("shop-product").filter({ hasText: title }).first();
@@ -53,12 +59,15 @@ test.describe("Settings › Shop", () => {
   test("a product's page and occasions save to Shopify and show again", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
     await openProduct(page, "Magic Poster");
+    await openTab(page, "Gifts & Products pages");
     const poster = page.getByRole("region", { name: "Gifts & Products pages" });
     await poster.getByLabel("Page", { exact: true }).selectOption("all");
     await poster.getByText("Birthday", { exact: true }).click();
     await poster.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
     await expect(poster.getByRole("status")).toHaveText("Saved to Shopify.");
     await page.reload();
+    // The open tab is kept in the address.
+    await expect(page.getByRole("tab", { name: "Gifts & Products pages" })).toHaveAttribute("aria-selected", "true");
     const again = page.getByRole("region", { name: "Gifts & Products pages" });
     await expect(again.getByLabel("Page", { exact: true })).toHaveValue("all");
     await page.goto("/settings/shop");
@@ -112,6 +121,7 @@ test.describe("Settings › Shop", () => {
   test("print rules: a size gets its maker, code and print area and the product shows", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
     await openProduct(page, "Magic Portrait Tile");
+    await openTab(page, "Print rules");
     await expect(page.getByRole("heading", { name: "Print rules" })).toBeVisible();
     await expectNoAxeViolations(page);
     const size = page.getByTestId("rules-size").first();
@@ -124,6 +134,7 @@ test.describe("Settings › Shop", () => {
     await page.getByRole("button", { name: "Save to Shopify" }).press("Enter"); // keyboard: the dev-only Next.js badge can sit over it at 390 px
     await expect(page.getByText("Saved to Shopify.")).toBeVisible();
     await page.reload();
+    await expect(page.getByRole("tab", { name: "Print rules" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("rules-size").first().getByText("READY")).toBeVisible();
     await expect(page.getByTestId("rules-size").first().getByLabel("Maker's product code")).toHaveValue("GLOBAL-TILE-8X8");
     // Put it back (the fixtures are shared by the other tests): clearing removes the fields again.
@@ -149,6 +160,7 @@ test.describe("Settings › Shop", () => {
 
     // Put the Poster in Acrylic as well as Wall art.
     await openProduct(page, "Magic Poster");
+    await openTab(page, "Gifts & Products pages");
     const poster = page.getByRole("region", { name: "Gifts & Products pages" });
     await poster.getByRole("group", { name: "Categories (Products page)" }).getByText("Acrylic", { exact: true }).click();
     await poster.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
@@ -166,6 +178,7 @@ test.describe("Settings › Shop", () => {
 
     // Put it back.
     await openProduct(page, "Magic Poster");
+    await openTab(page, "Gifts & Products pages");
     const again = page.getByRole("region", { name: "Gifts & Products pages" });
     await again.getByRole("group", { name: "Categories (Products page)" }).getByText("Acrylic", { exact: true }).click();
     await again.getByRole("button", { name: "Save page, occasions and categories for Magic Poster" }).click();
@@ -175,7 +188,10 @@ test.describe("Settings › Shop", () => {
   test("one product page: Magic Store fields save to Shopify, empty ones show the store default", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
     await openProduct(page, "Magic Pillow with Photo");
-    await expect(page.getByRole("region", { name: "Where it's sold" }).getByText("IN", { exact: true })).toHaveCount(2);
+    // The status is at the top, and the Magic Store tab opens first for a Magic Store product.
+    await expect(page.getByTestId("status-shop").getByText("SHOWN")).toBeVisible();
+    await expect(page.getByTestId("status-store").getByText("SHOWN")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Magic Store" })).toHaveAttribute("aria-selected", "true");
     const magic = page.getByRole("region", { name: "Magic Store" });
     await expect(magic.getByLabel("Imagen theme")).toHaveValue("admiral-01");
     // Empty fields show the store default in grey.
@@ -203,8 +219,14 @@ test.describe("Settings › Shop", () => {
   test("one product page: a store the product isn't in stays folded; the theme's photo count sets the slots", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
     await openProduct(page, "Magic Canvas");
+    await expect(page.getByTestId("status-shop").getByText("NOT IN COLLECTION")).toBeVisible();
+    await openTab(page, "Gifts & Products pages");
     await expect(page.getByRole("region", { name: "Gifts & Products pages" }).getByText("Not in the Store collection. Add it in Shopify to sell it there.")).toBeVisible();
     await openProduct(page, "Magic Tee");
+    await expect(page.getByTestId("status-store").getByText("NOT IN COLLECTION")).toBeVisible();
+    // Not in the Magic Store: Gifts & Products pages opens first.
+    await expect(page.getByRole("tab", { name: "Gifts & Products pages" })).toHaveAttribute("aria-selected", "true");
+    await openTab(page, "Magic Store");
     await expect(page.getByRole("region", { name: "Magic Store" }).getByText("Not in the Magic Store collection. Add it in Shopify to sell it there.")).toBeVisible();
     await openProduct(page, "Acrylic Block");
     const magic = page.getByRole("region", { name: "Magic Store" });
