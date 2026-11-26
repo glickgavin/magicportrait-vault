@@ -93,7 +93,7 @@ Mockups: the "Open store mockups" design canvas (store page, product page before
 | Step | What the visitor sees | What happens |
 |---|---|---|
 | Photo chosen | The thumbnail in the **Their photo** row; **Generate** turns on once every required photo slot is filled | The browser shrinks it to `open_store.upload_max_px` (default 2048) if bigger. Nothing is sent yet |
-| Create their picture | The picture area dims and shows three steps: "Uploading your photo", "Painting {name} as The Admiral", "Putting it on your pillow", around their photo in a spinning ring. The button reads "Generating…" and is disabled. The page below stays usable | `POST /api/store/generations` with the photo(s), the product and the name(s). The server checks each photo (as `docs/shop.md` › Images: type by content, up to 20 MB, at least `open_store.min_photo_px`, default 600, on the short side), the bot check and the limits; creates the visitor row if it's their first action; saves each photo in `store-uploads` as a `store_photos` row (JPEG, location and camera data removed); then calls Imagen |
+| Generate | The picture area dims and shows three steps: "Uploading your photo", "Painting {name} as The Admiral", "Putting it on your pillow", around their photo in a spinning ring. The button reads "Generating…" and is disabled. The page below stays usable | `POST /api/store/generations` with the photo(s), the product and the name(s). The server checks each photo (as `docs/shop.md` › Images: type by content, up to 20 MB, at least `open_store.min_photo_px`, default 600, on the short side), the bot check and the limits; creates the visitor row if it's their first action; saves each photo in `store-uploads` as a `store_photos` row (JPEG, location and camera data removed); then calls Imagen |
 | Waiting | The steps tick as Imagen's status moves (`pending` → `preprocessing` → `generating` → `done`) | The browser asks `GET /api/store/generations/<id>` every 2 s; the server asks Imagen |
 | Ready | The picture fades in on the product; a strip of the results to choose from ("Pick your favourite") when Imagen returned more than one; **Add to cart** | The server copies Imagen's results into `store-uploads` and records them on the `store_generations` row |
 | Slow | After `open_store.slow_after_s` (default 90): "Still painting. This one's taking a little longer." | |
@@ -359,7 +359,7 @@ The dashboard is set up in PostHog by hand at the end of Open store 5; its link 
 The store's settings stay the defaults; a flag only overrides them for its test group. Each test reports **paid orders per visitor who started a picture**, with Imagen cost per order as the guardrail.
 
 - **Email ask:** on vs off. Does asking while painting change orders?
-- **Button wording:** "Create their picture" vs "See it on your pillow".
+- **Button wording:** "Generate" (since 26 Nov) vs "See it on your pillow".
 - **Results:** one picture vs "Pick your favourite" of up to four. More choice, but more cost.
 - **More gifts:** with their picture vs the products' sample pictures.
 
