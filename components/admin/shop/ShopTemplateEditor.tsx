@@ -13,7 +13,7 @@ import { layerActive } from "@/lib/shop/layer";
 import { LayerEditor, layerProblem, loadLayerArt, sampleValues, type ArtItem } from "./LayerEditor";
 
 type Media = { id: string; url: string; alt: string | null; width: number; height: number };
-type Size = { id: string; title: string; aspect: number; placement: "cover" | "contain" | "wrap_zone"; background: string | null };
+type Size = { id: string; title: string; aspect: number; placement: "cover" | "contain" | "wrap_zone"; background: string | null; options?: { name: string; value: string }[] };
 
 const browserCanvas: MakeCanvas = (w, h) => {
   const c = document.createElement("canvas");
@@ -338,7 +338,7 @@ function Editor({
       void (async () => {
         try {
           const [bg, ov, artMap, , ...pics] = await Promise.all([cachedImg(t.background.url), t.overlay ? cachedImg(t.overlay.url) : Promise.resolve(null), loadLayerArt(t.layer, art), ensureFonts(t.layer?.texts.map((x) => x.font) ?? []), ...samples.map((u) => cachedImg(u).catch(() => null))]);
-          const layer = layerActive(t.layer) ? { layer: t.layer, values: sampleValues(t.layer), art: artMap, family: cssFamily } : null;
+          const layer = layerActive(t.layer) ? { layer: t.layer, values: sampleValues(t.layer, size?.options), art: artMap, family: cssFamily } : null;
           if (cancelled) return;
           const aspect = size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h);
           const placement = size?.placement ?? (t.zone.kind === "wrap" ? "wrap_zone" : "cover");
@@ -682,7 +682,7 @@ function Editor({
           </div>
         )}
       </section>
-      <LayerEditor template={t} setTemplate={setT} aspect={size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h)} sample={samples[0] ?? null} art={art} setArt={setArt} askName={askName} productLegacyId={productLegacyId} />
+      <LayerEditor template={t} setTemplate={setT} aspect={size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h)} sample={samples[0] ?? null} art={art} setArt={setArt} askName={askName} productLegacyId={productLegacyId} sizes={sizes} sizeOptions={size?.options ?? []} />
       </div>
 
       <div className="flex flex-col gap-5">

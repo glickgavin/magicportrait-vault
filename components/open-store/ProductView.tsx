@@ -15,7 +15,7 @@ import { t, tn } from "@/lib/i18n";
 import { trackClient } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 import { ShopPreview } from "@/components/shop/ShopPreview";
-import { checkLayerValues, layerActive, type LayerPosId, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
+import { borderWidthFor, checkLayerValues, layerActive, type LayerPosId, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
 import { Personalise } from "./Personalise";
 import { Reposition, type RepositionPicture } from "./Reposition";
 import { ClosingCard, Faq, Guarantees, Homes, HowItWorks, RealQuality, Reviews, TrustCard, TrustpilotTop } from "./ProductLower";
@@ -182,7 +182,9 @@ export function ProductView({
 
   // The personalisation layer (docs/open-store.md › Personalise): drawn on the preview as they type, a moment later.
   const layer = layerActive(data.template?.layer) ? data.template.layer : null;
-  const [layerVals, setLayerVals] = useState<LayerValues>(() => ({ art: layer?.art?.required ? (layer.art.choices[0] ?? null) : null }));
+  // The border's width for the chosen variant (0: none for it), drawn on every preview; the server works it out again.
+  const borderWidth = layer ? borderWidthFor(layer.border, variant?.options ?? []) : 0;
+  const [layerVals, setLayerVals] = useState<LayerValues>(() => ({ art: layer?.art?.required ? (layer.art.choices[0] ?? null) : null, border: layer?.border?.start === "border" }));
   const [drawVals, setDrawVals] = useState<LayerValues>(layerVals);
   const [layerError, setLayerError] = useState<{ field: LayerTextId | "art"; text: string } | null>(null);
   // "Reposition": open on one item, when the template lets customers move things.
@@ -483,7 +485,7 @@ export function ProductView({
           aspect={variant.aspect}
           background={variant.background}
           width={640}
-          layer={layer ? { values: drawVals, art: data.layerArt } : null}
+          layer={layer ? { values: { ...drawVals, border: Boolean(drawVals.border) && borderWidth > 0, borderWidth }, art: data.layerArt } : null}
           alt={t("store.yourPictureOn", { product: data.product.title })}
           className="rounded-none lg:rounded-[16px]"
         />
@@ -793,6 +795,7 @@ export function ProductView({
                 if (canDraw) setShown(0);
               }}
               onReposition={layer.reposition && data.template ? (id) => setRepositionAt(id) : undefined}
+              borderWidth={borderWidth}
             />
           )}
           {layer?.reposition && data.template && (
@@ -801,7 +804,7 @@ export function ProductView({
               onClose={() => setRepositionAt(null)}
               layer={layer}
               template={data.template}
-              values={layerVals}
+              values={{ ...layerVals, border: Boolean(layerVals.border) && borderWidth > 0, borderWidth }}
               onSave={(pos) => {
                 setLayerVals((v) => ({ ...v, pos }));
                 if (canDraw) setShown(0);
@@ -995,7 +998,7 @@ export function ProductView({
       setNote(b?.error === "layer_invalid" && b.message ? b.message : t("store.addError"));
       return;
     }
-    if (layer && layerBody) trackClient("store_layer_filled", { product_id: pid, has_text1: Boolean(layerBody.t1), has_text2: Boolean(layerBody.t2), has_art: Boolean(layerBody.art) });
+    if (layer && layerBody) trackClient("store_layer_filled", { product_id: pid, has_text1: Boolean(layerBody.t1), has_text2: Boolean(layerBody.t2), has_art: Boolean(layerBody.art), has_border: Boolean(layerBody.border) });
     const body = (await r.json()) as { cart: StoreCartEvent["cart"] };
     window.dispatchEvent(new CustomEvent<StoreCartEvent>(STORE_CART_EVENT, { detail: { cart: body.cart, open: true } }));
   }

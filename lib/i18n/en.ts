@@ -365,6 +365,8 @@ export const en = {
     optional: "optional",
     required: "required",
     noPicture: "None",
+    noBorder: "No border",
+    addBorder: "Add border",
     layerFill: "{label}: please fill this in.",
     layerChoose: "{label}: please choose one.",
     adding: "Adding…",

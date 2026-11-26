@@ -5,7 +5,7 @@
  * as a mesh of small triangles, which both canvases can draw with plain affine transforms.
  */
 import type { Rect } from "./fit";
-import { drawLayer, type LayerDraw } from "./layer";
+import { drawLayer, pictureRect, type LayerDraw } from "./layer";
 import { isBent, mesh, zoneAspect, zoneMapper, type Point, type Template } from "./template";
 
 export type PreviewImage = { width: number; height: number };
@@ -145,17 +145,23 @@ export function flatPicture(input: Pick<PreviewInput, "picture" | "crop" | "plac
   const { canvas, ctx } = input.makeCanvas(fw, fh);
   ctx.imageSmoothingEnabled = true;
   const c = input.crop;
+  // "Add border": the picture sits inside an even margin of the border's colour (the print isn't edge to edge).
+  const r = input.layer?.layer.border ? pictureRect(fw, fh, input.layer.values) : { x: 0, y: 0, w: fw, h: fh };
+  if (r.w < fw) {
+    ctx.fillStyle = input.layer?.layer.border?.color ?? "#FFFFFF";
+    ctx.fillRect(0, 0, fw, fh);
+  }
   if (input.placement === "contain") {
     ctx.fillStyle = input.backgroundColour ?? "#FFFFFF";
-    ctx.fillRect(0, 0, fw, fh);
-    const s = Math.min(fw / c.w, fh / c.h);
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    const s = Math.min(r.w / c.w, r.h / c.h);
     const w = c.w * s;
     const h = c.h * s;
-    ctx.drawImage(input.picture, c.x, c.y, c.w, c.h, (fw - w) / 2, (fh - h) / 2, w, h);
+    ctx.drawImage(input.picture, c.x, c.y, c.w, c.h, r.x + (r.w - w) / 2, r.y + (r.h - h) / 2, w, h);
   } else {
-    // A crop in another shape (an old crop, a resized file) is trimmed, never squashed.
-    const k = coverTop(c.w, c.h, fw / fh);
-    ctx.drawImage(input.picture, c.x + k.x, c.y + k.y, k.w, k.h, 0, 0, fw, fh);
+    // A crop in another shape (an old crop, a resized file, the space inside a border) is trimmed, never squashed.
+    const k = coverTop(c.w, c.h, r.w / r.h);
+    ctx.drawImage(input.picture, c.x + k.x, c.y + k.y, k.w, k.h, r.x, r.y, r.w, r.h);
   }
   if (input.layer) drawLayer(ctx, fw, fh, input.layer);
   const mask = input.template.mask;

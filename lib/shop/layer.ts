@@ -58,11 +58,32 @@ export const layerArtSchema = z.object({
 });
 export type LayerArt = z.infer<typeof layerArtSchema>;
 
+/**
+ * The border choice (26 Nov): the customer picks "No border" or "Add border"; with a border, the picture sits inside
+ * an even margin of `color`, so the print isn't edge to edge (posters). The margin's width is a share of the print
+ * area's shorter side, set per value of one product option (usually Size), else `width`.
+ */
+export const layerBorderSchema = z.object({
+  label: words(40).min(1).default("Border"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#FFFFFF"),
+  /** What's picked before the customer chooses. */
+  start: z.enum(["none", "border"]).default("none"),
+  /** The product option whose value sets the width (e.g. "Size"); null: `width` for every variant. */
+  option: z.string().trim().max(60).nullable().default(null),
+  /** Share of the shorter side, for any value without its own. */
+  width: z.number().min(0).max(0.25).default(0.05),
+  /** Share of the shorter side by option value (0: no border for that value, and the choice isn't shown). */
+  widths: z.record(z.string().max(120), z.number().min(0).max(0.25)).default({}),
+});
+export type LayerBorder = z.infer<typeof layerBorderSchema>;
+
 export const layerSchema = z
   .object({
     enabled: z.boolean(),
     texts: z.array(layerTextSchema).max(LAYER_TEXT_IDS.length).default([]),
     art: layerArtSchema.nullable().default(null),
+    /** "No border" or "Add border" (null: not offered). */
+    border: layerBorderSchema.nullable().default(null),
     /** On: the customer can move, turn and resize the text and the picture ("Reposition" on the product page). */
     reposition: z.boolean().default(false),
   })
@@ -82,11 +103,35 @@ export const LAYER_SCALE = { min: 0.5, max: 2.5 } as const;
 export const layerPosSchema = z.object({ cx: z.number().finite(), cy: z.number().finite(), rotate: z.number().finite(), scale: z.number().finite() }).strict();
 
 /** What the customer filled in. Text is the customer's own words: never logged or sent to analytics. */
-export type LayerValues = { t1?: string; t2?: string; art?: string | null; pos?: Partial<Record<LayerPosId, LayerPos>> };
+export type LayerValues = {
+  t1?: string;
+  t2?: string;
+  art?: string | null;
+  pos?: Partial<Record<LayerPosId, LayerPos>>;
+  /** "Add border" picked. */
+  border?: boolean;
+  /** The border's width for the chosen variant (share of the shorter side), worked out from the template, never sent by the browser. */
+  borderWidth?: number;
+};
 
 /** True when a layer is on and has something to fill in. */
 export function layerActive(layer: Layer | null | undefined): layer is Layer {
-  return Boolean(layer?.enabled && (layer.texts.length || layer.art));
+  return Boolean(layer?.enabled && (layer.texts.length || layer.art || layer.border));
+}
+
+/** The border's width for a variant: its value of the border's option, else the border's own width. */
+export function borderWidthFor(border: LayerBorder | null | undefined, options: { name: string; value: string }[]): number {
+  if (!border) return 0;
+  const v = border.option ? options.find((o) => o.name === border.option)?.value : undefined;
+  const w = v !== undefined && border.widths[v] !== undefined ? border.widths[v] : border.width;
+  return Math.min(0.25, Math.max(0, w));
+}
+
+/** Where the picture goes in a w × h print area: inside the border when one is on, else the whole area. */
+export function pictureRect(w: number, h: number, values: LayerValues | null | undefined): { x: number; y: number; w: number; h: number } {
+  const bw = values?.border && values.borderWidth ? Math.min(0.25, Math.max(0, values.borderWidth)) : 0;
+  const m = Math.round(bw * Math.min(w, h));
+  return m > 0 ? { x: m, y: m, w: w - 2 * m, h: h - 2 * m } : { x: 0, y: 0, w, h };
 }
 
 /** The customer's text made safe to print: no control characters, single spaces, cut to the box's limit. */
@@ -178,6 +223,8 @@ export function checkLayerValues(layer: Layer, raw: unknown): LayerCheck {
     if (a) pos.art = a;
     if (Object.keys(pos).length) values.pos = pos;
   }
+  // The border: only a yes or no from the customer; its width comes from the template for the variant (the cart).
+  if (layer.border && r.border === true) values.border = true;
   return { ok: true, values };
 }
 
@@ -286,7 +333,7 @@ export function drawLayer(ctx: LayerCtx, w: number, h: number, input: LayerDraw)
 }
 
 /** Line properties for the order: only what the customer filled in, under fixed names (docs/schema.md). */
-export const LAYER_ATTR = { t1: "_shop_layer_t1", t2: "_shop_layer_t2", art: "_shop_layer_art", pos: "_shop_layer_pos" } as const;
+export const LAYER_ATTR = { t1: "_shop_layer_t1", t2: "_shop_layer_t2", art: "_shop_layer_art", pos: "_shop_layer_pos", border: "_shop_layer_border" } as const;
 
 /** Positions on an order line: `{"t1":[cx,cy,rotate,scale],…}`, short enough for a line property. */
 export function posAttribute(pos: LayerValues["pos"]): string | null {
@@ -322,6 +369,8 @@ export function layerAttributes(values: LayerValues): { key: string; value: stri
   if (values.art) out.push({ key: LAYER_ATTR.art, value: values.art });
   const pos = out.length ? posAttribute(values.pos) : null;
   if (pos) out.push({ key: LAYER_ATTR.pos, value: pos });
+  // The border's width as printed (a share of the shorter side), so the print file never has to work it out again.
+  if (values.border && values.borderWidth && values.borderWidth > 0) out.push({ key: LAYER_ATTR.border, value: String(Math.round(Math.min(0.25, values.borderWidth) * 10_000) / 10_000) });
   return out;
 }
 
@@ -331,6 +380,11 @@ export function layerValuesFromProps(props: Record<string, string>): LayerValues
   if (props[LAYER_ATTR.t1]) v.t1 = props[LAYER_ATTR.t1];
   if (props[LAYER_ATTR.t2]) v.t2 = props[LAYER_ATTR.t2];
   if (props[LAYER_ATTR.art]) v.art = props[LAYER_ATTR.art];
+  const bw = Number(props[LAYER_ATTR.border]);
+  if (props[LAYER_ATTR.border] && Number.isFinite(bw) && bw > 0) {
+    v.border = true;
+    v.borderWidth = Math.min(0.25, bw);
+  }
   if (!Object.keys(v).length) return null;
   const pos = posFromAttribute(props[LAYER_ATTR.pos]);
   if (pos) v.pos = pos;

@@ -2,7 +2,7 @@ import { createCanvas } from "@napi-rs/canvas";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { registerFonts } from "@/lib/render/render";
-import { basePos, checkLayerValues, cleanLayerText, cleanPos, containIn, defaultLayerText, drawLayer, layerAttributes, layerSchema, layerValuesFromProps, placeBox, positionedLayer, type Layer, type LayerCtx } from "@/lib/shop/layer";
+import { basePos, borderWidthFor, checkLayerValues, pictureRect, cleanLayerText, cleanPos, containIn, defaultLayerText, drawLayer, layerAttributes, layerSchema, layerValuesFromProps, placeBox, positionedLayer, type Layer, type LayerCtx } from "@/lib/shop/layer";
 import { flatPicture, type PreviewCtx } from "@/lib/shop/preview";
 import { defaultTemplate, templateSchema } from "@/lib/shop/template";
 
@@ -199,5 +199,63 @@ describe("repositioning (the template's switch, the customer's positions)", () =
     expect(turn?.args[0]).toBeCloseTo(Math.PI / 2, 6);
     const at = calls.find((c) => c.op === "translate");
     expect(at?.args).toEqual([500, 300]);
+  });
+});
+
+describe("the border (No border / Add border)", () => {
+  const border = layerSchema.parse({ enabled: true, texts: [], border: { option: "Size", width: 0.04, widths: { '8x10"': 0.03, '24x36"': 0.06, "Mini": 0 } } }).border!;
+  const withBorder: Layer = { ...layer, border };
+
+  it("is a layer on its own, starts as No border and white", () => {
+    expect(border).toMatchObject({ label: "Border", color: "#FFFFFF", start: "none" });
+    expect(layerSchema.parse({ enabled: true, texts: [], border: {} }).border).toBeTruthy();
+  });
+
+  it("takes its width from the variant's value of the chosen option, else the border's own", () => {
+    expect(borderWidthFor(border, [{ name: "Frame", value: "Black" }, { name: "Size", value: '24x36"' }])).toBe(0.06);
+    expect(borderWidthFor(border, [{ name: "Size", value: '12x16"' }])).toBe(0.04);
+    expect(borderWidthFor(border, [{ name: "Size", value: "Mini" }])).toBe(0);
+    expect(borderWidthFor({ ...border, option: null }, [{ name: "Size", value: '24x36"' }])).toBe(0.04);
+    expect(borderWidthFor(null, [])).toBe(0);
+  });
+
+  it("the customer sends only yes or no; it's kept only when the template offers it", () => {
+    expect(checkLayerValues(withBorder, { t1: "Teddy", border: true, borderWidth: 0.2 })).toEqual({ ok: true, values: { t1: "Teddy", art: null, border: true } });
+    expect(checkLayerValues(layer, { t1: "Teddy", border: true })).toEqual({ ok: true, values: { t1: "Teddy", art: null } });
+    expect(checkLayerValues(withBorder, { t1: "Teddy", border: "yes" })).toEqual({ ok: true, values: { t1: "Teddy", art: null } });
+  });
+
+  it("goes on the order line as its width, even with no words, and comes back", () => {
+    const attrs = layerAttributes({ border: true, borderWidth: 0.05 });
+    expect(attrs).toEqual([{ key: "_shop_layer_border", value: "0.05" }]);
+    expect(layerValuesFromProps({ _shop_layer_border: "0.05" })).toEqual({ border: true, borderWidth: 0.05 });
+    expect(layerValuesFromProps({ _shop_layer_border: "nope" })).toBeNull();
+    expect(layerAttributes({ border: false, borderWidth: 0.05 })).toEqual([]);
+  });
+
+  it("puts the picture inside an even margin of the shorter side", () => {
+    expect(pictureRect(1200, 1600, { border: true, borderWidth: 0.05 })).toEqual({ x: 60, y: 60, w: 1080, h: 1480 });
+    expect(pictureRect(1200, 1600, { border: false, borderWidth: 0.05 })).toEqual({ x: 0, y: 0, w: 1200, h: 1600 });
+    expect(pictureRect(1200, 1600, null)).toEqual({ x: 0, y: 0, w: 1200, h: 1600 });
+  });
+
+  it("on a real canvas: the margin is the border's colour and the picture fills the rest", async () => {
+    const pic = createCanvas(400, 400);
+    const p = pic.getContext("2d");
+    p.fillStyle = "#336699";
+    p.fillRect(0, 0, 400, 400);
+    const make = (w: number, h: number) => {
+      const c = createCanvas(w, h);
+      return { canvas: c, ctx: c.getContext("2d") as unknown as PreviewCtx };
+    };
+    const tpl = defaultTemplate({ media_id: "m", url: "u", w: 400, h: 400 });
+    const lay: Layer = { ...withBorder, texts: [], border: { ...border, color: "#FF0000" } };
+    const f = flatPicture({ picture: pic, crop: { x: 0, y: 0, w: 400, h: 400 }, placement: "cover", backgroundColour: null, targetAspect: 1, makeCanvas: make, flatMax: 400, template: tpl, layer: { layer: lay, values: { border: true, borderWidth: 0.05 }, art: new Map(), family: (x) => `"${x}"` } });
+    const d = (await sharp((f.canvas as unknown as { toBuffer(m: "image/png"): Buffer }).toBuffer("image/png")).raw().toBuffer({ resolveWithObject: true })).data;
+    const pixel = (x: number, y: number) => [...d.subarray((y * 400 + x) * 4, (y * 400 + x) * 4 + 3)];
+    expect(pixel(5, 5)).toEqual([255, 0, 0]);
+    expect(pixel(395, 200)).toEqual([255, 0, 0]);
+    expect(pixel(25, 25)).toEqual([0x33, 0x66, 0x99]);
+    expect(pixel(200, 200)).toEqual([0x33, 0x66, 0x99]);
   });
 });

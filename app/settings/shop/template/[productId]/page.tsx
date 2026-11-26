@@ -41,7 +41,7 @@ export default async function ShopTemplatePage({ params, searchParams }: { param
     const r = parseVariantRules(v.metafields);
     if (!r.ok) return [];
     const t = target(r.rules);
-    return [{ id: v.id, title: v.title, aspect: t.w / t.h, placement: r.rules.placement, background: r.rules.background }];
+    return [{ id: v.id, title: v.title, aspect: t.w / t.h, placement: r.rules.placement, background: r.rules.background, options: v.options }];
   });
   // The product's photos, photos uploaded here for it, and any studio photo the saved template uses from Shopify Files.
   const published = parseTemplate(p.template?.value);

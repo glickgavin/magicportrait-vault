@@ -1,7 +1,7 @@
 import "server-only";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import sharp from "sharp";
-import { drawLayer, type Layer, type LayerValues } from "./layer";
+import { drawLayer, pictureRect, type Layer, type LayerValues } from "./layer";
 
 /**
  * The print file (docs/shop.md › Print file): the customer's picture cropped as they saw it and sized to the print
@@ -20,7 +20,14 @@ export async function composePrintFile(picture: Buffer, input: PrintFileInput): 
   const meta = await sharp(picture, { limitInputPixels: 200_000_000 }).rotate().metadata();
   const c = input.crop;
   if (c && meta.width && meta.height && c.x + c.w <= meta.width && c.y + c.h <= meta.height) img = img.extract({ left: c.x, top: c.y, width: c.w, height: c.h });
-  const sized = img.resize(input.printPx.w, input.printPx.h, { fit: "cover", position: "top" }).flatten({ background: "#ffffff" });
+  // "Add border": the picture is sized to the space inside the margin, and the margin is the border's colour.
+  // The width rode on the order line, so it's printed even if the template has changed since (white if its colour is gone).
+  const r = pictureRect(input.printPx.w, input.printPx.h, input.layer?.values);
+  let sized = img.resize(r.w, r.h, { fit: "cover", position: "top" }).flatten({ background: "#ffffff" });
+  if (r.x > 0) {
+    const bg = input.layer?.layer.border?.color ?? "#FFFFFF";
+    sized = sharp(await sized.png().toBuffer()).extend({ top: r.y, left: r.x, bottom: input.printPx.h - r.h - r.y, right: input.printPx.w - r.w - r.x, background: bg });
+  }
   if (!input.layer) return sized.jpeg({ quality: 92, mozjpeg: true }).toBuffer();
 
   const { serverLayer } = await import("./layer-server");

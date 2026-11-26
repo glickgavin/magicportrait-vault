@@ -18,6 +18,7 @@ export function Personalise({
   onChange,
   error,
   onReposition,
+  borderWidth = 0,
 }: {
   layer: Layer;
   art: { id: string; name: string; url: string }[];
@@ -26,6 +27,8 @@ export function Personalise({
   error: { field: LayerTextId | "art"; text: string } | null;
   /** When the template lets customers reposition: opens the editor on this item. */
   onReposition?: (id: LayerPosId) => void;
+  /** The border's width for the chosen variant (0: no border offered for it). */
+  borderWidth?: number;
 }) {
   const uid = useId();
   // "Reposition" sits on the label's line, at the end. Text boxes always have it (an empty one shows its example);
@@ -77,6 +80,26 @@ export function Personalise({
           </div>
         );
       })}
+      {layer.border && borderWidth > 0 && (
+        <fieldset className="flex flex-col gap-2" data-testid="store-border">
+          <legend className="mb-2 text-[15px] font-extrabold text-[#1a1a1a]">{layer.border.label}</legend>
+          <div role="radiogroup" aria-label={layer.border.label} className="grid grid-cols-2 gap-2.5">
+            {([false, true] as const).map((on) => {
+              const picked = Boolean(values.border) === on;
+              return (
+                <label key={String(on)} className={cn("flex h-[60px] cursor-pointer items-center gap-3 rounded-[12px] px-3 text-[15px] focus-within:ring-2 focus-within:ring-[#DD07C4] focus-within:ring-offset-2", picked ? "border-2 border-[#DD07C4] bg-pink-tint font-extrabold text-[#8E047B]" : "border-[1.5px] border-[#D9D5CA] font-bold text-[#2b2b2b]")}>
+                  <input type="radio" className="sr-only" name={`${uid}-border`} checked={picked} onChange={() => onChange({ ...values, border: on })} />
+                  {/* A small print: edge to edge, or with a margin. */}
+                  <span className={cn("flex h-9 w-7 flex-none rounded-[3px] border border-black/15 bg-white shadow-sm", on ? "p-[3px]" : "p-0")} aria-hidden="true">
+                    <span className="block h-full w-full rounded-[1px] bg-gradient-to-br from-[#c98a52] to-[#2f3d55]" />
+                  </span>
+                  {on ? t("store.addBorder") : t("store.noBorder")}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
       {layer.art && choices.length > 0 && (
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-2 flex w-full items-center gap-2 text-[15px] font-extrabold text-[#1a1a1a]">
