@@ -241,6 +241,12 @@ export const REGISTRY = {
   "links.main_site_url": url("links", "https://magicportraits.ai", { label: "Main site" }),
   "links.start_portrait_url": url("links", "https://magicportraits.ai/start", { label: "Create a new portrait" }),
   "links.order_session_url_template": text("links", "https://magicportraits.ai/order?product_id=8471707222212&magicid=999&session={lptemp_session_id}", { label: "Order as wall art link", allowEmpty: false }),
+  "links.sample_cards": list("links", ["/sample-cards/merry-christmas.webp", "/sample-cards/christmas-charm.webp", "/sample-cards/snowy-window.webp"], {
+    label: "Sample cards (three images, left to right)",
+    description: "Finished greeting cards with a portrait, 5 × 7, shown fanned out on the sign-in page and on home. A path on this site or an https:// link.",
+    max: 3,
+    item: z.string().max(2000).regex(/^(https:\/\/|\/)[^\s]+$/, "An https:// link, or a path on this site starting with /"),
+  }),
   "links.menu_thumbnails": list("links", [], { label: "Menu thumbnails (six image URLs)", max: 6, item: httpUrl() }),
   "links.vip_login_url": url("links", "https://shopify.com/4283367495/account", { label: "VIP Login" }),
 
