@@ -165,7 +165,7 @@ describe("Settings › Shop as one area", () => {
     const choices = shopFixtures().imagenThemeChoices();
     expect(choices).toContain("duo-portrait-01");
     expect(choices).not.toContain("retired-01");
-    // Another category (open_store.theme_category is "magicstore") stays out; a theme a product uses stays in.
+    // Another category (open_store.theme_category is "magicshop") stays out; a theme a product uses stays in.
     expect(choices).not.toContain("card-style-01");
     expect(choices).toContain("royal-flush");
     // With the dropdown set, a theme outside it is refused by Shopify too.
