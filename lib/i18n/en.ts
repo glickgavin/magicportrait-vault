@@ -603,7 +603,6 @@ export const en = {
     errorGeneric: "We couldn't make your card. Please try again.",
     errorName: "Please type who it's for.",
     // First card
-    yourFreeGift: "Your free gift",
     madeYouACard: "We made you a card",
     madeYouACardBody: "Add a name and send it. That's it.",
     changeDesign: "Change design",

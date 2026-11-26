@@ -732,6 +732,10 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 - **Done:** each layer text box has `rotate` (degrees, −180 to 180, default 0, so older templates are unchanged). `drawLayer` turns the text about the box's centre, so the preview, the mockup and the print file all match. The editor has an angle slider (±90°), a number box (±180°) and **Level**, and the box on the print area turns with it.
 - **Tests:** unit (turns about the centre; level boxes don't turn; missing angle reads as 0; out-of-range refused); e2e `layer-editor` sets −15°, publishes and reads it back.
 
+### 26 Nov: no "Your free gift" pill on /create
+- **Done:** the pill above "We made you a card" on the first-card screen (`FirstCard`) is gone, with its `builder.yourFreeGift` string. The home page's first-panel badge (`home.freeGiftBadge`) is unchanged.
+- **Tests:** unit (471) pass. `builder.spec` passes except "another person's card image is a 404", which also fails on main without this change (already in the known list).
+
 ### 26 Nov: their photo in one place; four more gifts with See more
 - **Their photo** (`ProductView`): the photo row stays under the size chips in every state. Ready: "Teddy is ready" with a check on their photo and **Change photo** (it keeps `data-testid="store-ready"`); the pink note above the title and its "Try another photo" are gone. **Change photo**, and **Choose another photo** after a failure, open one sheet (Radix dialog: bottom sheet on phones, centred on desktop): **Upload a new photo**, or a photo added before (this visit's saved photos, then earlier ones; the one in use marked). Changing the photo or the name of a ready picture keeps that picture on show, brings back **Create their picture**, and **Keep Teddy's picture** puts it back (`usePicture().restore`). Once a picture is ready, its photos are held by their saved ids, so making another never uploads them twice.
 - **Names on return:** the picture's status (`GenerationView.names`) carries the names to the visitor who made it, so a restored picture reads "Teddy is ready" and the name box is filled.
