@@ -29,7 +29,8 @@ export type PicturePhase =
 /** A photo for one slot: a file chosen now, or one added before (its file id, `p_…`). */
 export type SlotPhoto = { file: File; url: string; width: number; height: number } | { fileId: string; url: string; width: number; height: number };
 
-export const fileUrl = (fileId: string) => `/api/store/files/${fileId}`;
+/** A saved file's address. A path of this site ("/shop-samples/…") is used as it is: the editor's sample picture. */
+export const fileUrl = (fileId: string) => (fileId.startsWith("/") && !fileId.startsWith("//") ? fileId : `/api/store/files/${fileId}`);
 
 /** Shrinks a photo to `maxPx` on the long side as JPEG, in the browser; returns the file as is when it can't be read (HEIC). */
 export async function shrinkPhoto(file: File, maxPx: number): Promise<Blob> {

@@ -153,9 +153,14 @@ function GroupGrid({ groups, total }: { groups: ProductGroup[]; total: number })
         <h2 id="shop-products" className="text-[19px] font-extrabold">
           Product groups
         </h2>
-        <Link href="/settings/shop?group=all" className="link text-[14px] font-bold">
-          All products · {total} →
-        </Link>
+        <span className="flex flex-wrap gap-x-4 gap-y-1">
+          <Link href="/settings/shop/clone" className="link text-[14px] font-bold">
+            Clone a product →
+          </Link>
+          <Link href="/settings/shop?group=all" className="link text-[14px] font-bold">
+            All products · {total} →
+          </Link>
+        </span>
       </div>
       <p className="mt-1 text-[13px] text-ink-2">One group per Shopify collection whose handle starts with the prefix set on Settings › Magic Store. A product in two collections shows in both.</p>
       <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="shop-groups">

@@ -173,10 +173,12 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `store_generation_slow` | browser | "Still painting…" shown | `product_id`, `seconds` |
 | `store_generation_left` | browser | Page left while painting | `product_id`, `seconds` |
 | `store_result_picked` | browser | Another result chosen | `product_id`, `index`, `of` |
-| `store_layer_filled` | browser | Added to cart with the personalisation layer | `product_id`, `has_text1`, `has_text2`, `has_art` (never the words) |
+| `store_layer_filled` | browser | Added to cart with the personalisation layer | `product_id`, `has_text1`, `has_text2`, `has_art`, `has_border` (never the words) |
 | `store_try_again_tapped` | browser | The Change photo sheet opened (Change photo, or Choose another photo after a failure; the name is kept from before 26 Nov) | `product_id`, `after` (`photo` · `ready` · `failed`) |
 | `store_more_gifts_shown` | browser | **See more gifts** tapped | `product_id`, `shown` (how many cards now), `has_picture` |
 | `store_picture_kept` | browser | "Keep Teddy's picture" after changing the photo or name of a ready picture | `product_id` |
+| `store_reposition_opened` | browser | "Reposition" opened on a product whose template lets customers move the text and picture | `product_id`, `item` (`t1`, `t2` or `art`) |
+| `store_reposition_saved` | browser | Done in Reposition (never the words) | `product_id`, `items` (how many were moved) |
 | `store_lower_cta_tapped` | browser | The button on the closing card at the bottom of the product page (26 Nov) | `product_id`, `action` (`photo`, `generate` or `cart`) |
 | `store_email_ask_shown`, `store_email_ask_closed` | browser | The email box while painting | `product_id` |
 | `store_email_given` | server, business | Email given while painting | `product_id`, `marketing_consent` |
@@ -195,6 +197,10 @@ How it's wired (Open store 5): every server-side store event goes through `store
 | `admin_open_store_themes_refreshed` | server, business | Imagen themes copied into the Shopify dropdown | `themes`, `added`, `removed` |
 | `admin_dreamship_linked` | server, business | A Shopify product linked to its Dreamship product (`docs/dreamship.md` › Part A) | `product_id`, `fields_changed` |
 | `admin_dreamship_synced` | server, business | Dreamship's numbers saved to a product's sizes with Save to Shopify | `product_id`, `fields_changed` |
+| `admin_product_clone_started` | server, business | Settings › Shop › Clone a product: the new product was created in Dreamship | `master_product_id`, `dreamship_product_id`, `master_dreamship_product_id`, `theme_slug`, `title` (the product's name) |
+| `admin_product_clone_finished` | server, business | Finish setting up: added to the Magic Store collection, settings copied, theme set, linked and synced | `product_id`, `dreamship_product_id`, `master_product_id`, `theme_slug`, `notes` (how many parts need a look) |
+| `admin_product_clone_dismissed` | server, business | A clone taken off the "Being set up" list (nothing deleted) | `dreamship_product_id` |
+| `admin_dreamship_saved_all` | server, business | Save all to Shopify on Settings › Printers: every Dreamship product linked and brought in line with Dreamship | `products`, `fields_changed`, `linked`, `failed` |
 | `shop_print_file_made` | server, business | The print file with the personalisation layer made for an order's lines (printers other than Dreamship) and linked from the order, or it couldn't be | `maker`, `status` (`picture_set` · `failed`), `lines`, `of`, `reason` (when failed); never the words |
 | `shop_order_sent_to_maker` | server, business | The customer's picture set on the printer's order (`docs/dreamship.md` › Part B), or it couldn't be | `maker`, `status` (`picture_set` · `failed`), `lines`, `reason` (when failed) |
 | `admin_printer_job_retried` | server, business | Retry on Settings › Printers re-queued a picture job | `maker`, `order_id` |

@@ -90,23 +90,31 @@ test.describe("open store", () => {
         await expect(page.getByTestId("store-dots").getByRole("button")).not.toHaveCount(0);
         await expect(page.getByTestId("store-rail")).toBeVisible();
       }
-      await expect(page.getByTestId("store-create")).toHaveText("Generate");
+      // Before a photo there's no Generate yet (it comes with the photo); Add to cart is greyed until the picture is ready.
+      await expect(page.getByTestId("store-create")).toHaveCount(0);
+      await expect(page.getByTestId("store-add")).toBeDisabled();
+      await expect(page.getByTestId("store-add-note")).toHaveText("Generate your picture first, then add it to your cart.");
+      await expect(page.getByText(/Use a photo you have the right to use/)).toHaveCount(0);
       await expect(page.getByTestId("store-price")).toContainText("$59.99");
       await expect(page.getByRole("img", { name: "Rated 4.8 out of 5" })).toBeVisible();
       await expect(page.getByTestId("store-delivery")).toContainText(/Delivery approx\. \d{1,2} [A-Z][a-z]{2} – \d{1,2} [A-Z][a-z]{2}/);
       await expect(page.getByText("Sample · add a photo to see yours")).toBeVisible();
       await expect(page.getByLabel("Their name (optional, shown on the picture)")).toHaveAttribute("maxlength", "14");
       const create = page.getByTestId("store-create");
-      await expect(create).toBeDisabled();
       await expectNoAxeViolations(page, { exclude: ["iframe"] });
 
-      // A photo that's too small is refused in the browser; a good one turns Create on.
+      // A photo that's too small is refused in the browser; a good one shows in a row with Change photo and Generate.
       const input = page.getByLabel("Choose a photo: Their photo");
       await input.setInputFiles({ name: "small.png", mimeType: "image/png", buffer: await png(300, 300) });
       await expect(page.getByText(/This photo is a little small/)).toHaveAttribute("role", "alert");
       await input.setInputFiles({ name: "teddy.png", mimeType: "image/png", buffer: await png(900, 900) });
-      await expect(page.getByTestId("photo-added")).toBeVisible();
+      const row = page.getByTestId("photo-added");
+      await expect(row).toBeVisible();
+      await expect(row.getByRole("button", { name: "Change photo" })).toBeVisible();
+      await expect(row.getByTestId("store-create")).toHaveText("Generate");
       await expect(create).toBeEnabled();
+      await expect(page.getByTestId("store-add")).toBeDisabled();
+      await expectNoAxeViolations(page, { exclude: ["iframe"] });
 
       await page.getByRole("button", { name: "Product details" }).click();
       await expect(page.getByText("Linen-look cover, 12 × 12 in, zip closure. Insert included.")).toBeVisible();
@@ -146,7 +154,8 @@ test.describe("open store", () => {
       await expect(page.getByText("Second pet's photo")).toBeVisible();
       const create = page.getByTestId("store-create");
       await page.getByLabel("Choose a photo: First pet's photo").setInputFiles({ name: "a.png", mimeType: "image/png", buffer: await png(800, 800) });
-      await expect(create).toBeDisabled();
+      // Generate comes with the last photo's row.
+      await expect(create).toHaveCount(0);
       await page.getByLabel("Choose a photo: Second pet's photo").setInputFiles({ name: "b.png", mimeType: "image/png", buffer: await png(800, 800) });
       await expect(create).toBeEnabled();
     });

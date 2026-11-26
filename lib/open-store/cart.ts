@@ -7,8 +7,8 @@ import { getSettings } from "@/lib/settings";
 import { fitVariant, target } from "@/lib/shop/fit";
 import { getShopCartSource } from "@/lib/shop/sources";
 import type { RemoteCart } from "@/lib/shop/sources/cart";
-import { parseTemplate } from "@/lib/shop/template";
-import { checkLayerValues, layerActive, type LayerValues } from "@/lib/shop/layer";
+import { parseTemplate, templateFor } from "@/lib/shop/template";
+import { borderWidthFor, checkLayerValues, layerActive, layerPosSchema, type LayerValues } from "@/lib/shop/layer";
 import { getObject, putObject, signedUrl } from "@/lib/storage";
 import { aliasPerson } from "@/lib/track";
 import { storeTrack } from "./analytics";
@@ -28,7 +28,18 @@ export const addSchema = z.object({
   quantity: z.number().int().min(1).max(100),
   from: z.enum(["product", "related"]).default("product"),
   /** The personalisation layer (text boxes t1, t2 and a picture id); checked against the product's template. */
-  layer: z.object({ t1: z.string().max(400).optional(), t2: z.string().max(400).optional(), art: z.string().max(40).nullable().optional() }).strict().optional(),
+  layer: z
+    .object({
+      t1: z.string().max(400).optional(),
+      t2: z.string().max(400).optional(),
+      art: z.string().max(40).nullable().optional(),
+      /** Where the customer put each item (Reposition); used only when the template allows it. */
+      pos: z.object({ t1: layerPosSchema.optional(), t2: layerPosSchema.optional(), art: layerPosSchema.optional() }).strict().optional(),
+      /** "Add border" picked; its width comes from the template for the variant, never from here. */
+      border: z.boolean().optional(),
+    })
+    .strict()
+    .optional(),
 });
 
 export type CartFail = { ok: false; status: number; error: string; message?: string };
@@ -98,6 +109,12 @@ export async function addStoreLine(a: Asker, visitor: StoreVisitorRow, input: z.
     const c = checkLayerValues(template.layer, input.layer ?? {});
     if (!c.ok) return fail(422, "layer_invalid", c.error);
     layerValues = c.values;
+    // The border's width is the template's for this variant (a size with no border drops it).
+    if (layerValues.border) {
+      const w = borderWidthFor(template.layer.border, found.sv.variant.options);
+      if (w > 0) layerValues.borderWidth = w;
+      else delete layerValues.border;
+    }
   }
 
   const lineId = randomUUID();
@@ -107,7 +124,7 @@ export async function addStoreLine(a: Asker, visitor: StoreVisitorRow, input: z.
       const bytes = await getObject("store-uploads", img.storage_path);
       const { renderPreview } = await import("@/lib/shop/render");
       const t = target(found.sv.rules);
-      const jpeg = bytes ? await renderPreview({ template, picture: bytes, crop: fit.crop, placement: found.sv.rules.placement, backgroundColour: found.sv.rules.background, targetAspect: t.w / t.h, width: s["shop.preview_width_px"], layerValues }) : null;
+      const jpeg = bytes ? await renderPreview({ template: templateFor(template, found.sv.variant.options), picture: bytes, crop: fit.crop, placement: found.sv.rules.placement, backgroundColour: found.sv.rules.background, targetAspect: t.w / t.h, width: s["shop.preview_width_px"], layerValues }) : null;
       if (jpeg) {
         const path = previewPath(owner.id, lineId);
         await putObject("store-uploads", path, jpeg, "image/jpeg");
@@ -137,7 +154,7 @@ export async function addStoreLine(a: Asker, visitor: StoreVisitorRow, input: z.
   if (cart.id !== owner.shopify_cart_id) await setVisitorCart(owner.id, { id: cart.id, checkoutUrl: cart.checkoutUrl });
   await storeTrack(
     "store_added_to_cart",
-    { product_id: found.entry.product.legacyId, variant_id: found.sv.variant.legacyId, theme_slug: gen.theme, personalised: Boolean(layerValues && (layerValues.t1 || layerValues.t2 || layerValues.art)), price: found.sv.variant.price, quantity: input.quantity, from: input.from, lines_after: cart.lines.length, store_visitor_id: owner.id },
+    { product_id: found.entry.product.legacyId, variant_id: found.sv.variant.legacyId, theme_slug: gen.theme, personalised: Boolean(layerValues && (layerValues.t1 || layerValues.t2 || layerValues.art || layerValues.border)), price: found.sv.variant.price, quantity: input.quantity, from: input.from, lines_after: cart.lines.length, store_visitor_id: owner.id },
     { visitor: owner, email: a.user?.email ?? null },
   );
   return { ok: true, lines: cart.lines.length };

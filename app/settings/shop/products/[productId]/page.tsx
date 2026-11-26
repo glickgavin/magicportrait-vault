@@ -285,6 +285,14 @@ export default async function ShopProductPage({ params, searchParams }: { params
           </summary>
           <div className="border-t border-line p-4">
             <p className="mb-3 text-[14px] text-ink-2">For a product made by duplicating another: take its settings in one go, then change the theme and photos.</p>
+            {p.dreamshipProductId && found.row?.store && (
+              <p className="mb-3 text-[14px]">
+                To make a new product from this one (another name and Imagen theme, everything else copied):{" "}
+                <Link href={`/settings/shop/clone?master=${p.legacyId}`} className="link font-bold">
+                  Clone this product →
+                </Link>
+              </p>
+            )}
             <CopySettings productId={p.id} products={found.rows.filter((r) => r.product.id !== p.id).map((r) => ({ id: r.product.id, title: r.product.title, store: Boolean(r.store) }))} />
           </div>
         </details>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { areaKeyForSize, coverDpi, looksLikeDreamship, parseDreamshipProductId, proposeSync } from "@/lib/dreamship/sync";
 import { shopFixtures } from "@/lib/shop/sources";
-import { DreamshipFixtures } from "@/lib/sources/dreamship";
+import { DreamshipFixtures, parseProduct } from "@/lib/sources/dreamship";
 
 async function flush() {
   const all = await shopFixtures().allProducts();
@@ -17,6 +17,16 @@ async function report(over: { salePct?: number; minMarginPct?: number; picture?:
 }
 
 describe("Dreamship sync: matching and proposals", () => {
+  it("proposes from Dreamship's REST shapes (a product's product_variants, its item's w and h)", async () => {
+    const shopify = await flush();
+    shopify.variants = shopify.variants.slice(0, 1).map((v) => ({ ...v, title: "White / Small - 30x40in", sku: "45392982", metafields: [] }));
+    const product = parseProduct({ id: 9986009, item: { id: 18 }, product_variants: [{ id: 45392982, item_variant: 746, size: "30x40in", cost: "18.50", price: "49.99" }], print_areas: [{ key: "30x40", url: "x" }] }, 9986009)!;
+    const item = { id: 18, name: "Fleece Blanket", productionDaysMin: 1, productionDaysMax: 3, printAreas: [{ key: "30x40", widthPx: 5100, heightPx: 6600, dpi: 150, minDpi: null }] };
+    const r = proposeSync({ shopify, dreamship: product, item, salePct: 50, minMarginPct: 30, picture: null });
+    expect(r.sizes[0].proposed).toEqual({ maker: "dreamship", maker_sku: "746", print_px: "5100x6600", extra: JSON.stringify({ item_id: 18, print_area: "30x40", product_variant_id: 45392982 }), lead_days: "1-3" });
+    expect(r.sizes[0].changes).toHaveLength(5);
+  });
+
   it("matches every Shopify size to its Dreamship variant by SKU", async () => {
     const { r } = await report();
     expect(r.sizes.map((s) => [s.title, s.dreamshipVariantId, s.printArea])).toEqual([

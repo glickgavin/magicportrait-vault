@@ -51,27 +51,87 @@ export const layerArtSchema = z.object({
   label: words(40).min(1),
   required: z.boolean().default(false),
   box: layerBox,
+  /** Turn, in degrees, about the box's centre. Only a customer's repositioning sets it (see `positionedLayer`). */
+  rotate: z.number().min(-180).max(180).optional(),
   /** Ids from the art library (`layer_art`); the customer picks one. */
   choices: z.array(z.string().uuid()).min(1).max(LAYER_ART_MAX),
 });
 export type LayerArt = z.infer<typeof layerArtSchema>;
+
+/**
+ * The border choice (26 Nov): the customer picks "No border" or "Add border"; with a border, the picture sits inside
+ * an even margin of `color`, so the print isn't edge to edge (posters). The margin's width is a share of the print
+ * area's shorter side, set per value of one product option (usually Size), else `width`.
+ */
+export const layerBorderSchema = z.object({
+  label: words(40).min(1).default("Border"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#FFFFFF"),
+  /** What's picked before the customer chooses. */
+  start: z.enum(["none", "border"]).default("none"),
+  /** The product option whose value sets the width (e.g. "Size"); null: `width` for every variant. */
+  option: z.string().trim().max(60).nullable().default(null),
+  /** Share of the shorter side, for any value without its own. */
+  width: z.number().min(0).max(0.25).default(0.05),
+  /** Share of the shorter side by option value (0: no border for that value, and the choice isn't shown). */
+  widths: z.record(z.string().max(120), z.number().min(0).max(0.25)).default({}),
+});
+export type LayerBorder = z.infer<typeof layerBorderSchema>;
 
 export const layerSchema = z
   .object({
     enabled: z.boolean(),
     texts: z.array(layerTextSchema).max(LAYER_TEXT_IDS.length).default([]),
     art: layerArtSchema.nullable().default(null),
+    /** "No border" or "Add border" (null: not offered). */
+    border: layerBorderSchema.nullable().default(null),
+    /** On: the customer can move, turn and resize the text and the picture ("Reposition" on the product page). */
+    reposition: z.boolean().default(false),
   })
   .refine((l) => new Set(l.texts.map((t) => t.id)).size === l.texts.length, "Each text box once")
   .refine((l) => new Set(l.art?.choices ?? []).size === (l.art?.choices.length ?? 0), "Each picture once");
 export type Layer = z.infer<typeof layerSchema>;
 
+/** What the customer can reposition: each text box, and the picture. */
+export const LAYER_POS_IDS = ["t1", "t2", "art"] as const;
+export type LayerPosId = (typeof LAYER_POS_IDS)[number];
+/**
+ * Where the customer put one item: its centre (fractions of the print area), its turn in degrees, and its size as a
+ * multiple of the template's box (the text's size grows with it).
+ */
+export type LayerPos = { cx: number; cy: number; rotate: number; scale: number };
+export const LAYER_SCALE = { min: 0.5, max: 2.5 } as const;
+export const layerPosSchema = z.object({ cx: z.number().finite(), cy: z.number().finite(), rotate: z.number().finite(), scale: z.number().finite() }).strict();
+
 /** What the customer filled in. Text is the customer's own words: never logged or sent to analytics. */
-export type LayerValues = { t1?: string; t2?: string; art?: string | null };
+export type LayerValues = {
+  t1?: string;
+  t2?: string;
+  art?: string | null;
+  pos?: Partial<Record<LayerPosId, LayerPos>>;
+  /** "Add border" picked. */
+  border?: boolean;
+  /** The border's width for the chosen variant (share of the shorter side), worked out from the template, never sent by the browser. */
+  borderWidth?: number;
+};
 
 /** True when a layer is on and has something to fill in. */
 export function layerActive(layer: Layer | null | undefined): layer is Layer {
-  return Boolean(layer?.enabled && (layer.texts.length || layer.art));
+  return Boolean(layer?.enabled && (layer.texts.length || layer.art || layer.border));
+}
+
+/** The border's width for a variant: its value of the border's option, else the border's own width. */
+export function borderWidthFor(border: LayerBorder | null | undefined, options: { name: string; value: string }[]): number {
+  if (!border) return 0;
+  const v = border.option ? options.find((o) => o.name === border.option)?.value : undefined;
+  const w = v !== undefined && border.widths[v] !== undefined ? border.widths[v] : border.width;
+  return Math.min(0.25, Math.max(0, w));
+}
+
+/** Where the picture goes in a w × h print area: inside the border when one is on, else the whole area. */
+export function pictureRect(w: number, h: number, values: LayerValues | null | undefined): { x: number; y: number; w: number; h: number } {
+  const bw = values?.border && values.borderWidth ? Math.min(0.25, Math.max(0, values.borderWidth)) : 0;
+  const m = Math.round(bw * Math.min(w, h));
+  return m > 0 ? { x: m, y: m, w: w - 2 * m, h: h - 2 * m } : { x: 0, y: 0, w, h };
 }
 
 /** The customer's text made safe to print: no control characters, single spaces, cut to the box's limit. */
@@ -79,6 +139,58 @@ export function cleanLayerText(v: unknown, maxChars: number): string {
   if (typeof v !== "string") return "";
   const s = v.normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, " ").replace(/\s+/g, " ").trim();
   return [...s].slice(0, maxChars).join("").trim();
+}
+
+const round4 = (v: number) => Math.round(v * 10_000) / 10_000;
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** The template's box and turn for an item, as the editor starts from. */
+export function basePos(box: LayerBox, rotate = 0): LayerPos {
+  return { cx: round4(box.x + box.w / 2), cy: round4(box.y + box.h / 2), rotate, scale: 1 };
+}
+
+/**
+ * Applies a customer's position to a template box: resized about its centre (never past the print area), moved so
+ * the box stays inside it, and turned. Returns the box, the turn and the size multiple actually used.
+ */
+export function placeBox(box: LayerBox, pos: LayerPos): { box: LayerBox; rotate: number; scale: number } {
+  const scale = clamp(pos.scale, LAYER_SCALE.min, Math.min(LAYER_SCALE.max, 1 / box.w, 1 / box.h));
+  const w = box.w * scale;
+  const h = box.h * scale;
+  const x = clamp(pos.cx - w / 2, 0, 1 - w);
+  const y = clamp(pos.cy - h / 2, 0, 1 - h);
+  const turn = ((((pos.rotate + 180) % 360) + 360) % 360) - 180;
+  return { box: { x: round4(x), y: round4(y), w: round4(w), h: round4(h) }, rotate: round4(turn), scale: round4(scale) };
+}
+
+/** A position made safe: finite numbers, the centre inside the print area, a turn of ±180° and the size limits. */
+export function cleanPos(raw: unknown): LayerPos | null {
+  const r = layerPosSchema.safeParse(raw);
+  if (!r.success) return null;
+  const p = r.data;
+  const turn = ((((p.rotate + 180) % 360) + 360) % 360) - 180;
+  return { cx: round4(clamp(p.cx, 0, 1)), cy: round4(clamp(p.cy, 0, 1)), rotate: round4(turn), scale: round4(clamp(p.scale, LAYER_SCALE.min, LAYER_SCALE.max)) };
+}
+
+/**
+ * The layer as the customer arranged it: when the template lets them reposition, each moved item's box, turn and
+ * text size follow their position. Otherwise the template's own layer. Used by every drawing (preview, print file).
+ */
+export function positionedLayer(layer: Layer, values: LayerValues): Layer {
+  const pos = values.pos;
+  if (!layer.reposition || !pos) return layer;
+  const texts = layer.texts.map((t) => {
+    const p = pos[t.id] ? cleanPos(pos[t.id]) : null;
+    if (!p) return t;
+    const placed = placeBox(t.box, p);
+    return { ...t, box: placed.box, rotate: placed.rotate, size: Math.min(0.5, t.size * placed.scale), minSize: Math.min(0.5, (t.minSize ?? t.size * 0.6) * placed.scale) };
+  });
+  const a = layer.art && pos.art ? cleanPos(pos.art) : null;
+  const art = layer.art && a ? (() => {
+    const placed = placeBox(layer.art.box, a);
+    return { ...layer.art, box: placed.box, rotate: placed.rotate };
+  })() : layer.art;
+  return { ...layer, texts, art };
 }
 
 export type LayerCheck = { ok: true; values: LayerValues } | { ok: false; error: string; field: LayerTextId | "art" };
@@ -99,6 +211,20 @@ export function checkLayerValues(layer: Layer, raw: unknown): LayerCheck {
     if (layer.art.required && !a) return { ok: false, field: "art", error: `${layer.art.label}: please choose one.` };
     values.art = a;
   }
+  // Positions: only when the template allows it, and only for what's filled in.
+  if (layer.reposition && r.pos && typeof r.pos === "object") {
+    const raw = r.pos as Record<string, unknown>;
+    const pos: Partial<Record<LayerPosId, LayerPos>> = {};
+    for (const t of layer.texts) {
+      const p = values[t.id] ? cleanPos(raw[t.id]) : null;
+      if (p) pos[t.id] = p;
+    }
+    const a = values.art ? cleanPos(raw.art) : null;
+    if (a) pos.art = a;
+    if (Object.keys(pos).length) values.pos = pos;
+  }
+  // The border: only a yes or no from the customer; its width comes from the template for the variant (the cart).
+  if (layer.border && r.border === true) values.border = true;
   return { ok: true, values };
 }
 
@@ -157,14 +283,22 @@ export function containIn(box: LayerBox, w: number, h: number, imgW: number, img
 
 /** Draws the layer over a w × h print area (the flat picture, before it's warped or masked). */
 export function drawLayer(ctx: LayerCtx, w: number, h: number, input: LayerDraw) {
-  const { layer, values } = input;
-  if (!layerActive(layer)) return;
+  const { values } = input;
+  if (!layerActive(input.layer)) return;
+  // Where the customer put things, when the template lets them.
+  const layer = positionedLayer(input.layer, values);
   ctx.save();
   if (layer.art && values.art) {
     const img = input.art.get(values.art);
     if (img && img.width > 0 && img.height > 0) {
       const r = containIn(layer.art.box, w, h, img.width, img.height);
-      ctx.drawImage(img, 0, 0, img.width, img.height, r.x, r.y, r.w, r.h);
+      if (layer.art.rotate) {
+        ctx.save();
+        ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
+        ctx.rotate((layer.art.rotate * Math.PI) / 180);
+        ctx.drawImage(img, 0, 0, img.width, img.height, -r.w / 2, -r.h / 2, r.w, r.h);
+        ctx.restore();
+      } else ctx.drawImage(img, 0, 0, img.width, img.height, r.x, r.y, r.w, r.h);
     }
   }
   const font = (f: FontName, size: number, weight?: number) => `${weightFor(f, weight)} ${size.toFixed(2)}px ${input.family(f)}`;
@@ -199,13 +333,44 @@ export function drawLayer(ctx: LayerCtx, w: number, h: number, input: LayerDraw)
 }
 
 /** Line properties for the order: only what the customer filled in, under fixed names (docs/schema.md). */
-export const LAYER_ATTR = { t1: "_shop_layer_t1", t2: "_shop_layer_t2", art: "_shop_layer_art" } as const;
+export const LAYER_ATTR = { t1: "_shop_layer_t1", t2: "_shop_layer_t2", art: "_shop_layer_art", pos: "_shop_layer_pos", border: "_shop_layer_border" } as const;
+
+/** Positions on an order line: `{"t1":[cx,cy,rotate,scale],…}`, short enough for a line property. */
+export function posAttribute(pos: LayerValues["pos"]): string | null {
+  if (!pos) return null;
+  const out: Record<string, number[]> = {};
+  for (const id of LAYER_POS_IDS) {
+    const p = pos[id] ? cleanPos(pos[id]) : null;
+    if (p) out[id] = [p.cx, p.cy, p.rotate, p.scale];
+  }
+  return Object.keys(out).length ? JSON.stringify(out) : null;
+}
+
+export function posFromAttribute(value: string | undefined): LayerValues["pos"] | undefined {
+  if (!value) return undefined;
+  try {
+    const raw = JSON.parse(value) as Record<string, unknown>;
+    const pos: Partial<Record<LayerPosId, LayerPos>> = {};
+    for (const id of LAYER_POS_IDS) {
+      const a = raw?.[id];
+      const p = Array.isArray(a) && a.length === 4 ? cleanPos({ cx: a[0], cy: a[1], rotate: a[2], scale: a[3] }) : null;
+      if (p) pos[id] = p;
+    }
+    return Object.keys(pos).length ? pos : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function layerAttributes(values: LayerValues): { key: string; value: string }[] {
   const out: { key: string; value: string }[] = [];
   if (values.t1) out.push({ key: LAYER_ATTR.t1, value: values.t1 });
   if (values.t2) out.push({ key: LAYER_ATTR.t2, value: values.t2 });
   if (values.art) out.push({ key: LAYER_ATTR.art, value: values.art });
+  const pos = out.length ? posAttribute(values.pos) : null;
+  if (pos) out.push({ key: LAYER_ATTR.pos, value: pos });
+  // The border's width as printed (a share of the shorter side), so the print file never has to work it out again.
+  if (values.border && values.borderWidth && values.borderWidth > 0) out.push({ key: LAYER_ATTR.border, value: String(Math.round(Math.min(0.25, values.borderWidth) * 10_000) / 10_000) });
   return out;
 }
 
@@ -215,7 +380,15 @@ export function layerValuesFromProps(props: Record<string, string>): LayerValues
   if (props[LAYER_ATTR.t1]) v.t1 = props[LAYER_ATTR.t1];
   if (props[LAYER_ATTR.t2]) v.t2 = props[LAYER_ATTR.t2];
   if (props[LAYER_ATTR.art]) v.art = props[LAYER_ATTR.art];
-  return Object.keys(v).length ? v : null;
+  const bw = Number(props[LAYER_ATTR.border]);
+  if (props[LAYER_ATTR.border] && Number.isFinite(bw) && bw > 0) {
+    v.border = true;
+    v.borderWidth = Math.min(0.25, bw);
+  }
+  if (!Object.keys(v).length) return null;
+  const pos = posFromAttribute(props[LAYER_ATTR.pos]);
+  if (pos) v.pos = pos;
+  return v;
 }
 
 /** A starting text box for the editor. */

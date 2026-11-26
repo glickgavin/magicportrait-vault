@@ -51,9 +51,28 @@ export const templateSchema = z.object({
   blend: z.enum(["normal", "multiply"]).default("normal"),
   /** The personalisation layer: text and a picture the Magic Store customer adds on top (lib/shop/layer.ts). */
   layer: layerSchema.optional(),
+  /**
+   * Another product photo per value of one option (26 Nov): a framed print's photo with a black, white or wood
+   * frame. The preview swaps to the chosen value's photo; the picture sits in the same place (the zone is shared),
+   * so the photos must be the same shot. Only the preview changes: never the print file.
+   */
+  scenes: z
+    .object({
+      option: z.string().trim().min(1).max(60),
+      values: z.record(z.string().max(120), z.object({ background: media, overlay: media.nullable().default(null) })),
+    })
+    .optional(),
   updated_at: z.string().max(40).optional(),
 });
 export type Template = z.infer<typeof templateSchema>;
+
+/** The template as drawn for a variant: its option value's own photo when the template has one, else unchanged. */
+export function templateFor(t: Template, options: { name: string; value: string }[] | null | undefined): Template {
+  if (!t.scenes) return t;
+  const value = options?.find((o) => o.name === t.scenes!.option)?.value;
+  const scene = value !== undefined ? t.scenes.values[value] : undefined;
+  return scene ? { ...t, background: scene.background, overlay: scene.overlay } : t;
+}
 export type Point = { x: number; y: number };
 
 export function parseTemplate(value: string | null | undefined): Template | null {

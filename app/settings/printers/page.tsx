@@ -9,6 +9,7 @@ import { fmtBiz } from "@/lib/biztime";
 import { getSettings } from "@/lib/settings";
 import { SettingField } from "@/components/admin/SettingField";
 import { CheckConnection } from "@/components/admin/printers/CheckConnection";
+import { CheckAllDreamship } from "@/components/admin/printers/CheckAllDreamship";
 import { TrackPageView } from "@/components/TrackPageView";
 import { Badge } from "@/components/ui/Badge";
 
@@ -102,6 +103,7 @@ export default async function PrintersPage() {
           </div>
 
           <h3 className="mt-5 text-[16px] font-extrabold">Products</h3>
+          <CheckAllDreamship />
           {products === null ? (
             <p className="text-[14px] text-ink-2">Couldn&apos;t read the products.</p>
           ) : products.length === 0 ? (

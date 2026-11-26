@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { FONT_DEFS } from "@/lib/render/fonts";
 import { cssFamily, ensureFonts } from "@/lib/render/fonts-browser";
-import { defaultLayerText, LAYER_ART_MAX, LAYER_TEXT_IDS, layerSchema, type Layer, type LayerArt, type LayerBox, type LayerText, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
+import { borderWidthFor, defaultLayerText, LAYER_ART_MAX, LAYER_TEXT_IDS, layerBorderSchema, layerSchema, type Layer, type LayerArt, type LayerBorder, type LayerBox, type LayerText, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
 import { flatPicture, type MakeCanvas, type PreviewCtx } from "@/lib/shop/preview";
 import type { Template } from "@/lib/shop/template";
 import { cn } from "@/lib/utils";
@@ -41,12 +41,37 @@ export function loadArt(url: string): Promise<HTMLImageElement | null> {
   return p;
 }
 
-/** What the editor previews with: each box's placeholder (or its label), and the first picture offered. */
-export function sampleValues(layer: Layer): LayerValues {
+/** What the editor previews with: each box's placeholder (or its label), the first picture offered, and the border for the size shown. */
+export function sampleValues(layer: Layer, sizeOptions: { name: string; value: string }[] = []): LayerValues {
   const v: LayerValues = {};
   for (const t of layer.texts) v[t.id] = t.placeholder || t.label;
   v.art = layer.art?.choices[0] ?? null;
+  const bw = borderWidthFor(layer.border, sizeOptions);
+  if (bw > 0) {
+    v.border = true;
+    v.borderWidth = bw;
+  }
   return v;
+}
+
+/** The product's options and their values, in order (for the border's widths). */
+function optionValues(sizes: { options?: { name: string; value: string }[] }[]): { name: string; values: string[] }[] {
+  const out: { name: string; values: string[] }[] = [];
+  for (const s of sizes)
+    for (const o of s.options ?? []) {
+      let g = out.find((x) => x.name === o.name);
+      if (!g) out.push((g = { name: o.name, values: [] }));
+      if (!g.values.includes(o.value)) g.values.push(o.value);
+    }
+  return out;
+}
+
+/** "≈ 0.6 in" for a value that names its size in inches (12x16, 12 × 16 in), else null. */
+function inchesHint(value: string, share: number): string | null {
+  const m = /(\d+(?:\.\d+)?)\s*["″]?\s*[x×]\s*(\d+(?:\.\d+)?)/i.exec(value);
+  if (!m || share <= 0) return null;
+  const inches = Math.min(Number(m[1]), Number(m[2])) * share;
+  return `≈ ${inches < 1 ? inches.toFixed(2) : inches.toFixed(1)} in`;
 }
 
 /** The images a layer offers, loaded, by id. */
@@ -63,7 +88,7 @@ export async function loadLayerArt(layer: Layer | undefined, art: ArtItem[]): Pr
 /** The layer's problems before publishing, in words; null when it's fine. */
 export function layerProblem(layer: Layer | undefined): string | null {
   if (!layer?.enabled) return null;
-  if (!layer.texts.length && !layer.art) return "Add a text box or a picture slot, or turn the layer off.";
+  if (!layer.texts.length && !layer.art && !layer.border) return "Add a text box, a picture slot or a border choice, or turn the layer off.";
   if (layer.art && !layer.art.choices.length) return "Choose at least one picture for the picture slot, or remove the slot.";
   const r = layerSchema.safeParse(layer);
   if (r.success) return null;
@@ -88,6 +113,8 @@ export function LayerEditor({
   setArt,
   askName = false,
   productLegacyId = "",
+  sizes = [],
+  sizeOptions = [],
 }: {
   template: Template;
   setTemplate: React.Dispatch<React.SetStateAction<Template>>;
@@ -99,13 +126,19 @@ export function LayerEditor({
   setArt: React.Dispatch<React.SetStateAction<ArtItem[]>>;
   askName?: boolean;
   productLegacyId?: string;
+  /** The product's sizes (variants with rules) and their options, for the border's widths. */
+  sizes?: { title: string; options?: { name: string; value: string }[] }[];
+  /** The options of the size the preview shows. */
+  sizeOptions?: { name: string; value: string }[];
 }) {
   const uid = useId();
+  const options = optionValues(sizes);
   const layer = template.layer;
   const on = Boolean(layer?.enabled);
-  const setLayer = (fn: (l: Layer) => Layer) => setTemplate((p) => ({ ...p, layer: fn(p.layer ?? { enabled: true, texts: [], art: null }) }));
+  const setLayer = (fn: (l: Layer) => Layer) => setTemplate((p) => ({ ...p, layer: fn(p.layer ?? { enabled: true, texts: [], art: null, reposition: false, border: null }) }));
   const setText = (id: LayerTextId, patch: Partial<LayerText>) => setLayer((l) => ({ ...l, texts: l.texts.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
   const setArtSlot = (patch: Partial<LayerArt>) => setLayer((l) => (l.art ? { ...l, art: { ...l.art, ...patch } } : l));
+  const setBorder = (patch: Partial<LayerBorder>) => setLayer((l) => (l.border ? { ...l, border: { ...l.border, ...patch } } : l));
   const setBox = (t: Target, b: LayerBox) => (t.kind === "art" ? setArtSlot({ box: fitBox(b) }) : setText(t.id, { box: fitBox(b) }));
 
   // The flat print area with the sample picture and the layer, drawn by the same routine as the store.
@@ -127,7 +160,7 @@ export function LayerEditor({
       pc.fillStyle = g;
       pc.fillRect(0, 0, 600, 600);
       const p = (pic ?? plain.canvas) as unknown as { width: number; height: number };
-      const flat = flatPicture({ picture: p, crop: { x: 0, y: 0, w: p.width, h: p.height }, placement: "cover", backgroundColour: null, targetAspect: aspect, makeCanvas: browserCanvas, flatMax: 700, template: { ...template, mask: { kind: "none", radius: 0 } }, layer: { layer, values: sampleValues(layer), art: artMap, family: cssFamily } });
+      const flat = flatPicture({ picture: p, crop: { x: 0, y: 0, w: p.width, h: p.height }, placement: "cover", backgroundColour: null, targetAspect: aspect, makeCanvas: browserCanvas, flatMax: 700, template: { ...template, mask: { kind: "none", radius: 0 } }, layer: { layer, values: sampleValues(layer, sizeOptions), art: artMap, family: cssFamily } });
       const el = canvas.current;
       el.width = flat.w;
       el.height = flat.h;
@@ -136,7 +169,7 @@ export function LayerEditor({
     return () => {
       cancelled = true;
     };
-  }, [on, layer, template, aspect, sample, art]);
+  }, [on, layer, template, aspect, sample, art, sizeOptions]);
 
   const drag = useRef<{ target: Target; mode: "move" | "size"; x: number; y: number; box: LayerBox } | null>(null);
   const frac = (e: React.PointerEvent) => {
@@ -184,9 +217,18 @@ export function LayerEditor({
         <p className="text-[13px] text-ink-2">Text and a picture the customer adds on top of their portrait, in the Magic Store. It&apos;s shown on the previews and printed exactly where you place it.</p>
       </div>
       <label className="flex items-center gap-2 text-[14px] font-bold">
-        <input type="checkbox" checked={on} onChange={(e) => setTemplate((p) => ({ ...p, layer: { ...(p.layer ?? { texts: [defaultLayerText("t1")], art: null }), enabled: e.target.checked } }))} />
+        <input type="checkbox" checked={on} onChange={(e) => setTemplate((p) => ({ ...p, layer: { ...(p.layer ?? { texts: [defaultLayerText("t1")], art: null, reposition: false, border: null }), enabled: e.target.checked } }))} />
         Let customers personalise this product
       </label>
+      {on && layer && (
+        <label className="-mt-2 flex items-start gap-2 text-[14px] font-bold" data-testid="layer-reposition">
+          <input type="checkbox" className="mt-1" checked={Boolean(layer.reposition)} onChange={(e) => setLayer((l) => ({ ...l, reposition: e.target.checked }))} />
+          <span>
+            Let customers reposition it
+            <span className="block text-[13px] font-normal text-ink-2">Adds “Reposition” to the product page: they can move, turn and resize the text and the picture on their print. What they set is what&apos;s printed.</span>
+          </span>
+        </label>
+      )}
 
       {on && layer && askName && layer.texts.length > 0 && (
         <p role="note" className="rounded-[12px] bg-[#fff1d6] px-3 py-2 text-[13px] text-[#7a4a00]" data-testid="layer-name-twice">
@@ -201,7 +243,7 @@ export function LayerEditor({
         <>
           <div
             ref={panel}
-            className="relative mx-auto w-full max-w-[420px] touch-none select-none overflow-hidden rounded-[10px] bg-black/[0.04]"
+            className="relative mx-auto w-full max-w-[420px] touch-none select-none overflow-hidden rounded-[10px] bg-black/[0.04] ring-1 ring-black/15"
             style={{ aspectRatio: `${aspect}` }}
             onPointerMove={onMove}
             onPointerUp={() => (drag.current = null)}
@@ -422,6 +464,105 @@ export function LayerEditor({
                 <p className="mt-1 text-[12px] text-ink-2">The library is shared by every product; each offers at most {LAYER_ART_MAX}. PNGs need a see-through background.</p>
               </div>
               <BoxInputs name="Picture" box={layer.art.box} onChange={(b) => setArtSlot({ box: fitBox(b) })} />
+            </fieldset>
+          )}
+
+          {!layer.border ? (
+            <Button variant="secondary" size="sm" className="self-start" onClick={() => setLayer((l) => ({ ...l, border: layerBorderSchema.parse({ option: options.find((o) => /^size$/i.test(o.name))?.name ?? null }) }))}>
+              + Add a border choice (No border / Add border)
+            </Button>
+          ) : (
+            <fieldset className="flex flex-col gap-3 rounded-[14px] bg-black/[0.03] p-3" data-testid="layer-border">
+              <legend className="sr-only">Border</legend>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[15px] font-extrabold">Border</p>
+                <button type="button" className="text-[13px] font-bold text-[#a1251b]" onClick={() => setLayer((l) => ({ ...l, border: null }))}>
+                  Remove the border choice
+                </button>
+              </div>
+              <p className="text-[12px] text-ink-2">The customer picks “No border” or “Add border”. With a border, their picture sits inside an even margin, so the print isn&apos;t edge to edge. It shows on every preview and is printed. The width is a share of the print&apos;s shorter side.</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label htmlFor={`${uid}-b-label`} className="flex flex-col gap-1 text-[13px] font-bold">
+                  What to ask the customer (border)
+                  <input id={`${uid}-b-label`} className={input} value={layer.border.label} maxLength={40} onChange={(e) => setBorder({ label: e.target.value })} />
+                </label>
+                <label htmlFor={`${uid}-b-color`} className="flex flex-col gap-1 text-[13px] font-bold">
+                  Border colour
+                  <span className="flex gap-2">
+                    <input id={`${uid}-b-color`} type="color" className="h-10 w-12 flex-none rounded-[10px] border border-line bg-white" value={layer.border.color} onChange={(e) => setBorder({ color: e.target.value.toUpperCase() })} />
+                    <input aria-label="Border colour (hex)" className={input} value={layer.border.color} maxLength={7} onChange={(e) => /^#[0-9a-fA-F]{6}$/.test(e.target.value) && setBorder({ color: e.target.value.toUpperCase() })} />
+                  </span>
+                </label>
+                <label htmlFor={`${uid}-b-start`} className="flex flex-col gap-1 text-[13px] font-bold">
+                  Picked at first
+                  <select id={`${uid}-b-start`} className={input} value={layer.border.start} onChange={(e) => setBorder({ start: e.target.value === "border" ? "border" : "none" })}>
+                    <option value="none">No border</option>
+                    <option value="border">Add border</option>
+                  </select>
+                </label>
+                <label htmlFor={`${uid}-b-option`} className="flex flex-col gap-1 text-[13px] font-bold">
+                  Width set by
+                  <select id={`${uid}-b-option`} className={input} value={layer.border.option ?? ""} onChange={(e) => setBorder({ option: e.target.value || null })}>
+                    <option value="">The same for every variant</option>
+                    {options.map((o) => (
+                      <option key={o.name} value={o.name}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label htmlFor={`${uid}-b-width`} className="flex flex-col gap-1 text-[13px] font-bold">
+                {layer.border.option ? `Width for any ${layer.border.option.toLowerCase()} not listed below (%)` : "Width (% of the shorter side)"}
+                <input id={`${uid}-b-width`} type="number" min={0} max={25} step={0.5} className={cn(input, "sm:max-w-[160px]")} value={Math.round(layer.border.width * 1000) / 10} onChange={(e) => setBorder({ width: Math.min(0.25, Math.max(0, (Number(e.target.value) || 0) / 100)) })} />
+              </label>
+              {layer.border.option && (
+                <table className="w-full text-[13px]" data-testid="layer-border-widths">
+                  <caption className="sr-only">Border width for each {layer.border.option}</caption>
+                  <thead>
+                    <tr className="text-left text-ink-2">
+                      <th scope="col" className="py-1 font-bold">{layer.border.option}</th>
+                      <th scope="col" className="py-1 font-bold">Width (% of the shorter side)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(options.find((o) => o.name === layer.border!.option)?.values ?? []).map((v) => {
+                      const b = layer.border!;
+                      const own = b.widths[v];
+                      const share = own ?? b.width;
+                      return (
+                        <tr key={v} className="border-t border-black/5">
+                          <th scope="row" className="py-1.5 pr-2 text-left font-semibold">
+                            {v}
+                          </th>
+                          <td className="py-1.5">
+                            <span className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min={0}
+                                max={25}
+                                step={0.5}
+                                aria-label={`Border width for ${v} (%)`}
+                                placeholder={String(Math.round(b.width * 1000) / 10)}
+                                className={cn(input, "max-w-[110px]")}
+                                value={own === undefined ? "" : Math.round(own * 1000) / 10}
+                                onChange={(e) => {
+                                  const next = { ...b.widths };
+                                  if (e.target.value === "") delete next[v];
+                                  else next[v] = Math.min(0.25, Math.max(0, (Number(e.target.value) || 0) / 100));
+                                  setBorder({ widths: next });
+                                }}
+                              />
+                              <span className="text-ink-2">{share === 0 ? "no border for this one" : inchesHint(v, share) ?? ""}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              <p className="text-[12px] text-ink-2">0 means no border for that {layer.border.option ? layer.border.option.toLowerCase() : "product"}, and the choice isn&apos;t shown. The preview above shows the border for the size picked at the top.</p>
             </fieldset>
           )}
         </>
