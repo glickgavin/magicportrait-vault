@@ -12,9 +12,10 @@ import type { DescriptionBlock } from "@/lib/shop/description";
 import { defaultCrop, fitVariant } from "@/lib/shop/fit";
 import { formatMoney } from "@/lib/shop/money";
 import { t, tn } from "@/lib/i18n";
-import { trackClient } from "@/lib/track-client";
+import { trackClient as track } from "@/lib/track-client";
 import { cn } from "@/lib/utils";
 import { ShopPreview } from "@/components/shop/ShopPreview";
+import { templateFor } from "@/lib/shop/template";
 import { borderWidthFor, checkLayerValues, layerActive, type LayerPosId, type LayerTextId, type LayerValues } from "@/lib/shop/layer";
 import { Personalise } from "./Personalise";
 import { Reposition, type RepositionPicture } from "./Reposition";
@@ -22,6 +23,12 @@ import { ClosingCard, Faq, Guarantees, Homes, HowItWorks, RealQuality, Reviews, 
 import { Stars } from "./Stars";
 import { STORE_CART_EVENT, type StoreCartEvent } from "./StoreCart";
 import { fileUrl, usePicture, type PictureView, type SlotPhoto } from "./use-picture";
+
+// The template editor's customer view (demo) tracks nothing.
+let muted = false;
+const trackClient: typeof track = (event, props) => {
+  if (!muted) track(event, props);
+};
 
 const ICONS = { truck: Truck, heart: Heart, lock: Lock, gift: Gift, star: Star, clock: Clock } as const;
 
@@ -84,6 +91,7 @@ export function ProductView({
   earlierPhotos,
   askEmail = true,
   moreGiftsStep = 4,
+  demo = false,
 }: {
   data: ProductPageData;
   initialVariantId: string | null;
@@ -96,9 +104,14 @@ export function ProductView({
   askEmail?: boolean;
   /** "On more gifts": how many show at first and per "See more gifts" (open_store.more_gifts_step). */
   moreGiftsStep?: number;
+  /** The template editor's customer view: a sample picture, nothing tracked, nothing made or added to a cart. */
+  demo?: boolean;
 }) {
   const router = useRouter();
   const uid = useId();
+  useEffect(() => {
+    muted = demo;
+  }, [demo]);
   // The option rows; one with a single value is hidden when the store says so (the variant still carries it).
   const groups = useMemo(() => shownOptionGroups(data.variants, data.hideSingleOptions !== false), [data.variants, data.hideSingleOptions]);
   const [variantId, setVariantId] = useState<string>(initialVariantId ?? data.variants.find((v) => v.available)?.id ?? data.variants[0]?.id);
@@ -180,6 +193,8 @@ export function ProductView({
   const onShow = picture ?? kept?.picture ?? null;
   const result = onShow ? (onShow.images[onShow.chosen] ?? onShow.images[0]) : null;
 
+  // The product photo for the chosen variant: a frame colour can have its own (the template's scenes).
+  const tpl = useMemo(() => (data.template ? templateFor(data.template, variant?.options) : null), [data.template, variant?.options]);
   // The personalisation layer (docs/open-store.md › Personalise): drawn on the preview as they type, a moment later.
   const layer = layerActive(data.template?.layer) ? data.template.layer : null;
   // The border's width for the chosen variant (0: none for it), drawn on every preview; the server works it out again.
@@ -474,10 +489,10 @@ export function ProductView({
     result && variant?.aspect ? { url: fileUrl(result.file), crop: cropFor(result.width, result.height, variant.aspect, variant.placement), size: { width: result.width, height: result.height } } : photos[0]?.url ? { url: photos[0].url, crop: null, size: null } : null;
 
   const renderSlide = (slide: Slide | undefined) => {
-    if (slide?.kind === "drawn" && result && data.template && variant?.aspect)
+    if (slide?.kind === "drawn" && result && tpl && variant?.aspect)
       return (
         <ShopPreview
-          template={data.template}
+          template={tpl}
           pictureUrl={fileUrl(result.file)}
           crop={cropFor(result.width, result.height, variant.aspect, variant.placement)}
           pictureSize={{ width: result.width, height: result.height }}
@@ -803,7 +818,7 @@ export function ProductView({
               open={repositionAt !== null}
               onClose={() => setRepositionAt(null)}
               layer={layer}
-              template={data.template}
+              template={tpl ?? data.template}
               values={{ ...layerVals, border: Boolean(layerVals.border) && borderWidth > 0, borderWidth }}
               onSave={(pos) => {
                 setLayerVals((v) => ({ ...v, pos }));
@@ -963,6 +978,7 @@ export function ProductView({
   );
 
   function generate() {
+    if (demo) return;
     setPhotoError(null);
     void create(photos as SlotPhoto[], names);
   }
@@ -978,7 +994,7 @@ export function ProductView({
   }
 
   async function addToCart() {
-    if (!picture || !variant) return;
+    if (!picture || !variant || demo) return;
     let layerBody: LayerValues | undefined;
     if (layer) {
       const c = checkLayerValues(layer, layerVals);

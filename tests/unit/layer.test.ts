@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { registerFonts } from "@/lib/render/render";
 import { basePos, borderWidthFor, checkLayerValues, pictureRect, cleanLayerText, cleanPos, containIn, defaultLayerText, drawLayer, layerAttributes, layerSchema, layerValuesFromProps, placeBox, positionedLayer, type Layer, type LayerCtx } from "@/lib/shop/layer";
 import { flatPicture, type PreviewCtx } from "@/lib/shop/preview";
-import { defaultTemplate, templateSchema } from "@/lib/shop/template";
+import { defaultTemplate, templateFor, templateSchema } from "@/lib/shop/template";
 
 // The personalisation layer (docs/shop.md › Personalisation layer): schema, the customer's values, and drawing.
 
@@ -257,5 +257,26 @@ describe("the border (No border / Add border)", () => {
     expect(pixel(395, 200)).toEqual([255, 0, 0]);
     expect(pixel(25, 25)).toEqual([0x33, 0x66, 0x99]);
     expect(pixel(200, 200)).toEqual([0x33, 0x66, 0x99]);
+  });
+});
+
+describe("a photo per option (frame colours)", () => {
+  const main = { media_id: "m", url: "/black.jpg", w: 100, h: 100 };
+  const white = { media_id: "w", url: "/white.jpg", w: 100, h: 100 };
+  const base = defaultTemplate(main);
+  const t = templateSchema.parse({ ...base, scenes: { option: "Frame", values: { White: { background: white } } } });
+
+  it("swaps the photo for the chosen value and leaves everything else (the zone, the layer) alone", () => {
+    const w = templateFor(t, [{ name: "Frame", value: "White" }, { name: "Size", value: "8x10" }]);
+    expect(w.background).toEqual(white);
+    expect(w.overlay).toBeNull();
+    expect(w.zone).toEqual(t.zone);
+  });
+
+  it("keeps the main photo for a value without its own, another option, or no options", () => {
+    expect(templateFor(t, [{ name: "Frame", value: "Black" }])).toBe(t);
+    expect(templateFor(t, [{ name: "Size", value: "White" }])).toBe(t);
+    expect(templateFor(t, null)).toBe(t);
+    expect(templateFor(base, [{ name: "Frame", value: "White" }])).toBe(base);
   });
 });

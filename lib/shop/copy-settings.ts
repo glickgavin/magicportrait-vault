@@ -65,6 +65,8 @@ export function planCopy(from: ShopProduct, to: ShopProduct, parts: readonly Cop
         ...t,
         background: { media_id: photo.id, url: photo.url, w: photo.width ?? t.background.w, h: photo.height ?? t.background.h },
         overlay: overlayIsTheirs ? null : t.overlay,
+        // Photos per option (frame colours) are the other product's own: set them again here.
+        scenes: undefined,
         updated_at: undefined,
       };
     }

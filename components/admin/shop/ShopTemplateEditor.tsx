@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { defaultCrop } from "@/lib/shop/fit";
 import { drawPreview, previewSize, type MakeCanvas, type PreviewCtx } from "@/lib/shop/preview";
 import type { LibraryRoom } from "@/lib/shop/photo-library";
-import { BEND_RANGE, bendStops, defaultTemplate, homography, isBent, NO_BEND, zoneAspect, zoneMapper, type BendEdge, type Point, type Template } from "@/lib/shop/template";
+import { BEND_RANGE, bendStops, defaultTemplate, homography, isBent, NO_BEND, templateFor, zoneAspect, zoneMapper, type BendEdge, type Point, type Template } from "@/lib/shop/template";
 import { cn } from "@/lib/utils";
 import { cssFamily, ensureFonts } from "@/lib/render/fonts-browser";
 import { layerActive } from "@/lib/shop/layer";
+import { CustomerViewPanel } from "./CustomerViewPanel";
+import { ScenesEditor } from "./ScenesEditor";
 import { LayerEditor, layerProblem, loadLayerArt, sampleValues, type ArtItem } from "./LayerEditor";
 
 type Media = { id: string; url: string; alt: string | null; width: number; height: number };
@@ -337,7 +339,9 @@ function Editor({
       frame.current = null;
       void (async () => {
         try {
-          const [bg, ov, artMap, , ...pics] = await Promise.all([cachedImg(t.background.url), t.overlay ? cachedImg(t.overlay.url) : Promise.resolve(null), loadLayerArt(t.layer, art), ensureFonts(t.layer?.texts.map((x) => x.font) ?? []), ...samples.map((u) => cachedImg(u).catch(() => null))]);
+          // The live previews show the photo for the size picked (a frame colour can have its own).
+          const tv = templateFor(t, size?.options);
+          const [bg, ov, artMap, , ...pics] = await Promise.all([cachedImg(tv.background.url), tv.overlay ? cachedImg(tv.overlay.url) : Promise.resolve(null), loadLayerArt(t.layer, art), ensureFonts(t.layer?.texts.map((x) => x.font) ?? []), ...samples.map((u) => cachedImg(u).catch(() => null))]);
           const layer = layerActive(t.layer) ? { layer: t.layer, values: sampleValues(t.layer, size?.options), art: artMap, family: cssFamily } : null;
           if (cancelled) return;
           const aspect = size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h);
@@ -349,7 +353,7 @@ function Editor({
             el.height = out.h;
             const ctx = el.getContext("2d") as unknown as PreviewCtx;
             const crop = placement === "contain" ? { x: 0, y: 0, w: pw, h: ph } : defaultCrop(pw, ph, aspect, 1);
-            drawPreview(ctx, { template: t, background: bg, overlay: ov, picture: pic as never, crop, placement, backgroundColour: size?.background ?? null, targetAspect: aspect, size: out, makeCanvas: browserCanvas, flatMax: 900, layer });
+            drawPreview(ctx, { template: tv, background: bg, overlay: ov, picture: pic as never, crop, placement, backgroundColour: size?.background ?? null, targetAspect: aspect, size: out, makeCanvas: browserCanvas, flatMax: 900, layer });
           };
           pics.forEach((img, i) => img && draw(live.current[i], img, img.naturalWidth, img.naturalHeight, 640));
           SAMPLES.forEach(([, pw, ph], i) => draw(canvases.current[i], samplePicture(pw, ph), pw, ph, 360));
@@ -683,6 +687,8 @@ function Editor({
         )}
       </section>
       <LayerEditor template={t} setTemplate={setT} aspect={size?.aspect ?? zoneAspect(t.zone, t.background.w, t.background.h)} sample={samples[0] ?? null} art={art} setArt={setArt} askName={askName} productLegacyId={productLegacyId} sizes={sizes} sizeOptions={size?.options ?? []} />
+      <ScenesEditor template={t} setTemplate={setT} media={media} sizes={sizes} />
+      {productLegacyId && <CustomerViewPanel productLegacyId={productLegacyId} template={t} />}
       </div>
 
       <div className="flex flex-col gap-5">

@@ -204,5 +204,29 @@ test.describe("Personalise in the Magic Store", () => {
     const attrs = Object.fromEntries(cart.lines.at(-1)!.attributes.map((a) => [a.key, a.value]));
     expect(attrs._shop_layer_border).toBe("0.06");
   });
+
+  test("the template editor shows the customer view: the real product page with the draft, at phone and desktop size", async ({ page }) => {
+    await page.request.post("/api/test/reset-fixtures?shop=1");
+    await signInWithLink(page, "super@example.com", `/settings/shop/template/${PILLOW}`);
+    const panel = page.getByTestId("customer-view");
+    await expect(panel.getByRole("heading", { name: "Customer view" })).toBeVisible();
+    const view = page.frameLocator('[data-testid="customer-view-frame"]');
+    await expect(view.getByRole("heading", { level: 1, name: "Magic Pillow with Photo" })).toBeVisible({ timeout: 20_000 });
+    // With a picture: the sample is drawn on the product and Add to cart is on.
+    await expect(view.getByTestId("store-ready")).toBeVisible();
+    await expect(view.getByTestId("store-personalise")).toHaveCount(0);
+    // The draft reaches the frame before it's published.
+    await page.getByTestId("layer-editor").getByLabel("Let customers personalise this product").check();
+    await expect(view.getByTestId("store-personalise").getByRole("textbox", { name: /Their name/ })).toBeVisible();
+    await panel.getByText("Desktop", { exact: true }).click();
+    await expect(page.getByTestId("customer-view-frame")).toHaveAttribute("title", "Customer view: desktop");
+    await panel.getByText("Before a photo", { exact: true }).click();
+    await expect(view.getByText("Choose a photo")).toBeVisible({ timeout: 20_000 });
+    await expectNoAxeViolations(page);
+    // Not for customers: the page is a 404 without a super user.
+    const anon = await page.context().browser()!.newContext();
+    expect((await (await anon.newPage()).goto(`/customer-view/${PILLOW}`))!.status()).toBe(404);
+    await anon.close();
+  });
 });
 

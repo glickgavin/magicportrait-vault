@@ -7,7 +7,7 @@ import { getSettings } from "@/lib/settings";
 import { fitVariant, target } from "@/lib/shop/fit";
 import { getShopCartSource } from "@/lib/shop/sources";
 import type { RemoteCart } from "@/lib/shop/sources/cart";
-import { parseTemplate } from "@/lib/shop/template";
+import { parseTemplate, templateFor } from "@/lib/shop/template";
 import { borderWidthFor, checkLayerValues, layerActive, layerPosSchema, type LayerValues } from "@/lib/shop/layer";
 import { getObject, putObject, signedUrl } from "@/lib/storage";
 import { aliasPerson } from "@/lib/track";
@@ -124,7 +124,7 @@ export async function addStoreLine(a: Asker, visitor: StoreVisitorRow, input: z.
       const bytes = await getObject("store-uploads", img.storage_path);
       const { renderPreview } = await import("@/lib/shop/render");
       const t = target(found.sv.rules);
-      const jpeg = bytes ? await renderPreview({ template, picture: bytes, crop: fit.crop, placement: found.sv.rules.placement, backgroundColour: found.sv.rules.background, targetAspect: t.w / t.h, width: s["shop.preview_width_px"], layerValues }) : null;
+      const jpeg = bytes ? await renderPreview({ template: templateFor(template, found.sv.variant.options), picture: bytes, crop: fit.crop, placement: found.sv.rules.placement, backgroundColour: found.sv.rules.background, targetAspect: t.w / t.h, width: s["shop.preview_width_px"], layerValues }) : null;
       if (jpeg) {
         const path = previewPath(owner.id, lineId);
         await putObject("store-uploads", path, jpeg, "image/jpeg");
