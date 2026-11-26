@@ -28,7 +28,7 @@ test.describe("open store analytics", () => {
     await page.goto(`/store?utm_source=klaviyo&utm_campaign=Ready%20email&utm_medium=email`);
     await expect.poll(async () => (await events(page)).map((e) => e.event)).toContain("page_view_store");
     await page.goto(`/store/product/${PILLOW}?from=grid`);
-    await page.getByLabel("Choose a photo: Add their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
+    await page.getByLabel("Choose a photo: Their photo").setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await sharp({ create: { width: 900, height: 900, channels: 3, background: "#c98a52" } }).jpeg().toBuffer() });
     await page.getByLabel("Their name (optional, shown on the picture)").fill(NAME);
     await page.getByTestId("store-create").click();
     const ask = page.getByTestId("store-email-ask");

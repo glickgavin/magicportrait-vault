@@ -379,7 +379,7 @@ function applyStoreFields(list: ShopProduct[]) {
     generation: JSON.stringify({
       photos: [
         {
-          label: "Add their photo",
+          label: "Their photo",
           name_label: "Their name (optional, shown on the picture)",
           name_placeholder: "Teddy",
         },

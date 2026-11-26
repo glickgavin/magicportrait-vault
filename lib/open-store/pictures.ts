@@ -228,6 +228,8 @@ export type GenerationView = {
   images: { file: string; width: number; height: number }[];
   chosen: number;
   photos: string[];
+  /** The names typed with it, one per photo. Only ever sent to the visitor who made it (never tracked or logged). */
+  names: string[];
   /** They asked for it by email (the address is never sent back). */
   emailAsked: boolean;
 };
@@ -245,6 +247,7 @@ export async function generationView(gen: StoreGenerationRow, now = Date.now()):
     images,
     chosen: Math.min(gen.chosen_index, Math.max(0, images.length - 1)),
     photos: gen.photo_ids.map(photoFileId),
+    names: gen.names ?? [],
     emailAsked: Boolean(gen.email_to),
   };
 }

@@ -15,8 +15,16 @@ const ACRYLIC = "8705000000";
 
 const photo = (w = 900, h = 900) => sharp({ create: { width: w, height: h, channels: 3, background: "#c98a52" } }).jpeg().toBuffer();
 
-async function addPhoto(page: Page, label = "Add their photo") {
+async function addPhoto(page: Page, label = "Their photo") {
   await page.getByLabel(`Choose a photo: ${label}`).setInputFiles({ name: "pet.jpg", mimeType: "image/jpeg", buffer: await photo() });
+}
+
+/** "Change photo" (or "Choose another photo" after a failure) opens the sheet; a new photo is uploaded there. */
+async function uploadInSheet(page: Page) {
+  const sheet = page.getByTestId("store-photo-sheet");
+  await expect(sheet).toBeVisible();
+  await sheet.getByLabel("Upload a new photo").setInputFiles({ name: "pet2.jpg", mimeType: "image/jpeg", buffer: await photo(1000, 1000) });
+  await expect(sheet).toHaveCount(0);
 }
 
 async function createPicture(page: Page, name: string) {
@@ -82,7 +90,8 @@ test.describe("open store pictures", () => {
 
     // On return, the same picture (the chosen one) is back without making a new one.
     await page.reload();
-    await expect(page.getByTestId("store-ready")).toContainText("Your picture is ready");
+    await expect(page.getByTestId("store-ready")).toContainText("Teddy is ready");
+    await expect(page.getByLabel("Their name (optional, shown on the picture)")).toHaveValue("Teddy");
     await expect(page.locator(":is([data-testid=store-results],[data-testid=store-results-desktop]):visible").getByRole("radio", { name: "Picture 2" })).toHaveAttribute("aria-checked", "true");
 
     // A product under "On more gifts" opens with the same picture already on it.
@@ -106,14 +115,53 @@ test.describe("open store pictures", () => {
     await expect(page.getByTestId("store-create")).toBeEnabled();
   });
 
-  test("failed: the message, and Try another photo starts again", async ({ page }) => {
+  test("failed: the message, and Choose another photo opens the same sheet as Change photo", async ({ page }) => {
     await page.goto(`/store/product/${PILLOW}`);
     await createPicture(page, "Oops");
     const failed = page.getByTestId("store-failed");
     await expect(failed).toContainText("We couldn't make this one", { timeout: 15_000 });
-    await failed.getByRole("button", { name: "Try another photo" }).click();
-    await expect(page.getByLabel("Choose a photo: Add their photo")).toBeAttached();
-    await expect(page.getByTestId("store-create")).toBeDisabled();
+    await failed.getByRole("button", { name: "Choose another photo" }).click();
+    await uploadInSheet(page);
+    // The photo stays where it was added, and the name with it.
+    await expect(page.getByTestId("photo-added")).toBeVisible();
+    await expect(page.getByLabel("Their name (optional, shown on the picture)")).toHaveValue("Oops");
+    await expect(page.getByTestId("store-create")).toBeEnabled();
+  });
+
+  test("their photo stays in one place: Change photo, a photo added before, Keep Teddy's picture, and the name", async ({ page }) => {
+    await page.goto(`/store/product/${PILLOW}`);
+    await createPicture(page, "Teddy");
+    const ready = page.getByTestId("store-ready");
+    await expect(ready).toContainText("Teddy is ready", { timeout: 20_000 });
+    // No second "Try another photo" anywhere: the photo row is the one way to change it.
+    await expect(page.getByRole("button", { name: "Try another photo" })).toHaveCount(0);
+
+    // The sheet: upload, or a photo added before; the one in use is marked. Escape changes nothing.
+    await ready.getByRole("button", { name: "Change photo" }).click();
+    const sheet = page.getByTestId("store-photo-sheet");
+    await expect(sheet.getByRole("heading", { name: "Choose another photo" })).toBeVisible();
+    await expect(sheet.getByText("In use")).toBeVisible();
+    await expectNoAxeViolations(page);
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect(ready).toBeVisible();
+
+    // A new photo: the picture stays on show, Create comes back, and Keep Teddy's picture undoes it.
+    await ready.getByRole("button", { name: "Change photo" }).click();
+    await uploadInSheet(page);
+    await expect(page.getByTestId("photo-added")).toContainText("New photo added");
+    await expect(page.getByTestId("store-stage").locator("canvas[data-preview]")).toBeVisible();
+    await expect(page.getByTestId("store-create")).toBeEnabled();
+    await page.getByRole("button", { name: "Keep Teddy's picture" }).click();
+    await expect(ready).toContainText("Teddy is ready");
+    await expect(page.getByTestId("store-add")).toBeVisible();
+
+    // The photo just used is offered in the sheet next time, marked as in use; a changed name works the same way.
+    await page.getByLabel("Their name (optional, shown on the picture)").fill("Ted");
+    await expect(page.getByTestId("store-create")).toBeEnabled();
+    await page.getByRole("button", { name: "Keep Teddy's picture" }).click();
+    await expect(page.getByLabel("Their name (optional, shown on the picture)")).toHaveValue("Teddy");
+    expect((await admin().from("store_generations").select("id")).data!.length).toBeGreaterThanOrEqual(1);
   });
 
   test("slow: Still painting after open_store.slow_after_s, then ready", async ({ page }) => {
@@ -143,11 +191,14 @@ test.describe("open store pictures", () => {
     await page.goto(`/store/product/${PILLOW}`);
     await createPicture(page, "Oops");
     await expect(page.getByTestId("store-failed")).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId("store-failed").getByRole("button", { name: "Try another photo" }).click();
-    await createPicture(page, "Max");
+    await page.getByTestId("store-failed").getByRole("button", { name: "Choose another photo" }).click();
+    await uploadInSheet(page);
+    await page.getByLabel("Their name (optional, shown on the picture)").fill("Max");
+    await page.getByTestId("store-create").click();
     await expect(page.getByTestId("store-ready")).toBeVisible({ timeout: 20_000 });
-    await page.getByTestId("store-ready").getByRole("button", { name: "Try another photo" }).click();
-    await createPicture(page, "Max");
+    await page.getByTestId("store-ready").getByRole("button", { name: "Change photo" }).click();
+    await uploadInSheet(page);
+    await page.getByTestId("store-create").click();
     await expect(page.getByTestId("store-limited")).toContainText("You've made 1 picture today");
     await page.close();
 

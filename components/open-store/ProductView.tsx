@@ -3,7 +3,8 @@
 import { storeFetch } from "./store-fetch";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Check, Clock, Gift, Heart, Info, Loader2, Lock, Minus, Plus, Star, Truck, X } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Camera, Check, ChevronDown, Clock, Gift, Heart, Info, Loader2, Lock, Minus, Plus, Star, Truck, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ProductPageData, RelatedCard, VariantView } from "@/lib/open-store/pages";
 import { fillStep, optionGroups, variantFor } from "@/lib/open-store/view";
@@ -59,6 +60,8 @@ function cropFor(w: number, h: number, aspect: number, placement: VariantView["p
   return placement === "contain" ? { x: 0, y: 0, w, h } : defaultCrop(w, h, Math.round(aspect * 10000), 10000);
 }
 
+const PHOTO_TYPES = "image/jpeg,image/png,image/heic,image/heif,image/webp";
+
 const REFUSED: Record<string, (minPx: number, mb: number) => string> = {
   too_small: (px) => t("store.photoTooSmall", { px }),
   too_large: (_px, mb) => t("store.photoFormats", { mb }),
@@ -79,6 +82,7 @@ export function ProductView({
   initialPicture,
   earlierPhotos,
   askEmail = true,
+  moreGiftsStep = 4,
 }: {
   data: ProductPageData;
   initialVariantId: string | null;
@@ -89,6 +93,8 @@ export function ProductView({
   initialPicture: PictureView | null;
   earlierPhotos: EarlierPhoto[];
   askEmail?: boolean;
+  /** "On more gifts": how many show at first and per "See more gifts" (open_store.more_gifts_step). */
+  moreGiftsStep?: number;
 }) {
   const router = useRouter();
   const uid = useId();
@@ -103,7 +109,11 @@ export function ProductView({
       return id ? { fileId: id, url: fileUrl(id), width: known?.width ?? 0, height: known?.height ?? 0 } : null;
     }),
   );
-  const [names, setNames] = useState<string[]>(() => data.slots.map(() => ""));
+  const [names, setNames] = useState<string[]>(() => data.slots.map((_, i) => initialPicture?.names?.[i] ?? ""));
+  // Their photo stays in one place (docs/open-store.md › Product page, item 6). Changing the photo or the name of a
+  // ready picture keeps that picture on show (and one tap away) until they create a new one.
+  const [kept, setKept] = useState<{ picture: PictureView; photos: (SlotPhoto | null)[]; names: string[] } | null>(null);
+  const [sheetSlot, setSheetSlot] = useState<number | null>(null);
   const [photoError, setPhotoError] = useState<{ slot: number; text: string } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -117,7 +127,6 @@ export function ProductView({
       return false;
     }
   });
-  const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const relatedRef = useRef<HTMLElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
   // While the picture is made: on phones the progress shows where they added their photo, not up in the gallery.
@@ -132,11 +141,11 @@ export function ProductView({
   const pid = data.product.legacyId;
   const themeName = data.theme?.name ?? null;
 
-  const { state, create, choose: pickResult, reset } = usePicture({
+  const { state, create, choose: pickResult, reset, restore } = usePicture({
     productId: pid,
     uploadMaxPx,
     initial: initialPicture,
-    onEvent: (e) => {
+    onEvent: (e, made) => {
       if (e === "started") {
         started.current = Date.now();
         slowSent.current = false;
@@ -145,6 +154,19 @@ export function ProductView({
         started.current = null;
         setShown(0);
       }
+      if (e === "ready") {
+        setKept(null);
+        // The photos are saved now: hold them by their ids, so making another picture never uploads them twice.
+        if (made)
+          setPhotos((list) =>
+            list.map((x, i) => {
+              const id = made.photos[i];
+              if (!x || !id || "fileId" in x) return x;
+              URL.revokeObjectURL(x.url);
+              return { fileId: id, url: fileUrl(id), width: x.width, height: x.height };
+            }),
+          );
+      }
       // Phones: the steps show around their photo (scrolled into view); then the finished picture in the gallery.
       // Desktop: the gallery stays beside the form, so both show there.
       if (e === "started") (wideRef.current ? stageRef.current : progressRef.current)?.scrollIntoView({ block: wideRef.current ? "start" : "center", behavior: "smooth" });
@@ -152,7 +174,9 @@ export function ProductView({
     },
   });
   const picture = state.phase === "ready" ? state.picture : null;
-  const result = picture ? (picture.images[picture.chosen] ?? picture.images[0]) : null;
+  // What the gallery shows: the ready picture, or the one they had while a new photo or name waits to be made.
+  const onShow = picture ?? kept?.picture ?? null;
+  const result = onShow ? (onShow.images[onShow.chosen] ?? onShow.images[0]) : null;
 
   // The personalisation layer (docs/open-store.md › Personalise): drawn on the preview as they type, a moment later.
   const layer = layerActive(data.template?.layer) ? data.template.layer : null;
@@ -185,26 +209,45 @@ export function ProductView({
     return () => window.removeEventListener("pagehide", left);
   }, [pid]);
 
-  // Related products: the first 3, or with a picture, the first 3 the picture suits.
-  const related: RelatedCard[] = useMemo(() => {
-    if (!result) return data.related.slice(0, 3);
-    return data.related.filter((r) => r.draw && fitVariant({ kind: "portrait", width: result.width, height: result.height }, r.draw.rules).ok).slice(0, 3);
+  // "On more gifts": every candidate (with a picture, the ones it suits), shown a step at a time.
+  const allRelated: RelatedCard[] = useMemo(() => {
+    if (!result) return data.related;
+    return data.related.filter((r) => r.draw && fitVariant({ kind: "portrait", width: result.width, height: result.height }, r.draw.rules).ok);
   }, [data.related, result]);
+  const step = Math.max(1, moreGiftsStep);
+  const [giftCount, setGiftCount] = useState(step);
+  const related = allRelated.slice(0, giftCount);
+  const firstNewGift = useRef<number | null>(null);
+  const giftGrid = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // After "See more gifts", the first new card takes the focus.
+    const n = firstNewGift.current;
+    if (n == null) return;
+    firstNewGift.current = null;
+    giftGrid.current?.querySelectorAll<HTMLAnchorElement>("a")[n]?.focus();
+  }, [giftCount]);
+  const seeMoreGifts = () => {
+    const next = Math.min(allRelated.length, giftCount + step);
+    firstNewGift.current = giftCount;
+    setGiftCount(next);
+    trackClient("store_more_gifts_shown", { product_id: pid, shown: next, has_picture: Boolean(result) });
+  };
 
   // "On more gifts" in view (once).
   const withPicture = Boolean(result);
+  const relatedCount = related.length;
   useEffect(() => {
     const el = relatedRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver((es) => {
       if (es.some((e) => e.isIntersecting)) {
-        trackClient("store_related_shown", { product_id: pid, count: related.length, with_picture: withPicture });
+        trackClient("store_related_shown", { product_id: pid, count: relatedCount, with_picture: withPicture });
         io.disconnect();
       }
     });
     io.observe(el);
     return () => io.disconnect();
-  }, [pid, related.length, withPicture]);
+  }, [pid, relatedCount > 0, withPicture]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Object URLs for chosen photos are freed when the page goes.
   useEffect(() => () => photos.forEach((p) => p && "file" in p && URL.revokeObjectURL(p.url)), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -220,10 +263,43 @@ export function ProductView({
     trackClient("store_variant_selected", { product_id: pid, option: name, value, has_picture: withPicture });
   };
 
-  /** A new photo needs a new picture; the old one stays saved and comes back on return. */
+  /**
+   * A new photo (or name) needs a new picture. The ready one stays saved, stays on show until they create the new
+   * one, and "Keep Teddy's picture" puts it back.
+   */
   const photoChanged = () => {
+    if (state.phase === "ready") {
+      const had = state.picture;
+      setKept({
+        picture: had,
+        photos: photos.map((x, i) => {
+          const id = had.photos[i];
+          return id ? { fileId: id, url: fileUrl(id), width: x?.width ?? 0, height: x?.height ?? 0 } : x;
+        }),
+        names,
+      });
+    }
     if (state.phase !== "idle" && state.phase !== "creating") reset();
   };
+
+  function keepPicture() {
+    if (!kept) return;
+    photos.forEach((x, i) => {
+      if (x && "file" in x && x !== kept.photos[i]) URL.revokeObjectURL(x.url);
+    });
+    setPhotos(kept.photos);
+    setNames(kept.names);
+    setPhotoError(null);
+    restore(kept.picture);
+    setKept(null);
+    trackClient("store_picture_kept", { product_id: pid });
+  }
+
+  /** "Change photo" (and "Choose another photo" after a failure) open one sheet: upload, or a photo added before. */
+  function openSheet(slot: number) {
+    trackClient("store_try_again_tapped", { product_id: pid, after: picture ? "ready" : state.phase === "failed" ? "failed" : "photo" });
+    setSheetSlot(slot);
+  }
 
   async function choose(slot: number, file: File | undefined) {
     if (!file) return;
@@ -259,13 +335,26 @@ export function ProductView({
     trackClient("store_photo_chosen", { product_id: pid, ok: true, reason: null, slot: slot + 1, reused: true });
   }
 
-  function tryAgain() {
-    trackClient("store_try_again_tapped", { product_id: pid, after: state.phase === "ready" ? "ready" : "failed" });
-    reset();
-    setPhotos(data.slots.map(() => null));
-    setShown(0);
-    setTimeout(() => document.getElementById(`${uid}-slot-0`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 0);
+  function nameChanged(slot: number, value: string) {
+    if (value !== names[slot]) photoChanged();
+    setNames((n) => n.map((x, j) => (j === slot ? value : x)));
   }
+
+  // Photos for the sheet: this visit's saved photos, then the ones added before, each once, newest first.
+  const savedPhotos: EarlierPhoto[] = useMemo(() => {
+    const seen = new Set<string>();
+    const out: EarlierPhoto[] = [];
+    const add = (p: EarlierPhoto) => {
+      if (seen.has(p.fileId)) return;
+      seen.add(p.fileId);
+      out.push(p);
+    };
+    for (const pic of [picture, kept?.picture]) pic?.photos.forEach((id) => add({ fileId: id, width: 0, height: 0 }));
+    kept?.photos.forEach((p) => p && "fileId" in p && add({ fileId: p.fileId, width: p.width, height: p.height }));
+    photos.forEach((p) => p && "fileId" in p && add({ fileId: p.fileId, width: p.width, height: p.height }));
+    earlierPhotos.forEach(add);
+    return out;
+  }, [picture, kept, photos, earlierPhotos]);
 
   // A photo refused by the server shows under its slot.
   useEffect(() => {
@@ -287,6 +376,8 @@ export function ProductView({
     : data.gallery.map((g, i) => ({ kind: "media" as const, url: g.url, alt: g.alt, example: i > 0 }));
   const slide = slides[Math.min(shown, slides.length - 1)];
   const theirPhoto = photos[0]?.url || null;
+  // The small circle on the picture is the photo it was made from.
+  const madeFrom = (kept ? kept.photos[0]?.url : theirPhoto) || null;
 
   const accordion = (key: string, title: string, body: React.ReactNode, className?: string) => (
     <div className={cn("border-b border-[#EDEAE2]", className)}>
@@ -367,7 +458,7 @@ export function ProductView({
             {!result && !creating && shown === 0 && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.sample")}</span>}
             {slide?.kind === "media" && slide.example && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.example")}</span>}
             {!creating && data.pricing.pct != null && <span className="absolute right-3 top-3 rounded-full bg-[#B8059F] px-2.5 py-[5px] text-[12px] font-extrabold tracking-[0.06em] text-white">{t("store.off", { pct: Math.round(data.pricing.pct * 100) })}</span>}
-            {result && theirPhoto && slide?.kind !== "media" && <img src={theirPhoto} alt={t("store.yourPhoto")} className="absolute bottom-3 left-3 h-14 w-14 rounded-full border-[3px] border-white object-cover shadow-md" />}
+            {result && madeFrom && slide?.kind !== "media" && <img src={madeFrom} alt={t("store.yourPhoto")} className="absolute bottom-3 left-3 h-14 w-14 rounded-full border-[3px] border-white object-cover shadow-md" />}
             {creating && wide && (
               <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
                 <Progress photo={theirPhoto} steps={steps} step={state.step} slow={state.slow} />
@@ -393,17 +484,6 @@ export function ProductView({
         </section>
 
         <div>
-          {picture && (
-            <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-[14px] bg-pink-tint px-4 py-3 lg:mx-0 lg:mt-0 lg:mb-4" role="status" data-testid="store-ready">
-              <span className="flex flex-col gap-0.5">
-                <span className="text-[15px] font-extrabold text-[#8E047B]">{petName ? t("store.readyNamed", { name: petName }) : t("store.ready")}</span>
-                {(picture.emailAsked || emailDone) && <span className="text-[13px] text-[#8E047B]">{t("store.emailedToo")}</span>}
-              </span>
-              <button type="button" onClick={tryAgain} className="h-10 flex-none rounded-[10px] border-[1.5px] border-[#8E047B] bg-white px-3 text-[14px] font-extrabold text-[#8E047B]">
-                {t("store.tryAnother")}
-              </button>
-            </div>
-          )}
           {picture && picture.images.length > 1 && (
             <fieldset className="mx-0 mb-4 hidden lg:block" data-testid="store-results-desktop">
               <legend className="pb-2 text-[14px] font-extrabold">{t("store.pickFavourite")}</legend>
@@ -471,99 +551,119 @@ export function ProductView({
             );
           })}
 
-          {!picture &&
-            data.slots.map((slot, i) => {
-              const p = photos[i];
-              const earlier = earlierPhotos.filter((e) => !photos.some((x) => x && "fileId" in x && x.fileId === e.fileId));
-              return (
-                <section key={i} className="mx-4 mt-6 flex flex-col gap-2.5 lg:mx-0" aria-labelledby={`${uid}-slot-${i}`}>
-                  <span id={`${uid}-slot-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
-                    {slot.label}
-                  </span>
+          {data.slots.map((slot, i) => {
+            const p = photos[i];
+            const earlier = earlierPhotos.filter((e) => !photos.some((x) => x && "fileId" in x && x.fileId === e.fileId));
+            const thumb = (cls: string) => (p?.url ? <img src={p.url} alt={t("store.yourPhoto")} className={cn("object-cover", cls)} /> : <span className={cn("block bg-page", cls)} aria-hidden="true" />);
+            const change = (
+              <button type="button" disabled={creating} onClick={() => openSheet(i)} className="h-10 flex-none whitespace-nowrap rounded-[10px] border-[1.5px] border-[#1f1f1f] bg-white px-3.5 text-[14px] font-extrabold text-[#1f1f1f] disabled:opacity-50">
+                {t("store.changePhoto")}
+              </button>
+            );
+            return (
+              // Their photo, in the same place in every state: choose one, then the photo, the progress (phones) or "ready".
+              <section key={i} className="mx-4 mt-6 flex flex-col gap-2.5 lg:mx-0" aria-labelledby={`${uid}-slot-${i}`}>
+                <h2 id={`${uid}-slot-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
+                  {slot.label}
+                </h2>
+                {!p && (
                   <input
-                    ref={(el) => {
-                      inputs.current[i] = el;
-                    }}
                     id={`${uid}-file-${i}`}
                     type="file"
-                    accept="image/jpeg,image/png,image/heic,image/heif,image/webp"
+                    accept={PHOTO_TYPES}
                     className="sr-only"
                     disabled={creating}
-                    aria-label={p ? `${t("store.change")}: ${slot.label}` : `${t("store.choosePhoto")}: ${slot.label}`}
+                    aria-label={`${t("store.choosePhoto")}: ${slot.label}`}
                     onChange={(e) => {
                       void choose(i, e.target.files?.[0]);
                       e.target.value = "";
                     }}
                   />
-                  {creating && !wide && i === 0 ? (
-                    <div ref={progressRef} className="ph-no-capture scroll-mt-[88px] flex flex-col gap-3 rounded-[16px] border border-[#E7E3D8] bg-[#FFF8FD] px-4 py-5" data-ph-mask>
-                      <Progress photo={p?.url || theirPhoto} steps={steps} step={state.step} slow={state.slow} />
-                      {emailBits}
-                    </div>
-                  ) : p ? (
-                    <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border border-[#E7E3D8] p-2.5" data-testid="photo-added" data-ph-mask>
-                      {p.url ? <img src={p.url} alt={t("store.yourPhoto")} className="h-14 w-14 flex-none rounded-[10px] object-cover" /> : <span className="h-14 w-14 flex-none rounded-[10px] bg-page" aria-hidden="true" />}
-                      <span className="min-w-0 flex-1 text-[14px] font-extrabold">{t("store.photoAdded")}</span>
-                      <button type="button" disabled={creating} onClick={() => inputs.current[i]?.click()} className="h-10 rounded-[10px] border-[1.5px] border-[#1f1f1f] px-3.5 text-[14px] font-extrabold disabled:opacity-50">
-                        {t("store.change")}
-                      </button>
-                    </div>
-                  ) : (
-                    <label htmlFor={`${uid}-file-${i}`} className="relative flex cursor-pointer flex-col items-center gap-2 rounded-[16px] border-2 border-dashed border-[#D9A6CF] bg-[#FFF8FD] px-[18px] py-6 text-center focus-within:ring-2 focus-within:ring-[#DD07C4]">
-                      <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-pink-tint">
-                        <Camera className="h-[26px] w-[26px] text-[#B8059F]" aria-hidden="true" />
+                )}
+                {creating && !wide && i === 0 ? (
+                  <div ref={progressRef} className="ph-no-capture scroll-mt-[88px] flex flex-col gap-3 rounded-[16px] border border-[#E7E3D8] bg-[#FFF8FD] px-4 py-5" data-ph-mask>
+                    <Progress photo={p?.url || theirPhoto} steps={steps} step={state.step} slow={state.slow} />
+                    {emailBits}
+                  </div>
+                ) : picture && i === 0 ? (
+                  <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border-[1.5px] border-[#F2C6EA] bg-[#FFF8FD] py-2.5 pl-2.5 pr-3" data-testid="store-ready" data-ph-mask>
+                    <span className="relative h-[60px] w-[60px] flex-none">
+                      {thumb("h-full w-full rounded-[10px]")}
+                      <span className="absolute -bottom-1.5 -right-1.5 flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 border-white bg-[#8E047B]" aria-hidden="true">
+                        <Check className="h-3 w-3 text-white" strokeWidth={3.4} />
                       </span>
-                      <span className="text-[16px] font-extrabold text-[#1a1a1a]">{t("store.choosePhoto")}</span>
-                      <span className="text-[13px] leading-[1.45] text-[#616161]">{t("store.photoFormats", { mb: maxMb })}</span>
+                    </span>
+                    <span role="status" className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-[15px] font-extrabold text-[#1a1a1a]">{petName ? t("store.readyNamed", { name: petName }) : t("store.ready")}</span>
+                      <span className="text-[13px] leading-[1.4] text-[#4d4d4d]">{picture.emailAsked || emailDone ? t("store.emailedToo") : t("store.readySub")}</span>
+                    </span>
+                    {change}
+                  </div>
+                ) : p ? (
+                  <div className="ph-no-capture flex items-center gap-3 rounded-[14px] border-[1.5px] border-[#D9D5CA] py-2.5 pl-2.5 pr-3" data-testid="photo-added" data-ph-mask>
+                    {thumb("h-14 w-14 flex-none rounded-[10px]")}
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-[14px] font-extrabold text-[#1a1a1a]">{kept ? t("store.newPhotoAdded") : t("store.photoAdded")}</span>
+                      {kept && <span className="text-[13px] leading-[1.4] text-[#4d4d4d]">{t("store.newPhotoSub")}</span>}
+                    </span>
+                    {change}
+                  </div>
+                ) : (
+                  <label htmlFor={`${uid}-file-${i}`} className="relative flex cursor-pointer flex-col items-center gap-2 rounded-[16px] border-2 border-dashed border-[#D9A6CF] bg-[#FFF8FD] px-[18px] py-6 text-center focus-within:ring-2 focus-within:ring-[#DD07C4]">
+                    <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-pink-tint">
+                      <Camera className="h-[26px] w-[26px] text-[#B8059F]" aria-hidden="true" />
+                    </span>
+                    <span className="text-[16px] font-extrabold text-[#1a1a1a]">{t("store.choosePhoto")}</span>
+                    <span className="text-[13px] leading-[1.45] text-[#616161]">{t("store.photoFormats", { mb: maxMb })}</span>
+                  </label>
+                )}
+                {!p && earlier.length > 0 && (
+                  <div className="flex flex-col gap-2" data-testid="earlier-photos">
+                    <span className="text-[13px] font-bold text-[#4d4d4d]">{t("store.usePhotoBefore")}</span>
+                    <div className="ph-no-capture flex gap-2" data-ph-mask>
+                      {earlier.slice(0, 6).map((e, n) => (
+                        <button key={e.fileId} type="button" onClick={() => reuse(i, e)} aria-label={t("store.earlierPhotoN", { n: n + 1 })} className="h-14 w-14 flex-none overflow-hidden rounded-[10px] border border-[#E7E3D8]">
+                          <img src={fileUrl(e.fileId)} alt="" className="h-full w-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {photoError?.slot === i && (
+                  <p role="alert" className="text-[14px] font-bold text-[#a1251b]">
+                    {photoError.text}
+                  </p>
+                )}
+                {i === 0 && data.photoTips && !picture && !kept && (
+                  <div className="flex items-start gap-2.5 px-0.5 pt-0.5">
+                    <Info className="mt-px h-[18px] w-[18px] flex-none text-[#8E047B]" aria-hidden="true" />
+                    <span className="text-[13px] leading-[1.5] text-[#4d4d4d]">{data.photoTips}</span>
+                  </div>
+                )}
+                {slot.nameLabel && (
+                  <div className="mt-2 flex flex-col gap-2">
+                    <label htmlFor={`${uid}-name-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
+                      {slot.nameLabel}
                     </label>
-                  )}
-                  {!p && earlier.length > 0 && (
-                    <div className="flex flex-col gap-2" data-testid="earlier-photos">
-                      <span className="text-[13px] font-bold text-[#4d4d4d]">{t("store.usePhotoBefore")}</span>
-                      <div className="ph-no-capture flex gap-2" data-ph-mask>
-                        {earlier.slice(0, 6).map((e, n) => (
-                          <button key={e.fileId} type="button" onClick={() => reuse(i, e)} aria-label={t("store.earlierPhotoN", { n: n + 1 })} className="h-14 w-14 flex-none overflow-hidden rounded-[10px] border border-[#E7E3D8]">
-                            <img src={fileUrl(e.fileId)} alt="" className="h-full w-full object-cover" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {photoError?.slot === i && (
-                    <p role="alert" className="text-[14px] font-bold text-[#a1251b]">
-                      {photoError.text}
-                    </p>
-                  )}
-                  {i === 0 && data.photoTips && (
-                    <div className="flex items-start gap-2.5 px-0.5 pt-0.5">
-                      <Info className="mt-px h-[18px] w-[18px] flex-none text-[#8E047B]" aria-hidden="true" />
-                      <span className="text-[13px] leading-[1.5] text-[#4d4d4d]">{data.photoTips}</span>
-                    </div>
-                  )}
-                  {slot.nameLabel && (
-                    <div className="mt-2 flex flex-col gap-2">
-                      <label htmlFor={`${uid}-name-${i}`} className="text-[15px] font-extrabold text-[#1a1a1a]">
-                        {slot.nameLabel}
-                      </label>
-                      <input
-                        id={`${uid}-name-${i}`}
-                        type="text"
-                        value={names[i]}
-                        maxLength={data.nameMax}
-                        autoComplete="off"
-                        disabled={creating}
-                        placeholder={slot.namePlaceholder ? `e.g. ${slot.namePlaceholder}` : undefined}
-                        onChange={(e) => setNames((n) => n.map((x, j) => (j === i ? e.target.value : x)))}
-                        className="ph-no-capture h-[52px] rounded-[12px] border-[1.5px] border-[#D9D5CA] bg-white px-3.5 text-[16px] text-[#1a1a1a]"
-                      />
-                      <span className="self-end text-[12px] text-[#6b6b6b]" aria-live="polite">
-                        {t("store.nameCount", { count: names[i].length, max: data.nameMax })}
-                      </span>
-                    </div>
-                  )}
-                </section>
-              );
-            })}
+                    <input
+                      id={`${uid}-name-${i}`}
+                      type="text"
+                      value={names[i]}
+                      maxLength={data.nameMax}
+                      autoComplete="off"
+                      disabled={creating}
+                      placeholder={slot.namePlaceholder ? `e.g. ${slot.namePlaceholder}` : undefined}
+                      onChange={(e) => nameChanged(i, e.target.value)}
+                      className="ph-no-capture h-[52px] rounded-[12px] border-[1.5px] border-[#D9D5CA] bg-white px-3.5 text-[16px] text-[#1a1a1a]"
+                    />
+                    <span className="self-end text-[12px] text-[#6b6b6b]" aria-live="polite">
+                      {t("store.nameCount", { count: names[i].length, max: data.nameMax })}
+                    </span>
+                  </div>
+                )}
+              </section>
+            );
+          })}
           {layer && (
             <Personalise
               layer={layer}
@@ -623,14 +723,19 @@ export function ProductView({
                   {creating ? t("store.creating") : t("store.create")}
                 </button>
                 <span className="text-center text-[13px] text-[#616161]">{t("store.createNote")}</span>
+                {kept && !creating && (
+                  <button type="button" onClick={keepPicture} data-testid="store-keep" className="self-center px-2 py-1 text-[14px] font-extrabold text-[#8E047B] underline underline-offset-2">
+                    {kept.names[0]?.trim() ? t("store.keepPictureNamed", { name: kept.names[0].trim() }) : t("store.keepPicture")}
+                  </button>
+                )}
               </>
             )}
             {picture && <p className="text-center text-[12px] text-[#616161]">{t("store.payments")}</p>}
             {state.phase === "failed" && (
               <div role="alert" className="flex flex-col items-start gap-2.5 rounded-[14px] bg-[#FDECEA] p-3.5 text-[14px] font-bold text-[#a1251b]" data-testid="store-failed">
                 {t("store.failed")}
-                <button type="button" onClick={tryAgain} className="h-10 rounded-[10px] border-[1.5px] border-[#a1251b] bg-white px-3 font-extrabold">
-                  {t("store.tryAnother")}
+                <button type="button" onClick={() => openSheet(0)} className="h-10 rounded-[10px] border-[1.5px] border-[#a1251b] bg-white px-3 font-extrabold">
+                  {t("store.chooseAnother")}
                 </button>
               </div>
             )}
@@ -707,13 +812,41 @@ export function ProductView({
           <h2 id={`${uid}-related`} className="font-serif text-[24px] font-normal leading-[1.15] text-[#1a1a1a] lg:text-[32px]">
             {result ? (petName ? t("store.onMoreGiftsNamed", { name: petName }) : t("store.onMoreGifts")) : t("store.alsoMade")}
           </h2>
-          <div className="grid grid-cols-3 gap-2.5 lg:gap-6" data-testid="store-related">
-            {result && picture
-              ? related.map((r) => <RelatedWithPicture key={r.id} card={r} picture={picture} result={result} currency={data.pricing.currency} />)
-              : related.map((r, i) => <ProductCard key={r.id} card={r} currency={data.pricing.currency} position={i + 1} collection="related" small from="related" />)}
+          {/* Four at a time: 2 × 2 on phones, one row on desktop; "See more gifts" adds the next ones. */}
+          <div ref={giftGrid} className="grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-4 lg:gap-x-6 lg:gap-y-8" data-testid="store-related">
+            {result && onShow
+              ? related.map((r) => <RelatedWithPicture key={r.id} card={r} picture={onShow} result={result} currency={data.pricing.currency} />)
+              : related.map((r, i) => <ProductCard key={r.id} card={r} currency={data.pricing.currency} position={i + 1} collection="related" from="related" />)}
           </div>
+          {allRelated.length > related.length && (
+            <button type="button" onClick={seeMoreGifts} data-testid="store-more-gifts" className="mx-auto mt-2 flex h-[52px] w-full max-w-[360px] items-center justify-center gap-2 rounded-[12px] border-[1.5px] border-[#1f1f1f] bg-white text-[16px] font-extrabold text-[#1f1f1f]">
+              {t("store.seeMoreGifts")}
+              <ChevronDown className="h-[18px] w-[18px]" aria-hidden="true" />
+            </button>
+          )}
         </section>
       )}
+
+      <PhotoSheet
+        open={sheetSlot != null}
+        onClose={() => setSheetSlot(null)}
+        current={sheetSlot != null ? photos[sheetSlot] : null}
+        saved={savedPhotos}
+        name={(kept ?? picture) ? (kept?.names[0] ?? names[0])?.trim() || null : null}
+        hasPicture={Boolean(onShow)}
+        tips={data.photoTips}
+        maxMb={maxMb}
+        onUpload={(file) => {
+          const slot = sheetSlot ?? 0;
+          setSheetSlot(null);
+          void choose(slot, file);
+        }}
+        onReuse={(e) => {
+          const slot = sheetSlot ?? 0;
+          setSheetSlot(null);
+          reuse(slot, e);
+        }}
+      />
     </div>
   );
 
@@ -767,13 +900,133 @@ function RelatedWithPicture({ card, picture, result, currency }: { card: Related
   const d = card.draw!;
   return (
     <Link href={`${card.href}?from=related&g=${picture.id}`} className="group flex flex-col gap-1" data-testid="store-related-card">
-      <ShopPreview template={d.template} pictureUrl={fileUrl(result.file)} crop={cropFor(result.width, result.height, d.aspect, d.placement)} pictureSize={{ width: result.width, height: result.height }} placement={d.placement} aspect={d.aspect} background={d.background} width={220} alt={t("store.yourPictureOn", { product: card.title })} className="rounded-[10px]" />
-      <span data-testid="store-card-title" className="pt-1 text-[13px] font-extrabold leading-[1.3] group-hover:underline">
+      <ShopPreview template={d.template} pictureUrl={fileUrl(result.file)} crop={cropFor(result.width, result.height, d.aspect, d.placement)} pictureSize={{ width: result.width, height: result.height }} placement={d.placement} aspect={d.aspect} background={d.background} width={300} alt={t("store.yourPictureOn", { product: card.title })} className="rounded-[12px]" />
+      <span data-testid="store-card-title" className="pt-1 text-[14px] font-extrabold leading-[1.3] group-hover:underline">
         {card.title}
       </span>
-      <span className="text-[13px] text-[#2b2b2b]">{card.many ? t("store.from", { price: formatMoney(card.price, currency) }) : formatMoney(card.price, currency)}</span>
+      <span className="flex flex-wrap items-baseline gap-x-2">
+        <span className="text-[15px] font-extrabold text-[#1a1a1a]">{card.many ? t("store.from", { price: formatMoney(card.price, currency) }) : formatMoney(card.price, currency)}</span>
+        {card.was && (
+          <span className="text-[13px] text-[#616161] line-through">
+            <span className="sr-only">{t("store.wasPrice", { price: "" })}</span>
+            {formatMoney(card.was, currency)}
+          </span>
+        )}
+      </span>
       <span className="text-[13px] font-extrabold text-[#8E047B]">{t("store.seeIt")}</span>
     </Link>
+  );
+}
+
+/**
+ * "Change photo": a sheet from the bottom on phones, a dialog on desktop. Upload a new photo, or tap one added
+ * before; the one in use is marked. Escape or Close changes nothing.
+ */
+function PhotoSheet({
+  open,
+  onClose,
+  current,
+  saved,
+  name,
+  hasPicture,
+  tips,
+  maxMb,
+  onUpload,
+  onReuse,
+}: {
+  open: boolean;
+  onClose: () => void;
+  current: SlotPhoto | null;
+  saved: EarlierPhoto[];
+  name: string | null;
+  hasPicture: boolean;
+  tips: string | null;
+  maxMb: number;
+  onUpload: (file: File) => void;
+  onReuse: (p: EarlierPhoto) => void;
+}) {
+  const uid = useId();
+  const inUse = current && "fileId" in current ? current.fileId : null;
+  const others = saved.filter((p) => p.fileId !== inUse);
+  return (
+    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content
+          aria-describedby={`${uid}-d`}
+          data-testid="store-photo-sheet"
+          className="ph-no-capture fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col gap-4 overflow-y-auto rounded-t-[22px] bg-white px-4 pb-6 pt-2 shadow-[0_-10px_30px_rgba(0,0,0,0.18)] focus:outline-none lg:inset-x-auto lg:bottom-auto lg:left-1/2 lg:top-1/2 lg:w-[480px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[22px] lg:p-6"
+          data-ph-mask
+        >
+          <span className="mx-auto h-[5px] w-10 flex-none rounded-full bg-[#D9D5CA] lg:hidden" aria-hidden="true" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <Dialog.Title className="font-serif text-[26px] font-normal leading-[1.1] text-[#1a1a1a]">{t("store.chooseAnother")}</Dialog.Title>
+              <Dialog.Description id={`${uid}-d`} className="text-[13px] leading-[1.45] text-[#4d4d4d]">
+                {!hasPicture ? t("store.sheetSubFresh") : name ? t("store.sheetSubNamed", { name }) : t("store.sheetSub")}
+              </Dialog.Description>
+            </div>
+            <Dialog.Close asChild>
+              <button type="button" aria-label={t("store.close")} className="-mr-2 -mt-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-[10px] hover:bg-black/5">
+                <X className="h-[18px] w-[18px]" aria-hidden="true" />
+              </button>
+            </Dialog.Close>
+          </div>
+
+          <label className="relative flex cursor-pointer items-center gap-3.5 rounded-[16px] border-2 border-dashed border-[#D9A6CF] bg-[#FFF8FD] px-4 py-3.5 focus-within:ring-2 focus-within:ring-[#DD07C4]">
+            <input
+              type="file"
+              accept={PHOTO_TYPES}
+              className="sr-only"
+              aria-label={t("store.uploadNew")}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) onUpload(f);
+              }}
+            />
+            <span className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-pink-tint">
+              <Camera className="h-6 w-6 text-[#B8059F]" aria-hidden="true" />
+            </span>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[16px] font-extrabold text-[#1a1a1a]">{t("store.uploadNew")}</span>
+              <span className="text-[13px] text-[#616161]">{t("store.photoFormats", { mb: maxMb })}</span>
+            </span>
+          </label>
+
+          {(current || others.length > 0) && (
+            <section aria-labelledby={`${uid}-b`} className="flex flex-col gap-2.5">
+              <h3 id={`${uid}-b`} className="text-[15px] font-extrabold text-[#1a1a1a]">
+                {t("store.usePhotoBefore")}
+              </h3>
+              <div className="grid grid-cols-3 gap-2.5" data-testid="store-sheet-photos">
+                {current?.url && (
+                  <span className="relative block overflow-hidden rounded-[12px] border-2 border-[#DD07C4] bg-page" aria-current="true">
+                    <img src={current.url} alt={t("store.photoInUse")} className="block aspect-square w-full object-cover" />
+                    <span className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-[#8E047B] py-0.5 pl-1 pr-2 text-[11px] font-extrabold text-white">
+                      <Check className="h-3 w-3" strokeWidth={3.4} aria-hidden="true" />
+                      {t("store.inUse")}
+                    </span>
+                  </span>
+                )}
+                {others.slice(0, 11).map((p, n) => (
+                  <button key={p.fileId} type="button" onClick={() => onReuse(p)} aria-label={t("store.earlierPhotoN", { n: n + 1 })} className="block overflow-hidden rounded-[12px] border-[1.5px] border-[#E7E3D8] bg-page focus-visible:ring-2 focus-visible:ring-[#DD07C4] focus-visible:ring-offset-2">
+                    <img src={fileUrl(p.fileId)} alt="" className="block aspect-square w-full object-cover" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {tips && (
+            <div className="flex items-start gap-2.5">
+              <Info className="mt-px h-[18px] w-[18px] flex-none text-[#8E047B]" aria-hidden="true" />
+              <span className="text-[13px] leading-[1.5] text-[#4d4d4d]">{tips}</span>
+            </div>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
