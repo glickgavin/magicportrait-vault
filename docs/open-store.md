@@ -210,6 +210,7 @@ The pages load them through an app route that checks the cookie (or a signed-in 
 - **Everything is kept, bought or not** (Gavin, 23 Nov), for future marketing. There is no clean-up job.
 - **What "marketing" may use:** a visitor's own photo and pictures may be shown back to that visitor, on the site and in emails to an address they gave us. Using them anywhere public (ads, social, the site's examples) needs that person's separate permission. The privacy policy has to say we keep photos and pictures and why, before launch.
 - **Data-deletion requests** for an email delete its linked visitors (and those that only gave that email), their rows and their files.
+- **Testing reset** (26 Nov): Settings › Magic Store › Testing › **Start again as a new visitor** lets a super user remove their own state. That covers this browser's visitor and the visitors linked to their email (rows, photos, pictures, previews), their Gifts & Products cart and uploads, the `mmp_visitor`, `mmp_ft` and `mmp_entry` cookies, and the store's notes in the browser. They stay signed in; cards, Shopify orders and the activity log are untouched. Recorded as `admin_test_reset` (counts only).
 - **Imagen's copy:** Imagen keeps its own copy, in public storage (open question for deletion requests).
 
 ### Visitors and sign-in

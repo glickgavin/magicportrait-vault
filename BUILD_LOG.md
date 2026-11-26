@@ -759,3 +759,7 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 - **Chips:** 4 in a row when the values come in fours, else 3 (`chipColumns`). Options in the new setting `open_store.picture_options` (default Frame, Color, Colour) show a picture per value: Shopify's swatch, else that variant's own first photo (`OpenStoreSource.optionPictures`, cached like the catalogue); options with Shopify swatches on every value show them too (`chipPictures`).
 - **Button:** "Generate" ("Generating…").
 - **Checks:** typecheck, lint, the unit tests without a database (new ones for the chips); the page in the component harness at 390 and 1280, axe clean. e2e updated (`open-store`: the name, dots, Generate; `open-store-pictures`: Generating…); not run here (no local database).
+
+### 26 Nov: "Start again as a new visitor" (testing)
+- **Done:** Settings › Magic Store › Testing. It removes the super user's own state: this browser's visitor plus the visitors linked to their email (rows, photos, pictures, previews), their Gifts & Products cart and uploads, the visitor, first-touch and entry cookies, and the store's notes in the browser. Sign-in is kept. `POST /api/admin/test-reset` (404 for anyone else), `lib/admin/test-reset.ts`, new event `admin_test_reset`.
+- **Tests:** e2e `test-reset.spec.ts` (a picture and a cart, reset, fresh visitor and still signed in; others get 404).

@@ -13,6 +13,8 @@ import { SettingField } from "@/components/admin/SettingField";
 import { RefreshThemesButton } from "@/components/admin/shop/StoreFieldsEditor";
 import { TrackPageView } from "@/components/TrackPageView";
 import { Badge } from "@/components/ui/Badge";
+import { TestReset } from "@/components/admin/shop/TestReset";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Shop: Magic Store" };
@@ -70,6 +72,18 @@ export default async function MagicStoreSettings() {
         </Link>
         ; the store defaults below apply wherever a product has none.
       </p>
+
+      <section className={cn(CARD, "mt-5")} aria-labelledby="store-testing">
+        <h2 id="store-testing" className="text-[19px] font-extrabold">
+          Testing
+        </h2>
+        <p className="mt-1 text-[14px] text-ink-2">
+          Start again as if you&apos;d just arrived: removes <strong>your own</strong> photos and pictures, your Magic Store and Gifts &amp; Products carts and uploads, and this browser&apos;s store cookies and notes. You stay signed in; greeting cards and orders in Shopify aren&apos;t touched.
+        </p>
+        <div className="mt-3">
+          <TestReset />
+        </div>
+      </section>
 
       <div className="mt-5 grid gap-5 2xl:grid-cols-[1fr_420px]">
         <div className="flex min-w-0 flex-col gap-5">
