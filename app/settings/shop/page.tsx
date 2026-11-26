@@ -9,6 +9,9 @@ import { CreateFieldsButton } from "@/components/admin/shop/ShopEditors";
 import { TrackPageView } from "@/components/TrackPageView";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
+import { getSettings } from "@/lib/settings";
+import { getOpenStoreSource } from "@/lib/open-store/sources";
+import { groupLabel, productGroups, UNGROUPED, type ProductGroup } from "@/lib/open-store/groups";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Shop: products" };
@@ -26,11 +29,35 @@ const hiddenAnywhere = (r: ProductRow) => Boolean((r.shop && r.shop.hidden.lengt
 const matches = (r: ProductRow, f: Filter) => (f === "shop" ? Boolean(r.shop) : f === "magic" ? Boolean(r.store) : f === "hidden" ? hiddenAnywhere(r) : true);
 
 /** Settings › Shop › Products: every product in the Store or Magic Store collection, each once (docs/open-store.md › Settings). */
-export default async function ShopProducts({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
+export default async function ShopProducts({ searchParams }: { searchParams: Promise<{ filter?: string; group?: string }> }) {
   await requireSuperUser();
   const sp = await searchParams;
   const filter: Filter = FILTERS.some(([k]) => k === sp.filter) ? (sp.filter as Filter) : "all";
-  const [list, overview, dreamship] = await Promise.all([productRows(), shopOverview(), syncSummaries().catch(() => new Map() as Awaited<ReturnType<typeof syncSummaries>>)]);
+  const s = await getSettings(["open_store.admin_group_prefix", "open_store.collection"] as const);
+  const [list, overview, dreamship, collections] = await Promise.all([
+    productRows(),
+    shopOverview(),
+    syncSummaries().catch(() => new Map() as Awaited<ReturnType<typeof syncSummaries>>),
+    getOpenStoreSource()
+      .then((src) => src.collectionsByPrefix(s["open_store.admin_group_prefix"]))
+      .catch(() => null),
+  ]);
+  // Groups (one per "magic…" collection) come first; a group, "all", or a filter opens the product list.
+  const grouping =
+    list.ok && collections
+      ? productGroups(
+          list.rows.map((r) => ({ product: r.product, hidden: hiddenAnywhere(r), warnings: dreamship.get(r.product.id)?.warnings ?? 0 })),
+          collections,
+          s["open_store.collection"],
+        )
+      : null;
+  const allGroups = grouping ? [...grouping.groups, ...(grouping.ungrouped ? [grouping.ungrouped] : [])] : [];
+  const group = sp.group && sp.group !== "all" ? (allGroups.find((g) => g.handle === sp.group) ?? null) : null;
+  const showGroups = Boolean(grouping) && !sp.group && !sp.filter;
+  const inView = (r: ProductRow) => (group ? group.productIds.includes(r.product.id) : true) && matches(r, filter);
+  const base = group ? `/settings/shop?group=${encodeURIComponent(group.handle)}` : "/settings/shop?group=all";
+  const withFilter = (k: Filter) => (k === "all" ? base : `${base}&filter=${k}`);
+  const ordered = group ? group.productIds.map((id) => list.ok && list.rows.find((r) => r.product.id === id)).filter((r): r is ProductRow => Boolean(r)) : list.ok ? list.rows : [];
 
   return (
     <div>
@@ -66,9 +93,20 @@ export default async function ShopProducts({ searchParams }: { searchParams: Pro
           </>
         ) : (
           <>
+            {showGroups ? (
+              <GroupGrid groups={allGroups} total={list.rows.length} />
+            ) : (
+            <>
+            {grouping && (
+              <nav aria-label="Breadcrumb" className="mb-2 text-[14px]">
+                <Link href="/settings/shop" className="link">
+                  ← All groups
+                </Link>
+              </nav>
+            )}
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 id="shop-products" className="text-[19px] font-extrabold">
-                Products
+                {group ? groupLabel(group.title) : "All products"}
               </h2>
               <span className="text-[14px] text-ink-2">
                 {list.rows.filter((r) => r.shop).length} in Gifts &amp; Products · {list.rows.filter((r) => r.store).length} in the Magic Store
@@ -78,12 +116,12 @@ export default async function ShopProducts({ searchParams }: { searchParams: Pro
             </div>
             <nav aria-label="Filter products" className="mt-3 flex flex-wrap gap-2">
               {FILTERS.map(([k, label]) => {
-                const n = list.rows.filter((r) => matches(r, k)).length;
+                const n = ordered.filter((r) => matches(r, k)).length;
                 const on = k === filter;
                 return (
                   <Link
                     key={k}
-                    href={k === "all" ? "/settings/shop" : `/settings/shop?filter=${k}`}
+                    href={withFilter(k)}
                     aria-current={on ? "page" : undefined}
                     className={cn("flex h-9 items-center rounded-full px-3.5 text-[14px]", on ? "border-2 border-[#DD07C4] bg-pink-tint font-bold text-pink-dark" : "border border-line bg-white font-semibold")}
                   >
@@ -93,17 +131,58 @@ export default async function ShopProducts({ searchParams }: { searchParams: Pro
               })}
             </nav>
             <ul className="mt-4 flex flex-col gap-3">
-              {list.rows
-                .filter((r) => matches(r, filter))
-                .map((r) => (
-                  <ProductItem key={r.product.id} row={r} dreamship={dreamship.get(r.product.id) ?? null} />
-                ))}
-              {!list.rows.filter((r) => matches(r, filter)).length && <li className="text-[15px] text-ink-2">No products here.</li>}
+              {ordered.filter(inView).map((r) => (
+                <ProductItem key={r.product.id} row={r} dreamship={dreamship.get(r.product.id) ?? null} />
+              ))}
+              {!ordered.filter(inView).length && <li className="text-[15px] text-ink-2">No products here.</li>}
             </ul>
+            </>
+            )}
           </>
         )}
       </section>
     </div>
+  );
+}
+
+/** The groups as cards: each opens its products. "All products" keeps the full list one click away. */
+function GroupGrid({ groups, total }: { groups: ProductGroup[]; total: number }) {
+  return (
+    <>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="shop-products" className="text-[19px] font-extrabold">
+          Product groups
+        </h2>
+        <Link href="/settings/shop?group=all" className="link text-[14px] font-bold">
+          All products · {total} →
+        </Link>
+      </div>
+      <p className="mt-1 text-[13px] text-ink-2">One group per Shopify collection whose handle starts with the prefix set on Settings › Magic Store. A product in two collections shows in both.</p>
+      <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="shop-groups">
+        {groups.map((g) => (
+          <li key={g.handle}>
+            <Link href={`/settings/shop?group=${encodeURIComponent(g.handle)}`} className="flex h-full items-center gap-3 rounded-[16px] border border-line p-3 hover:bg-black/[0.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DD07C4]" data-testid="shop-group">
+              {g.image ? <img src={g.image} alt="" className="h-16 w-16 flex-none rounded-[12px] object-cover" /> : <span className="h-16 w-16 flex-none rounded-[12px] bg-black/[0.05]" aria-hidden="true" />}
+              <span className="min-w-0 flex-1">
+                <span className="block text-[16px] font-bold">{g.handle === UNGROUPED ? g.title : groupLabel(g.title)}</span>
+                <span className="mt-0.5 block text-[13px] text-ink-2">
+                  {g.productIds.length} {g.productIds.length === 1 ? "product" : "products"}
+                </span>
+                {(g.hidden > 0 || g.warnings > 0) && (
+                  <span className="mt-1 flex flex-wrap gap-1.5">
+                    {g.hidden > 0 && <Badge tone="amber">{`${g.hidden} HIDDEN`}</Badge>}
+                    {g.warnings > 0 && <Badge tone="amber">{`${g.warnings} ${g.warnings === 1 ? "WARNING" : "WARNINGS"}`}</Badge>}
+                  </span>
+                )}
+              </span>
+              <span aria-hidden="true" className="text-[18px] text-ink-2">
+                ›
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

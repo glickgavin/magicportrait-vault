@@ -30,12 +30,8 @@ export type StoreFieldsValues = {
   variants: { id: string; title: string; badge: string; lead_days: string }[];
 };
 
-const NO_FEATURE: QualityFeature = { icon: "check", title: "", sub: "" };
-/** The form's four feature rows, from what's stored. */
-export function qualityForm(q: { photo: string; alt?: string; features: QualityFeature[] } | null): StoreFieldsValues["quality"] {
-  const f = q?.features ?? [];
-  return { photo: q?.photo ?? "", alt: q?.alt ?? "", features: [0, 1, 2, 3].map((i) => ({ ...NO_FEATURE, ...f[i] })) };
-}
+// The form's four feature rows, from what's stored: built on the server page too, so it lives in a plain module.
+export { qualityForm } from "@/lib/open-store/quality-form";
 /** What's saved: null when nothing is filled in. */
 function qualityValue(q: StoreFieldsValues["quality"]) {
   const features = q.features.filter((f) => f.title.trim()).map((f) => ({ icon: f.icon, title: f.title.trim(), sub: f.sub.trim() }));

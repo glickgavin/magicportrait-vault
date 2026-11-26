@@ -13,6 +13,8 @@ import { SettingField } from "@/components/admin/SettingField";
 import { RefreshThemesButton } from "@/components/admin/shop/StoreFieldsEditor";
 import { TrackPageView } from "@/components/TrackPageView";
 import { Badge } from "@/components/ui/Badge";
+import { TestReset } from "@/components/admin/shop/TestReset";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Shop: Magic Store" };
@@ -22,7 +24,7 @@ const CARD = "rounded-[20px] bg-white p-5 shadow-[0_1px_6px_rgba(0,0,0,0.05)]";
 /** The store's own settings, grouped as on the page (docs/open-store.md › Settings: one area for both stores). */
 const GROUPS: [string, string, string[]][] = [
   ["store-who", "Who sees the Magic Store", ["open_store.enabled", "open_store.super_user_preview"]],
-  ["store-catalogue", "Collection and menu", ["open_store.collection", "open_store.home_collection", "open_store.menu_handle", "open_store.theme_category", "open_store.storefront_publication_id", "open_store.products_per_page"]],
+  ["store-catalogue", "Collection and menu", ["open_store.collection", "open_store.home_collection", "open_store.menu_handle", "open_store.admin_group_prefix", "open_store.theme_category", "open_store.storefront_publication_id", "open_store.products_per_page"]],
   ["store-prices", "Discount", ["open_store.discount_code", "open_store.discount_label"]],
   ["store-page", "Product page", ["open_store.reassurance", "open_store.shipping_days", "open_store.more_gifts_step", "open_store.picture_options"]],
   ["store-lower", "Product page: trust and the lower page", ["open_store.trust_stats", "open_store.trustpilot", "open_store.how_steps", "open_store.wall_photos", "open_store.reviews", "open_store.guarantees", "open_store.faq"]],
@@ -71,6 +73,18 @@ export default async function MagicStoreSettings() {
         </Link>
         ; the store defaults below apply wherever a product has none.
       </p>
+
+      <section className={cn(CARD, "mt-5")} aria-labelledby="store-testing">
+        <h2 id="store-testing" className="text-[19px] font-extrabold">
+          Testing
+        </h2>
+        <p className="mt-1 text-[14px] text-ink-2">
+          Start again as if you&apos;d just arrived: removes <strong>your own</strong> photos and pictures, your Magic Store and Gifts &amp; Products carts and uploads, and this browser&apos;s store cookies and notes. You stay signed in; greeting cards and orders in Shopify aren&apos;t touched.
+        </p>
+        <div className="mt-3">
+          <TestReset />
+        </div>
+      </section>
 
       <div className="mt-5 grid gap-5 2xl:grid-cols-[1fr_420px]">
         <div className="flex min-w-0 flex-col gap-5">

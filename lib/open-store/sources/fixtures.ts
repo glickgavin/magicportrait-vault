@@ -14,6 +14,12 @@ const CATEGORIES: Record<string, { title: string; description: string; image: st
   "pet-gifts": { title: "Pet gifts", description: "Cosy things with your pet on them.", image: "/fixtures/shop/pillow.jpg", handles: ["fx-pillow", "fx-mug", "fx-ornaments", "fx-canvas"] },
   "wall-art": { title: "Wall art", description: "Your pet, framed for the wall.", image: "/fixtures/shop/poster.jpg", handles: ["fx-canvas", "fx-poster", "fx-acrylic-block", "fx-tile"] },
   "for-the-home": { title: "For the home", description: "Everyday things, made yours.", image: "/fixtures/shop/mug.jpg", handles: ["fx-mug", "fx-pillow", "fx-puzzle"] },
+  // The Settings › Shop › Products groups (collections whose handle starts with "magic"); one empty, one product in two.
+  "magic-store-wall-art": { title: "Magic Store · Wall art", description: "", image: "/fixtures/shop/poster.jpg", handles: ["fx-canvas", "fx-poster", "fx-flush-poster", "fx-tile", "fx-acrylic-block"] },
+  "magic-store-pillows": { title: "Magic Store · Pillows", description: "", image: "/fixtures/shop/pillow.jpg", handles: ["fx-pillow"] },
+  "magic-store-mugs": { title: "Magic Store · Mugs", description: "", image: "/fixtures/shop/mug.jpg", handles: ["fx-mug"] },
+  "magic-store-acrylic": { title: "Magic Store · Acrylic", description: "", image: "/fixtures/shop/poster.jpg", handles: ["fx-acrylic-block"] },
+  "magic-empty": { title: "Magic (empty)", description: "", image: "/fixtures/shop/mug.jpg", handles: [] },
 };
 const MENU: StoreMenu = {
   handle: "magic-store",
@@ -59,6 +65,12 @@ export class OpenStoreFixtures implements OpenStoreSource {
     const all = this.byHandle();
     const products = MAGIC_ORDER.map((h) => all.get(h)).filter((p): p is ShopProduct => Boolean(p)).map((p, i) => ({ ...p, position: i }));
     return { collection, products };
+  }
+
+  async collectionsByPrefix(prefix: string): Promise<StoreCollection[]> {
+    const out: StoreCollection[] = [];
+    for (const h of Object.keys(CATEGORIES).filter((k) => k.startsWith(prefix)).sort((a, b) => CATEGORIES[a].title.localeCompare(CATEGORIES[b].title))) out.push((await this.collection(h))!);
+    return out;
   }
 
   async menu(handle: string): Promise<StoreMenu | null> {

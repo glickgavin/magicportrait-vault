@@ -12,7 +12,7 @@ async function openTab(page: Page, name: string) {
 }
 
 async function openProduct(page: Page, title: string) {
-  await page.goto("/settings/shop");
+  await page.goto("/settings/shop?group=all");
   const row = page.getByTestId("shop-product").filter({ hasText: title }).first();
   const href = await row.getByRole("link", { name: `Open ${title} →` }).getAttribute("href");
   await page.goto(href!);
@@ -26,7 +26,7 @@ test.describe.configure({ mode: "serial" });
 test.describe("Settings › Shop", () => {
   test("lists every product in both collections once and says why each store hides it", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
-    await page.goto("/settings/shop");
+    await page.goto("/settings/shop?group=all");
     await expect(page.getByRole("heading", { name: "Shop: products" })).toBeVisible();
     const tile = page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" });
     await expect(tile.getByText("GIFTS & PRODUCTS: HIDDEN")).toBeVisible();
@@ -70,7 +70,7 @@ test.describe("Settings › Shop", () => {
     await expect(page.getByRole("tab", { name: "Gifts & Products pages" })).toHaveAttribute("aria-selected", "true");
     const again = page.getByRole("region", { name: "Gifts & Products pages" });
     await expect(again.getByLabel("Page", { exact: true })).toHaveValue("all");
-    await page.goto("/settings/shop");
+    await page.goto("/settings/shop?group=all");
     await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Poster" }).getByText("Gifts + Products · Birthday")).toBeVisible();
     await page.goBack();
     // Put it back.
@@ -106,7 +106,7 @@ test.describe("Settings › Shop", () => {
     await page.keyboard.press("Shift+ArrowRight");
     await page.getByRole("button", { name: "Publish to Shopify" }).click();
     await expect(page.getByText("Published to Shopify.")).toBeVisible();
-    await page.goto("/settings/shop");
+    await page.goto("/settings/shop?group=all");
     await expect(page.getByTestId("shop-product").filter({ hasText: "Magic Portrait Tile" }).getByText("Gifts & Products: No preview template yet")).toHaveCount(0);
 
     const r = await page.request.post("/api/admin/shop/template", {
@@ -151,7 +151,7 @@ test.describe("Settings › Shop", () => {
 
   test("categories: managed like occasions, ticked on a product, and the Products page groups by them", async ({ page }) => {
     await signInWithLink(page, "super@example.com", "/");
-    await page.goto("/settings/shop");
+    await page.goto("/settings/shop?group=all");
     // A category still on a product can't be removed.
     await page.goto("/settings/shop/pages");
     await page.getByRole("button", { name: "Remove Mugs" }).click();
