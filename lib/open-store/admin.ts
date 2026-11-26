@@ -12,6 +12,7 @@ import type { ImagenTheme } from "@/lib/sources/imagen-api";
 import { track } from "@/lib/track";
 import type { StoreEntry } from "./catalog";
 import { getStoreCatalog, imagenThemes } from "./index";
+import { listedThemes } from "./view";
 
 /**
  * Settings › Shop as one area for both stores (docs/open-store.md › Settings: one area for both stores).
@@ -37,7 +38,9 @@ function errorText(e: unknown): string {
 /** Every product in either collection, each once: the Store collection's order, then the Magic Store's own products. */
 export async function productRows(): Promise<{ ok: true; rows: ProductRow[]; themes: ImagenTheme[] | null; magicCollection: string | null } | { ok: false; error: string }> {
   try {
-    const [shop, store, themes] = await Promise.all([getCatalog({ fresh: true }), getStoreCatalog({ fresh: true }), imagenThemes()]);
+    const [shop, store, all, s] = await Promise.all([getCatalog({ fresh: true }), getStoreCatalog({ fresh: true }), imagenThemes(), getSettings(["open_store.theme_category"] as const)]);
+    // Only the Magic Store's own themes (open_store.theme_category), plus any a product already uses.
+    const themes = all ? listedThemes(all, s["open_store.theme_category"], themesInUse(store.entries)) : null;
     const byId = new Map<string, ProductRow>();
     for (const e of shop) byId.set(e.product.id, { product: e.product, shop: e, store: null });
     for (const e of store.entries) {
@@ -56,6 +59,11 @@ export async function productRow(legacyId: string): Promise<{ ok: true; row: Pro
   const r = await productRows();
   if (!r.ok) return r;
   return { ok: true, row: r.rows.find((x) => x.product.legacyId === legacyId) ?? null, rows: r.rows, themes: r.themes };
+}
+
+/** The Imagen themes the Magic Store's products use now. */
+export function themesInUse(entries: StoreEntry[]): string[] {
+  return entries.map((e) => e.product.store?.imagenTheme).filter((t): t is string => Boolean(t));
 }
 
 // ---------- Saving one product's shared and Magic Store fields ----------
@@ -203,15 +211,18 @@ export async function updateStoreFields(actor: { email: string }, input: StoreFi
 
 /** Copies Imagen's active theme slugs into the `mmp_shop.imagen_theme` dropdown, keeping any a product still uses. */
 export async function refreshThemes(actor: { email: string }): Promise<AdminResult & { themes?: number; added?: number; removed?: number }> {
-  const ns = (await getSettings(["shop.metafield_namespace"] as const))["shop.metafield_namespace"];
+  const s = await getSettings(["shop.metafield_namespace", "open_store.theme_category"] as const);
+  const ns = s["shop.metafield_namespace"];
   const themes = await imagenThemes({ fresh: true });
   if (!themes) return { ok: false, status: 502, error: "Couldn't read Imagen's theme list just now." };
   const src = await getShopCatalogSource();
   const defs = await src.fieldDefinitions(ns);
   const before = defs.find((d) => d.ownerType === "PRODUCT" && d.key === "imagen_theme")?.choices ?? [];
   const store = await getStoreCatalog({ fresh: true });
-  const inUse = store.entries.map((e) => e.product.store?.imagenTheme).filter((t): t is string => Boolean(t));
-  const choices = [...new Set([...themes.filter((t) => t.active).map((t) => t.slug), ...inUse])].sort();
+  const inUse = themesInUse(store.entries);
+  // Shopify's dropdown: the active themes in the Magic Store's category, plus any a product already uses.
+  const listed = listedThemes(themes, s["open_store.theme_category"], inUse);
+  const choices = [...new Set([...listed.filter((t) => t.active).map((t) => t.slug), ...inUse])].sort();
   const r = await src.setThemeChoices(ns, choices);
   if (!r.ok) return { ok: false, status: 502, error: `Shopify refused the change (${r.reason}).` };
   await invalidateCatalog();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canSeeOpenStore } from "@/lib/open-store/access";
-import { addWorkingDays, badgePct, deliveryWindow, fillStep, initialVariant, isSort, optionGroups, parseDays, photoSlots, shortDay, variantFor } from "@/lib/open-store/view";
+import { addWorkingDays, badgePct, categoryKey, listedThemes, deliveryWindow, fillStep, initialVariant, isSort, optionGroups, parseDays, photoSlots, shortDay, variantFor } from "@/lib/open-store/view";
 import type { ShopVariant } from "@/lib/shop/sources/types";
 
 describe("open store: who sees it", () => {
@@ -83,5 +83,29 @@ describe("open store: page helpers", () => {
   it("progress steps fill in the name and product", () => {
     expect(fillStep("Painting {name} on the {product}", "Teddy", "pillow")).toBe("Painting Teddy on the pillow");
     expect(fillStep("Painting {name}", " ", "pillow")).toBe("Painting your pet");
+  });
+});
+
+describe("listedThemes: the Magic Store's own themes (open_store.theme_category)", () => {
+  const themes = [
+    { slug: "a", category: "magicstore" },
+    { slug: "b", category: "Magic Store" },
+    { slug: "c", category: "pets" },
+    { slug: "d", category: null },
+    { slug: "e", category: "magic-store" },
+  ];
+  it("keeps the category, matched without case, spaces or dashes, in Imagen's order", () => {
+    expect(listedThemes(themes, "magicstore").map((t) => t.slug)).toEqual(["a", "b", "e"]);
+    expect(listedThemes(themes, " Magic_Store ").map((t) => t.slug)).toEqual(["a", "b", "e"]);
+  });
+  it("keeps a theme a product already uses, whatever its category", () => {
+    expect(listedThemes(themes, "magicstore", ["c"]).map((t) => t.slug)).toEqual(["a", "b", "c", "e"]);
+  });
+  it("shows every theme when the setting is empty", () => {
+    expect(listedThemes(themes, "").map((t) => t.slug)).toEqual(["a", "b", "c", "d", "e"]);
+  });
+  it("compares categories the same way everywhere", () => {
+    expect(categoryKey("Magic Store")).toBe("magicstore");
+    expect(categoryKey(null)).toBe("");
   });
 });

@@ -120,6 +120,20 @@ export function relatedEntries(current: ShopProduct, entries: StoreEntry[], coun
   return [...own, ...rest].filter(fits).slice(0, count);
 }
 
+/** An Imagen category compared without case, spaces, dashes or underscores ("Magic Store" = "magic-store" = "magicstore"). */
+export const categoryKey = (c: string | null | undefined) => (c ?? "").toLowerCase().replace(/[\s_-]+/g, "");
+
+/**
+ * The themes the lists show (docs/open-store.md › Settings): those in `open_store.theme_category`, plus any a product
+ * already uses, in Imagen's order. An empty category shows every theme. Never decides whether a product is in the store.
+ */
+export function listedThemes<T extends { slug: string; category: string | null }>(themes: T[], category: string, inUse: Iterable<string> = []): T[] {
+  const want = categoryKey(category);
+  if (!want) return themes;
+  const used = new Set(inUse);
+  return themes.filter((t) => categoryKey(t.category) === want || used.has(t.slug));
+}
+
 /** The words for each photo slot: the theme says how many; Shopify words them; a slot without words is "Photo n". */
 export function photoSlots(
   count: number,

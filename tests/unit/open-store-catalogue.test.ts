@@ -159,12 +159,15 @@ describe("Settings › Shop as one area", () => {
     expect(await updateStoreFields(actor, { productId: "gid://shopify/Product/1", fields: {}, variants: [] })).toMatchObject({ ok: false, status: 404 });
   });
 
-  it("Refresh themes from Imagen fills the Shopify dropdown with the active themes", async () => {
+  it("Refresh themes from Imagen fills the Shopify dropdown with the active themes in the Magic Store's category", async () => {
     const r = await refreshThemes(actor);
     expect(r).toMatchObject({ ok: true, removed: 0 });
     const choices = shopFixtures().imagenThemeChoices();
     expect(choices).toContain("duo-portrait-01");
     expect(choices).not.toContain("retired-01");
+    // Another category (open_store.theme_category is "magicstore") stays out; a theme a product uses stays in.
+    expect(choices).not.toContain("card-style-01");
+    expect(choices).toContain("royal-flush");
     // With the dropdown set, a theme outside it is refused by Shopify too.
     expect(await shopFixtures().setProductMetafields((await entry("fx-pillow")).product.id, "mmp_shop", { set: [{ key: "imagen_theme", type: "single_line_text_field", value: "retired-01" }], clear: [] })).toEqual({ ok: false, reason: "INCLUSION" });
   });

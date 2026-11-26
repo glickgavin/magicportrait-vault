@@ -58,24 +58,26 @@ export interface ImagenApiSource {
 const STATUSES: ImagenStatus[] = ["pending", "preprocessing", "generating", "done", "failed", "cancelled", "awaiting_face_selection"];
 export const asStatus = (v: unknown): ImagenStatus => (STATUSES.includes(v as ImagenStatus) ? (v as ImagenStatus) : "pending");
 
-/** Made-up themes for tests and local dev: one takes two photos, one is inactive. */
+/** Made-up themes for tests and local dev: one takes two photos, one is inactive, one is in another category. */
 export const FX_IMAGEN_THEMES: ImagenTheme[] = [
-  { slug: "admiral-01", name: "The Admiral", active: true, photos: 1, category: "pets", inputs: null },
-  { slug: "bathroom-01", name: "Bath time", active: true, photos: 1, category: "pets", inputs: null },
-  { slug: "journal-02", name: "Morning paper", active: true, photos: 1, category: "pets", inputs: null },
-  { slug: "plumber-01", name: "The Plumber", active: true, photos: 1, category: "pets", inputs: null },
+  { slug: "admiral-01", name: "The Admiral", active: true, photos: 1, category: "magicstore", inputs: null },
+  { slug: "bathroom-01", name: "Bath time", active: true, photos: 1, category: "magicstore", inputs: null },
+  { slug: "journal-02", name: "Morning paper", active: true, photos: 1, category: "magicstore", inputs: null },
+  { slug: "plumber-01", name: "The Plumber", active: true, photos: 1, category: "magicstore", inputs: null },
   {
     slug: "duo-portrait-01",
     name: "Best friends",
     active: true,
     photos: 2,
-    category: "pets",
+    category: "magicstore",
     inputs: [
       { role: "pet_1", label: "First pet", required: true },
       { role: "pet_2", label: "Second pet", required: true },
     ],
   },
-  { slug: "retired-01", name: "Retired style", active: false, photos: 1, category: "pets", inputs: null },
+  { slug: "retired-01", name: "Retired style", active: false, photos: 1, category: "magicstore", inputs: null },
+  // In another category: left out of the Magic Store's theme lists (open_store.theme_category).
+  { slug: "card-style-01", name: "Card style", active: true, photos: 1, category: "cards", inputs: null },
 ];
 
 /**
