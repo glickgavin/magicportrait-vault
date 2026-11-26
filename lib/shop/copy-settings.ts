@@ -46,7 +46,7 @@ export type CopyPlan = {
   skipped: string[];
 };
 
-const GENERATION_KEYS = ["photos", "ask_name", "name_max", "photo_tips", "subject", "images_to_show", "step_labels"] as const;
+const GENERATION_KEYS = ["photos", "ask_name", "name_max", "photo_tips", "subject", "images_to_show", "step_labels", "quality"] as const;
 
 export function planCopy(from: ShopProduct, to: ShopProduct, parts: readonly CopyPart[]): CopyPlan {
   const plan: CopyPlan = { template: null, fields: null, variants: [], pages: null, skipped: [] };
