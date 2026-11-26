@@ -29,6 +29,10 @@ test.describe("Personalisation layer in the template editor", () => {
     await editor.getByLabel("Example words (Text 1)").fill("Teddy");
     await editor.getByLabel("Font (Text 1)").selectOption("Lobster");
     await editor.getByLabel("The customer must fill this in (Text 1)").check();
+    // At an angle: the box on the print area turns with it.
+    await editor.getByLabel("Angle in degrees (Text 1)").fill("-15");
+    await expect(editor.getByText("Angle (Text 1): -15°")).toBeVisible();
+    await expect(editor.getByTestId("layer-panel").locator("div[style*='rotate(-15deg)']")).toHaveCount(1);
     await editor.getByRole("button", { name: "+ Add text 2" }).click();
     await editor.getByLabel("Most characters (Text 2)").fill("20");
     await editor.getByLabel("From the top % (Text 2)").fill("5");
@@ -49,6 +53,7 @@ test.describe("Personalisation layer in the template editor", () => {
     await expect(editor.getByLabel("Let customers personalise this product")).toBeChecked();
     await expect(editor.getByLabel("What to ask the customer (Text 1)")).toHaveValue("Pet's name");
     await expect(editor.getByLabel("Font (Text 1)")).toHaveValue("Lobster");
+    await expect(editor.getByLabel("Angle in degrees (Text 1)")).toHaveValue("-15");
     await expect(editor.getByLabel("From the top % (Text 2)")).toHaveValue("5");
     await expect(editor.getByText("Pictures offered (1 of 3), from the art library")).toBeVisible();
     const ev = (await admin().from("activity_log").select("props").eq("event", "admin_shop_template_published").order("occurred_at", { ascending: false }).limit(1)).data!;

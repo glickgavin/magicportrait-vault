@@ -41,6 +41,8 @@ export const layerTextSchema = z
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     align: z.enum(["left", "center", "right"]).default("center"),
     maxLines: z.number().int().min(1).max(6).default(1),
+    /** Turn, in degrees (clockwise), about the box's centre. 0 = level; templates saved before 26 Nov have none. */
+    rotate: z.number().min(-180).max(180).default(0),
   })
   .refine((t) => !t.minSize || t.minSize <= t.size, "The smallest size can't be bigger than the size");
 export type LayerText = z.infer<typeof layerTextSchema>;
@@ -104,6 +106,8 @@ export function checkLayerValues(layer: Layer, raw: unknown): LayerCheck {
 export interface LayerCtx {
   save(): void;
   restore(): void;
+  translate(x: number, y: number): void;
+  rotate(radians: number): void;
   drawImage(img: { width: number; height: number }, ...args: number[]): void;
   fillText(text: string, x: number, y: number): void;
   measureText(text: string): { width: number };
@@ -177,7 +181,19 @@ export function drawLayer(ctx: LayerCtx, w: number, h: number, input: LayerDraw)
     ctx.textAlign = t.align;
     ctx.textBaseline = "alphabetic";
     ctx.font = font(t.font, fit.size, t.weight);
-    for (const l of placeLines(fit, zone)) ctx.fillText(l.text, l.x, l.y);
+    const lines = placeLines(fit, zone);
+    if (!t.rotate) {
+      for (const l of lines) ctx.fillText(l.text, l.x, l.y);
+      continue;
+    }
+    // At an angle: turn about the box's centre, and draw the lines relative to it.
+    const cx = zone.x + zone.w / 2;
+    const cy = zone.y + (zone.h ?? 0) / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((t.rotate * Math.PI) / 180);
+    for (const l of lines) ctx.fillText(l.text, l.x - cx, l.y - cy);
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -216,5 +232,6 @@ export function defaultLayerText(id: LayerTextId): LayerText {
     color: "#FFFFFF",
     align: "center",
     maxLines: 1,
+    rotate: 0,
   };
 }

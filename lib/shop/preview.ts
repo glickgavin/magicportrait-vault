@@ -38,6 +38,8 @@ export interface PreviewCtx {
   fillRect(x: number, y: number, w: number, h: number): void;
   drawImage(img: PreviewImage, ...args: number[]): void;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  translate(x: number, y: number): void;
+  rotate(radians: number): void;
   fillText(text: string, x: number, y: number): void;
   measureText(text: string): { width: number };
   fillStyle: unknown;
