@@ -169,9 +169,9 @@ export function LayerEditor({
     setLayer((l) => (l.art && l.art.choices.length < LAYER_ART_MAX ? { ...l, art: { ...l.art, choices: [...l.art.choices, b.art!.id] } } : l));
   }
 
-  const targets: (Target & { label: string; box: LayerBox })[] = [
-    ...(layer?.texts ?? []).map((t) => ({ kind: "text" as const, id: t.id, label: t.label || (t.id === "t1" ? "Text 1" : "Text 2"), box: t.box })),
-    ...(layer?.art ? [{ kind: "art" as const, label: layer.art.label || "Picture", box: layer.art.box }] : []),
+  const targets: (Target & { label: string; box: LayerBox; rotate: number })[] = [
+    ...(layer?.texts ?? []).map((t) => ({ kind: "text" as const, id: t.id, label: t.label || (t.id === "t1" ? "Text 1" : "Text 2"), box: t.box, rotate: t.rotate ?? 0 })),
+    ...(layer?.art ? [{ kind: "art" as const, label: layer.art.label || "Picture", box: layer.art.box, rotate: 0 }] : []),
   ];
   const offered = art.filter((a) => !a.archived || layer?.art?.choices.includes(a.id));
 
@@ -210,7 +210,7 @@ export function LayerEditor({
           >
             <canvas ref={canvas} role="img" aria-label="The print area with the personalisation layer" className="absolute inset-0 h-full w-full" />
             {targets.map((t) => (
-              <div key={t.kind === "art" ? "art" : t.id} className="absolute border-2 border-dashed border-[#DD07C4] bg-[#DD07C4]/10" style={{ left: `${t.box.x * 100}%`, top: `${t.box.y * 100}%`, width: `${t.box.w * 100}%`, height: `${t.box.h * 100}%` }}>
+              <div key={t.kind === "art" ? "art" : t.id} className="absolute border-2 border-dashed border-[#DD07C4] bg-[#DD07C4]/10" style={{ left: `${t.box.x * 100}%`, top: `${t.box.y * 100}%`, width: `${t.box.w * 100}%`, height: `${t.box.h * 100}%`, transform: t.rotate ? `rotate(${t.rotate}deg)` : undefined, transformOrigin: "center" }}>
                 <button
                   type="button"
                   aria-label={`${t.label}: drag to move, or use the arrow keys (Shift for bigger steps)`}
@@ -312,6 +312,30 @@ export function LayerEditor({
                       <option value="right">Right</option>
                     </select>
                   </label>
+                  <div className="flex flex-col gap-1 sm:col-span-2">
+                    <label htmlFor={f("angle")} className="text-[13px] font-bold">
+                      Angle ({name}): {t.rotate ?? 0}°
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input id={f("angle")} type="range" min={-90} max={90} step={1} className="min-w-0 flex-1" value={t.rotate ?? 0} onChange={(e) => setText(id, { rotate: Number(e.target.value) })} />
+                      <input
+                        type="number"
+                        min={-180}
+                        max={180}
+                        step={1}
+                        aria-label={`Angle in degrees (${name})`}
+                        className="h-10 w-20 rounded-[10px] border border-line bg-white px-2 text-[15px]"
+                        value={t.rotate ?? 0}
+                        onChange={(e) => setText(id, { rotate: Math.max(-180, Math.min(180, Math.round(Number(e.target.value) || 0))) })}
+                      />
+                      {(t.rotate ?? 0) !== 0 && (
+                        <button type="button" className="text-[13px] font-bold text-pink-link" onClick={() => setText(id, { rotate: 0 })}>
+                          Level
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[12px] font-normal text-ink-2">Turns the text about the middle of its box: plus turns it clockwise, minus anticlockwise (rising to the right). The slider goes to 90°; type up to 180°.</p>
+                  </div>
                   <label htmlFor={f("max")} className="flex flex-col gap-1 text-[13px] font-bold">
                     Most characters ({name})
                     <input id={f("max")} type="number" min={1} max={120} className={input} value={t.maxChars} onChange={(e) => setText(id, { maxChars: Math.min(120, Math.max(1, Math.round(Number(e.target.value) || 1))) })} />

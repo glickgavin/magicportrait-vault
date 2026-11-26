@@ -25,6 +25,8 @@ function fakeCtx() {
     textBaseline: "",
     save: () => calls.push({ op: "save", args: [] }),
     restore: () => calls.push({ op: "restore", args: [] }),
+    translate: (x: number, y: number) => calls.push({ op: "translate", args: [x, y] }),
+    rotate: (r: number) => calls.push({ op: "rotate", args: [r] }),
     drawImage: (...args: unknown[]) => calls.push({ op: "drawImage", args }),
     fillText: (text: string, x: number, y: number) => calls.push({ op: "fillText", args: [text, x, y], font: ctx.font }),
     measureText: (t: string) => ({ width: t.length * (parseFloat(/([\d.]+)px/.exec(ctx.font)?.[1] ?? "20") / 2) }),
@@ -81,6 +83,23 @@ describe("drawing", () => {
     expect(text[0].args[0]).toBe("Teddy");
     expect(text[0].args[1]).toBe(500); // centred in a box from 100 to 900
     expect(text[0].font).toContain('"Playfair Display"');
+  });
+
+  it("a box at an angle turns about its centre; level boxes don't turn at all", () => {
+    const tilted = layerSchema.parse({ ...layer, texts: [{ ...layer.texts[0], rotate: -15 }], art: null });
+    const { ctx, calls } = fakeCtx();
+    drawLayer(ctx, 1000, 1000, { layer: tilted, values: { t1: "Teddy" }, art: new Map(), family: (f) => `"${f}"` });
+    // t1's box is x 0.1–0.9, y 0.78–0.90: centre (500, 840).
+    expect(calls.find((c) => c.op === "translate")!.args).toEqual([500, 840]);
+    expect(calls.find((c) => c.op === "rotate")!.args[0]).toBeCloseTo((-15 * Math.PI) / 180);
+    const text = calls.find((c) => c.op === "fillText")!;
+    expect(text.args[1]).toBe(0); // centred on the box's centre
+    const level = fakeCtx();
+    drawLayer(level.ctx, 1000, 1000, { layer, values: { t1: "Teddy" }, art: new Map(), family: (f) => `"${f}"` });
+    expect(level.calls.some((c) => c.op === "rotate" || c.op === "translate")).toBe(false);
+    // Saved before angles existed: reads as level.
+    expect(layerSchema.parse({ ...layer, texts: [{ ...layer.texts[0], rotate: undefined }] }).texts[0].rotate).toBe(0);
+    expect(layerSchema.safeParse({ ...layer, texts: [{ ...layer.texts[0], rotate: 200 }] }).success).toBe(false);
   });
 
   it("nothing is drawn when the layer is off", () => {
