@@ -354,6 +354,11 @@ export const REGISTRY = {
   "open_store.enabled": bool("open_store", false, { label: "Magic Store on for everyone", description: "Off: /store and /api/store are 404 for everyone (except super users with the preview on). Turning it on is the store's launch." }),
   "open_store.super_user_preview": bool("open_store", false, { label: "Magic Store preview for super users", description: "On: super users see /store on the live site while it is still off for everyone else." }),
   "open_store.collection": text("open_store", "magic-store", { label: "Magic Store collection (handle)", description: "Only products in this Shopify collection appear anywhere in the store, and only they use the Magic Store fields. A product joins or leaves the store by being added to or removed from it in Shopify.", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),
+  "open_store.picture_options": list("open_store", ["Frame", "Color", "Colour"], {
+    label: "Options shown with pictures",
+    description: "Product options (by name, any case) whose choices show a picture on the product page: the value's swatch in Shopify, else that variant's own first photo. Any option with Shopify swatches on every value shows them too.",
+    max: 20,
+  }),
   "open_store.theme_category": text("open_store", "magicstore", { label: "Imagen themes: only this category", description: "The theme lists (here, on each product and in Shopify's dropdown) show only Imagen themes in this category, matched without case, spaces or dashes, plus any theme a product already uses. Empty: every theme.", max: 80 }),
   "open_store.menu_handle": text("open_store", "magic-store", { label: "Category menu (Shopify navigation handle)", description: "The category circles: each item of this menu links to a collection. Edited in Shopify admin › Online Store › Navigation.", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),
   "open_store.home_collection": text("open_store", "magic-store", { label: "Collection shown at /store (handle)", pattern: /^[a-z0-9][a-z0-9-]{0,99}$/, allowEmpty: false, max: 100 }),

@@ -66,7 +66,7 @@ test.describe("open store pictures", () => {
       await expect(inGallery).toHaveCount(0);
       await expect(creating).toBeInViewport();
     } else await expect(inGallery).toBeVisible();
-    await expect(page.getByTestId("store-create")).toHaveText("Creating their picture…");
+    await expect(page.getByTestId("store-create")).toHaveText("Generating…");
 
     await expect(page.getByTestId("store-ready")).toContainText("Teddy is ready", { timeout: 20_000 });
     await expect(page.getByTestId("store-stage").locator("canvas[data-preview]")).toBeVisible();

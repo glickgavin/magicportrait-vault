@@ -16,6 +16,7 @@ import { parseTemplate, type Template } from "@/lib/shop/template";
 import { canSeeOpenStore } from "./access";
 import { gridProducts, type StoreEntry } from "./catalog";
 import { cachedRead, getStoreCatalog, imagenThemes } from "./index";
+import type { OptionPictures } from "./sources/types";
 import { getOpenStoreSource } from "./sources";
 import type { StoreCollection } from "./sources/types";
 import { badgePct, deliveryWindow, fillStep, photoSlots, priceSummary, productTypes, relatedEntries, shortDay, sortEntries, type StoreSort } from "./view";
@@ -140,6 +141,8 @@ export type VariantView = {
   delivery: string | null;
   /** Drawing their picture on the product: the print area's shape and how the picture sits (Open store 3). */
   aspect: number | null;
+  /** The variant's own first photo in Shopify, for option chips with pictures. */
+  image: string | null;
   placement: "cover" | "contain" | "wrap_zone";
   background: string | null;
 };
@@ -167,12 +170,12 @@ function drawInfo(e: StoreEntry): DrawInfo | null {
 
 /** Everything the product page needs before a picture (docs/open-store.md › Product page). Null: not in the store. */
 export async function productPageData(legacyId: string) {
-  const s = await getSettings(["open_store.shipping_days", "open_store.reassurance", "open_store.how_it_works", "open_store.home_collection", "brand.timezone"] as const);
+  const s = await getSettings(["open_store.shipping_days", "open_store.reassurance", "open_store.how_it_works", "open_store.home_collection", "brand.timezone", "open_store.picture_options"] as const);
   const magic = await getStoreCatalog();
   const entry = magic.entries.find((e) => e.product.legacyId === legacyId);
   if (!entry || entry.hidden.length) return null;
   const p = entry.product;
-  const [pricing, themes, policies, photos, nameMax, photoTips, subject, stepLabels, imagesToShow, askName] = await Promise.all([
+  const [pricing, themes, policies, photos, nameMax, photoTips, subject, stepLabels, imagesToShow, askName, pictures] = await Promise.all([
     storePricing(magic.collection?.id ?? null),
     imagenThemes(),
     cachedRead("policies", async () => (await getOpenStoreSource()).policies()).catch(() => ({ shippingHtml: null, refundHtml: null })),
@@ -183,6 +186,8 @@ export async function productPageData(legacyId: string) {
     getProductSetting(p, "step_labels"),
     getProductSetting(p, "images_to_show"),
     getProductSetting(p, "ask_name"),
+    // Swatches and variant photos for the option chips; none when Shopify can't be read (plain chips).
+    cachedRead(`option-pictures:${p.id}`, async () => (await getOpenStoreSource()).optionPictures(p.id)).catch((): OptionPictures => ({ swatches: {}, variantImages: {} })),
   ]);
   const themeNames = new Map(themes?.map((t) => [t.slug, t.name]) ?? []);
   const theme = entry.theme ? (themes?.find((t) => t.slug === entry.theme) ?? null) : null;
@@ -208,6 +213,7 @@ export async function productPageData(legacyId: string) {
         badge: (await getVariantSetting(v, "badge")) || null,
         delivery: win ? `${shortDay(win.from)} – ${shortDay(win.to)}` : null,
         aspect: t ? t.w / t.h : null,
+        image: pictures.variantImages[v.id] ?? null,
         placement: r?.placement ?? "cover",
         background: r?.background ?? null,
       };
@@ -234,6 +240,9 @@ export async function productPageData(legacyId: string) {
     shipping: [...descriptionBlocks(policies.shippingHtml), ...descriptionBlocks(policies.refundHtml)],
     reassurance: s["open_store.reassurance"] as ReassuranceRow[],
     variants,
+    // Option chips with pictures (open_store.picture_options, or Shopify swatches on every value).
+    optionSwatches: pictures.swatches,
+    pictureOptions: s["open_store.picture_options"],
     // No name box when the product doesn't ask for the name (e.g. its personalisation layer does).
     slots: photoSlots(theme?.photos ?? photos.length, photos, theme?.inputs?.map((i) => i.label) ?? []).map((sl) => (askName ? sl : { ...sl, nameLabel: null, namePlaceholder: null })),
     nameMax,
