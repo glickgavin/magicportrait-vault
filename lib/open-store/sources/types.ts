@@ -16,6 +16,17 @@ export type StoreCollection = {
 export type StoreMenuItem = { title: string; collectionHandle: string | null; image: StoreCollection["image"] };
 export type StoreMenu = { handle: string; title: string; items: StoreMenuItem[] };
 
+/**
+ * Pictures for a product's option chips (docs/open-store.md › Product page): Shopify's own swatches (Shopify admin ›
+ * the product's option › linked to a category metafield), and each variant's own first photo.
+ */
+export type OptionPictures = {
+  /** option name → value → swatch (a colour, an image, or both). */
+  swatches: Record<string, Record<string, { color: string | null; image: string | null }>>;
+  /** variant gid → its first photo's URL. */
+  variantImages: Record<string, string>;
+};
+
 /** Shopify's own shipping and refund policies (HTML from Shopify admin › Policies). */
 export type StorePolicies = { shippingHtml: string | null; refundHtml: string | null };
 
@@ -33,4 +44,6 @@ export interface OpenStoreSource {
   /** The navigation menu with each item's collection (null when there's no such menu). */
   menu(handle: string): Promise<StoreMenu | null>;
   policies(): Promise<StorePolicies>;
+  /** One product's option swatches and variant photos, for its option chips. */
+  optionPictures(productId: string): Promise<OptionPictures>;
 }

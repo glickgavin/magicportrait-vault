@@ -120,6 +120,58 @@ export function relatedEntries(current: ShopProduct, entries: StoreEntry[], coun
   return [...own, ...rest].filter(fits).slice(0, count);
 }
 
+/** A chip's picture: Shopify's swatch (a colour and/or an image) or the variant's own photo. */
+export type ChipPicture = { image: string | null; color: string | null };
+
+/**
+ * The pictures for one option's chips (open_store.picture_options): null when the option isn't shown with pictures,
+ * or when any of its values has none (all or nothing, so the chips line up). Shopify's swatch comes first; else the
+ * photo of the variant that value would pick, given the other choices, else of any variant with that value.
+ */
+export function chipPictures(
+  option: string,
+  values: string[],
+  variants: { options: { name: string; value: string }[]; image?: string | null }[],
+  chosen: Record<string, string>,
+  swatches: Record<string, Record<string, { color: string | null; image: string | null }>>,
+  pictureOptions: string[],
+): Map<string, ChipPicture> | null {
+  const sw = swatches[option] ?? {};
+  const allSwatched = values.length > 0 && values.every((v) => sw[v]?.image || sw[v]?.color);
+  const listed = pictureOptions.some((o) => o.trim().toLowerCase() === option.trim().toLowerCase());
+  if (!allSwatched && !listed) return null;
+  const has = (v: (typeof variants)[number], name: string, value: string) => v.options.some((o) => o.name === name && o.value === value);
+  const out = new Map<string, ChipPicture>();
+  for (const value of values) {
+    const s = sw[value];
+    if (s?.image || s?.color) {
+      out.set(value, { image: s.image, color: s.color });
+      continue;
+    }
+    const want = { ...chosen, [option]: value };
+    const exact = variants.find((v) => Object.entries(want).every(([n, val]) => has(v, n, val)));
+    const image = exact?.image ?? variants.find((v) => has(v, option, value) && v.image)?.image ?? null;
+    if (!image) return null;
+    out.set(value, { image, color: null });
+  }
+  return out;
+}
+
+/** A Shopify CDN picture at a small size for a chip; other hosts as they are. */
+export function chipImageUrl(url: string, width = 120): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "cdn.shopify.com") return url;
+    u.searchParams.set("width", String(width));
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/** Columns for a row of option chips: 4 when the values come in fours, else 3. */
+export const chipColumns = (n: number) => (n === 4 || (n >= 7 && n % 4 === 0) ? 4 : 3);
+
 /** An Imagen category compared without case, spaces, dashes or underscores ("Magic Store" = "magic-store" = "magicstore"). */
 export const categoryKey = (c: string | null | undefined) => (c ?? "").toLowerCase().replace(/[\s_-]+/g, "");
 

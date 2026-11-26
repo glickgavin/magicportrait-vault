@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canSeeOpenStore } from "@/lib/open-store/access";
-import { addWorkingDays, badgePct, categoryKey, listedThemes, deliveryWindow, fillStep, initialVariant, isSort, optionGroups, parseDays, photoSlots, shortDay, variantFor } from "@/lib/open-store/view";
+import { addWorkingDays, badgePct, categoryKey, chipColumns, chipImageUrl, chipPictures, listedThemes, deliveryWindow, fillStep, initialVariant, isSort, optionGroups, parseDays, photoSlots, shortDay, variantFor } from "@/lib/open-store/view";
 import type { ShopVariant } from "@/lib/shop/sources/types";
 
 describe("open store: who sees it", () => {
@@ -107,5 +107,40 @@ describe("listedThemes: the Magic Store's own themes (open_store.theme_category)
   it("compares categories the same way everywhere", () => {
     expect(categoryKey("Magic Store")).toBe("magicstore");
     expect(categoryKey(null)).toBe("");
+  });
+});
+
+describe("option chips: columns and pictures", () => {
+  it("four in a row when the values come in fours, else three", () => {
+    expect([2, 3, 4, 5, 6, 7, 8, 12].map(chipColumns)).toEqual([3, 3, 4, 3, 3, 3, 4, 4]);
+  });
+  const variants = [
+    { options: [{ name: "Frame", value: "Black" }, { name: "Size", value: "8x10" }], image: "https://cdn.shopify.com/b8.jpg?v=1" },
+    { options: [{ name: "Frame", value: "Black" }, { name: "Size", value: "12x16" }], image: "https://cdn.shopify.com/b12.jpg?v=1" },
+    { options: [{ name: "Frame", value: "White" }, { name: "Size", value: "8x10" }], image: "https://cdn.shopify.com/w8.jpg?v=1" },
+    { options: [{ name: "Frame", value: "White" }, { name: "Size", value: "12x16" }], image: null },
+  ];
+  it("a listed option shows the photo of the variant each value would pick", () => {
+    const m = chipPictures("frame", ["Black", "White"], variants, { Frame: "Black", Size: "8x10" }, {}, ["Frame"]);
+    expect(m).toBeNull(); // the option name must match ("frame" ≠ "Frame" as given by Shopify)
+    const pics = chipPictures("Frame", ["Black", "White"], variants, { Frame: "Black", Size: "8x10" }, {}, ["frame"]);
+    expect(pics?.get("Black")?.image).toBe("https://cdn.shopify.com/b8.jpg?v=1");
+    expect(pics?.get("White")?.image).toBe("https://cdn.shopify.com/w8.jpg?v=1");
+  });
+  it("falls back to any photo with that value, and shows none unless every value has one", () => {
+    const pics = chipPictures("Frame", ["Black", "White"], variants, { Frame: "Black", Size: "12x16" }, {}, ["Frame"]);
+    expect(pics?.get("White")?.image).toBe("https://cdn.shopify.com/w8.jpg?v=1");
+    expect(chipPictures("Frame", ["Black", "Gold"], variants, {}, {}, ["Frame"])).toBeNull();
+  });
+  it("an option that isn't listed shows pictures only when Shopify has a swatch for every value", () => {
+    expect(chipPictures("Size", ["8x10", "12x16"], variants, {}, {}, ["Frame"])).toBeNull();
+    const sw = { Size: { "8x10": { color: "#000000", image: null }, "12x16": { color: null, image: "https://cdn.shopify.com/s.png" } } };
+    const pics = chipPictures("Size", ["8x10", "12x16"], variants, {}, sw, []);
+    expect(pics?.get("8x10")).toEqual({ color: "#000000", image: null });
+    expect(pics?.get("12x16")?.image).toBe("https://cdn.shopify.com/s.png");
+  });
+  it("asks Shopify's CDN for a small copy", () => {
+    expect(chipImageUrl("https://cdn.shopify.com/x.jpg?v=1")).toBe("https://cdn.shopify.com/x.jpg?v=1&width=120");
+    expect(chipImageUrl("/fixtures/shop/pillow.jpg")).toBe("/fixtures/shop/pillow.jpg");
   });
 });

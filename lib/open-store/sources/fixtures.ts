@@ -1,6 +1,6 @@
 import { shopFixtures } from "@/lib/shop/sources";
 import type { ShopProduct } from "@/lib/shop/sources/types";
-import type { OpenStoreSource, StoreCollection, StoreMenu, StorePolicies } from "./types";
+import type { OpenStoreSource, StoreCollection, StoreMenu, StorePolicies, OptionPictures } from "./types";
 
 /**
  * Made-up Magic Store for tests and local dev. Products are the shop fixtures' products (one in-memory copy,
@@ -68,5 +68,14 @@ export class OpenStoreFixtures implements OpenStoreSource {
 
   async policies(): Promise<StorePolicies> {
     return { ...POLICIES };
+  }
+
+  async optionPictures(productId: string): Promise<OptionPictures> {
+    // Made-up products have no swatches; each variant shows the product's first photo.
+    const p = shopFixtures().allProducts().find((x) => x.id === productId);
+    const out: OptionPictures = { swatches: {}, variantImages: {} };
+    if (!p) return out;
+    for (const v of p.variants) if (p.media[0]) out.variantImages[v.id] = p.media[0].url;
+    return out;
   }
 }

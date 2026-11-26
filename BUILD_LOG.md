@@ -752,3 +752,10 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 ### 26 Nov: sample cards on sign-in and home; Masterpiece menu picture
 - **Sample cards:** the sign-in page's fan drew three empty seed themes with no portrait. It now shows three finished Christmas cards with pet portraits (Merry Christmas, Christmas Charm, Snowy Window, the ones in the Christmas email), from the new setting `links.sample_cards` (three images, a path on this site or an https:// link; defaults in `public/sample-cards/`). Home (VaultHome, VaultGuest) uses the same fan. `components/CardFan.tsx` (the drawn one) is gone, with its sample copy.
 - **Masterpiece menu picture:** `links.menu_thumbnails` item 2 pointed at a hashed asset the main site no longer serves. Set (Settings › General, 26 Nov) to the main site's current menu picture, `__l5e/assets-v1/…/menu-masterpiece-royal-flush-full.jpg`, which doesn't change with each build.
+
+### 26 Nov: product page: swipe gallery, the plain name, chip rows and pictures, Generate
+- **Gallery (phones):** the pictures in a row to swipe (scroll snap), dots under them and a "Swipe" hint until the first swipe; no thumbnails. Desktop keeps the thumbnail column. The rail is keyboard-reachable (arrow keys).
+- **Name:** just Shopify's product title (no theme), on one line: `useFitText` shrinks it to fit, down to 18 px, then "…". The breadcrumb shows the title too.
+- **Chips:** 4 in a row when the values come in fours, else 3 (`chipColumns`). Options in the new setting `open_store.picture_options` (default Frame, Color, Colour) show a picture per value: Shopify's swatch, else that variant's own first photo (`OpenStoreSource.optionPictures`, cached like the catalogue); options with Shopify swatches on every value show them too (`chipPictures`).
+- **Button:** "Generate" ("Generating…").
+- **Checks:** typecheck, lint, the unit tests without a database (new ones for the chips); the page in the component harness at 390 and 1280, axe clean. e2e updated (`open-store`: the name, dots, Generate; `open-store-pictures`: Generating…); not run here (no local database).

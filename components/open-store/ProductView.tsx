@@ -4,10 +4,10 @@ import { storeFetch } from "./store-fetch";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Camera, Check, ChevronDown, Clock, Gift, Heart, Info, Loader2, Lock, Minus, Plus, Star, Truck, X } from "lucide-react";
+import { Camera, Check, ChevronDown, Clock, Gift, Heart, Info, Loader2, Lock, Minus, MoveHorizontal, Plus, Star, Truck, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ProductPageData, RelatedCard, VariantView } from "@/lib/open-store/pages";
-import { fillStep, optionGroups, variantFor } from "@/lib/open-store/view";
+import { chipColumns, chipImageUrl, chipPictures, fillStep, optionGroups, variantFor } from "@/lib/open-store/view";
 import type { DescriptionBlock } from "@/lib/shop/description";
 import { defaultCrop, fitVariant } from "@/lib/shop/fit";
 import { formatMoney } from "@/lib/shop/money";
@@ -139,7 +139,6 @@ export function ProductView({
   const started = useRef<number | null>(null);
   const slowSent = useRef(false);
   const pid = data.product.legacyId;
-  const themeName = data.theme?.name ?? null;
 
   const { state, create, choose: pickResult, reset, restore } = usePicture({
     productId: pid,
@@ -375,6 +374,28 @@ export function ProductView({
     ? [...(canDraw ? [{ kind: "drawn" as const }] : []), { kind: "alone" as const }, ...data.gallery.slice(1).map((g) => ({ kind: "media" as const, url: g.url, alt: g.alt, example: true }))]
     : data.gallery.map((g, i) => ({ kind: "media" as const, url: g.url, alt: g.alt, example: i > 0 }));
   const slide = slides[Math.min(shown, slides.length - 1)];
+
+  // The name on one line: the type gets smaller until it fits (down to 18 px), then the end is cut with "…".
+  const titleRef = useFitText<HTMLHeadingElement>(data.product.title, 18);
+
+  // Phones: the pictures in a row to swipe through, with dots under them (no thumbnails). Desktop keeps the thumbnails.
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [swiped, setSwiped] = useState(false);
+  const slideCount = slides.length;
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail || !rail.clientWidth) return;
+    if (Math.round(rail.scrollLeft / rail.clientWidth) === shown) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    rail.scrollTo({ left: shown * rail.clientWidth, behavior: still ? "auto" : "smooth" });
+  }, [shown, slideCount]);
+  const onRailScroll = () => {
+    const rail = railRef.current;
+    if (!rail || !rail.clientWidth) return;
+    const i = Math.max(0, Math.min(slideCount - 1, Math.round(rail.scrollLeft / rail.clientWidth)));
+    if (rail.scrollLeft > 4) setSwiped(true);
+    if (i !== shown) setShown(i);
+  };
   const theirPhoto = photos[0]?.url || null;
   // The small circle on the picture is the photo it was made from.
   const madeFrom = (kept ? kept.photos[0]?.url : theirPhoto) || null;
@@ -417,7 +438,7 @@ export function ProductView({
     </>
   );
 
-  const mainPicture = () => {
+  const renderSlide = (slide: Slide | undefined) => {
     if (slide?.kind === "drawn" && result && data.template && variant?.aspect)
       return (
         <ShopPreview
@@ -447,14 +468,32 @@ export function ProductView({
             {data.breadcrumb.title}
           </Link>
           <span aria-hidden="true">/</span>
-          <span className="text-[#2b2b2b]">{themeName ?? data.product.title}</span>
+          <span className="min-w-0 truncate text-[#2b2b2b]">{data.product.title}</span>
         </nav>
       )}
 
       <div className="lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-[52px] lg:pb-12">
         <section ref={stageRef} aria-label={t("store.pictures")} className="scroll-mt-[72px] flex flex-col gap-2.5 lg:sticky lg:top-[88px] lg:flex-row-reverse lg:gap-4">
           <div className="ph-no-capture relative lg:flex-1" data-ph-mask data-testid="store-stage">
-            <div className={cn("transition-opacity", creating && "opacity-40")}>{mainPicture()}</div>
+            <div className={cn("transition-opacity", creating && "opacity-40")}>
+              {wide || slides.length < 2 ? (
+                renderSlide(slide)
+              ) : (
+                <div ref={railRef} onScroll={onRailScroll} tabIndex={0} aria-label={t("store.swipeLabel")} className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#DD07C4] [&::-webkit-scrollbar]:hidden" data-testid="store-rail">
+                  {slides.map((s, i) => (
+                    <div key={i} className="w-full flex-none snap-center snap-always" aria-hidden={i !== shown ? true : undefined}>
+                      {renderSlide(s)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {!wide && !swiped && !creating && slides.length > 1 && (
+              <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[12px] font-bold text-white" aria-hidden="true">
+                <MoveHorizontal className="h-3.5 w-3.5" />
+                {t("store.swipe")}
+              </span>
+            )}
             {!result && !creating && shown === 0 && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.sample")}</span>}
             {slide?.kind === "media" && slide.example && <span className="absolute left-3 top-3 rounded-full bg-white/[0.92] px-2.5 py-[5px] text-[12px] font-bold text-[#2b2b2b]">{t("store.example")}</span>}
             {!creating && data.pricing.pct != null && <span className="absolute right-3 top-3 rounded-full bg-[#B8059F] px-2.5 py-[5px] text-[12px] font-extrabold tracking-[0.06em] text-white">{t("store.off", { pct: Math.round(data.pricing.pct * 100) })}</span>}
@@ -467,7 +506,16 @@ export function ProductView({
           </div>
           {creating && wide && emailBits}
           {!creating && slides.length > 1 && (
-            <div className="flex gap-2 px-4 lg:flex-col lg:px-0">
+            <div className="flex items-center justify-center lg:hidden" data-testid="store-dots">
+              {slides.map((_, i) => (
+                <button key={i} type="button" aria-label={t("store.pictureN", { n: i + 1, count: slides.length })} aria-current={i === shown ? "true" : undefined} onClick={() => setShown(i)} className="flex h-6 w-6 items-center justify-center">
+                  <span className={cn("block h-2 rounded-full transition-all", i === shown ? "w-5 bg-[#DD07C4]" : "w-2 bg-[#CFC9BC]")} />
+                </button>
+              ))}
+            </div>
+          )}
+          {!creating && slides.length > 1 && (
+            <div className="hidden gap-2 lg:flex lg:flex-col">
               {slides.map((g, i) => (
                 <button key={i} type="button" aria-label={t("store.pictureN", { n: i + 1, count: slides.length })} aria-current={i === shown ? "true" : undefined} onClick={() => setShown(i)} className={cn("ph-no-capture h-16 w-16 flex-none overflow-hidden rounded-[10px] bg-page lg:h-[72px] lg:w-[72px]", i === shown ? "border-2 border-[#DD07C4]" : "border border-[#E7E3D8]")}>
                   <img src={g.kind === "media" ? g.url : fileUrl(result!.file)} alt="" className={cn("block h-full w-full object-top", g.kind === "alone" ? "object-contain" : "object-cover")} />
@@ -491,7 +539,9 @@ export function ProductView({
             </fieldset>
           )}
           <section className="flex flex-col gap-2 px-4 pt-5 lg:px-0 lg:pt-0">
-            <h1 className="font-serif text-[30px] font-normal leading-[1.12] text-[#1a1a1a] lg:text-[40px]">{themeName ? `${data.product.title} · ${themeName}` : data.product.title}</h1>
+            <h1 ref={titleRef} className="truncate font-serif text-[26px] font-normal leading-[1.15] text-[#1a1a1a] lg:text-[36px]" title={data.product.title}>
+              {data.product.title}
+            </h1>
             {data.product.rating != null && data.product.ratingCount != null && (
               <span className="flex items-center gap-1.5 text-[13px] text-[#6b6b6b]">
                 <Stars rating={data.product.rating} />
@@ -526,20 +576,27 @@ export function ProductView({
 
           {groups.map((g) => {
             const value = chosen[g.name];
+            const pics = chipPictures(g.name, g.values, data.variants, chosen, data.optionSwatches, data.pictureOptions);
             return (
               <fieldset key={g.name} className="mx-4 mt-[22px] flex flex-col gap-2.5 lg:mx-0">
                 <legend className="pb-2.5 text-[15px] font-extrabold text-[#1a1a1a]">
                   {t("store.variantLabel", { option: g.name })}
                   <span className="font-medium">{value}</span>
                 </legend>
-                <div className="grid grid-cols-3 gap-2">
+                <div className={cn("grid gap-2", chipColumns(g.values.length) === 4 ? "grid-cols-4" : "grid-cols-3")} data-testid="store-option-chips">
                   {g.values.map((val) => {
                     const v = variantFor(data.variants, { ...chosen, [g.name]: val });
                     const on = val === value;
                     const dis = !v || !v.available;
+                    const pic = pics?.get(val) ?? null;
                     return (
-                      <label key={val} className={cn("relative flex h-[52px] cursor-pointer items-center justify-center rounded-[12px] px-1 text-center text-[14px] focus-within:ring-2 focus-within:ring-[#DD07C4] focus-within:ring-offset-2", on ? "border-2 border-[#DD07C4] bg-pink-tint font-extrabold text-[#8E047B]" : "border-[1.5px] border-[#D9D5CA] font-bold text-[#2b2b2b]", dis && "cursor-not-allowed opacity-50 line-through")}>
+                      <label key={val} className={cn("relative flex cursor-pointer items-center justify-center rounded-[12px] px-1 text-center text-[14px] leading-tight focus-within:ring-2 focus-within:ring-[#DD07C4] focus-within:ring-offset-2", pic ? "min-h-[52px] flex-col gap-1.5 py-2 text-[13px]" : "h-[52px]", on ? "border-2 border-[#DD07C4] bg-pink-tint font-extrabold text-[#8E047B]" : "border-[1.5px] border-[#D9D5CA] font-bold text-[#2b2b2b]", dis && "cursor-not-allowed opacity-50 line-through")}>
                         <input type="radio" name={`${uid}-${g.name}`} value={val} checked={on} disabled={dis} onChange={() => pickOption(g.name, val)} className="absolute h-px w-px opacity-0" />
+                        {pic && (
+                          <span className="block h-11 w-11 flex-none overflow-hidden rounded-[8px] border border-black/10 bg-page" style={pic.color && !pic.image ? { background: pic.color } : undefined} aria-hidden="true" data-testid="store-chip-picture">
+                            {pic.image && <img src={chipImageUrl(pic.image)} alt="" className="h-full w-full object-cover" loading="lazy" />}
+                          </span>
+                        )}
                         {val}
                         {dis && <span className="sr-only"> ({t("store.soldOut")})</span>}
                         {v?.badge && !dis && <span className="absolute -top-[9px] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#1a1a1a] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-white no-underline">{v.badge}</span>}
@@ -1114,6 +1171,37 @@ function Progress({ photo, steps, step, slow }: { photo: string | null; steps: s
       {slow && <p className="max-w-[300px] rounded-[12px] bg-white/[0.94] px-3 py-2 text-center text-[14px] font-bold text-[#8E047B]">{t("store.slow")}</p>}
     </div>
   );
+}
+
+/** Shrinks an element's font size, 1 px at a time from its CSS size, until its text fits on one line (or `min`). */
+function useFitText<T extends HTMLElement>(text: string, min: number) {
+  const ref = useRef<T | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.fontSize = "";
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      while (el.scrollWidth > el.clientWidth && size > min) {
+        size -= 1;
+        el.style.fontSize = `${size}px`;
+      }
+    };
+    fit();
+    // Again once the web font has loaded: it's wider than the fallback.
+    void document.fonts?.ready.then(fit);
+    if (typeof ResizeObserver === "undefined") return;
+    let w = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth !== w) {
+        w = el.clientWidth;
+        fit();
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, min]);
+  return ref;
 }
 
 /** True on desktop widths (the lg breakpoint), where the gallery sits beside the form. */

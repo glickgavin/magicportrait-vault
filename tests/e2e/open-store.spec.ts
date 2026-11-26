@@ -81,7 +81,16 @@ test.describe("open store", () => {
       await page.goto("/store");
       await page.getByTestId("store-card").filter({ hasText: "Magic Pillow with Photo" }).click();
       await expect(page).toHaveURL(new RegExp(`/store/product/${PILLOW}\\?from=grid`));
-      await expect(page.getByRole("heading", { level: 1, name: "Magic Pillow with Photo · The Admiral" })).toBeVisible();
+      // Just the Shopify name, on one line (no theme).
+      const h1 = page.getByRole("heading", { level: 1, name: "Magic Pillow with Photo", exact: true });
+      await expect(h1).toBeVisible();
+      expect((await h1.evaluate((el) => getComputedStyle(el).whiteSpace))).toBe("nowrap");
+      // Phones: dots under the picture to swipe through, no thumbnails; desktop keeps the thumbnails.
+      if (test.info().project.name === "mobile") {
+        await expect(page.getByTestId("store-dots").getByRole("button")).not.toHaveCount(0);
+        await expect(page.getByTestId("store-rail")).toBeVisible();
+      }
+      await expect(page.getByTestId("store-create")).toHaveText("Generate");
       await expect(page.getByTestId("store-price")).toContainText("$59.99");
       await expect(page.getByRole("img", { name: "Rated 4.8 out of 5" })).toBeVisible();
       await expect(page.getByTestId("store-delivery")).toContainText(/Delivery approx\. \d{1,2} [A-Z][a-z]{2} – \d{1,2} [A-Z][a-z]{2}/);
