@@ -759,3 +759,7 @@ Plan approved 24 Nov: "Copy settings from…" first, then a personalisation laye
 - **Chips:** 4 in a row when the values come in fours, else 3 (`chipColumns`). Options in the new setting `open_store.picture_options` (default Frame, Color, Colour) show a picture per value: Shopify's swatch, else that variant's own first photo (`OpenStoreSource.optionPictures`, cached like the catalogue); options with Shopify swatches on every value show them too (`chipPictures`).
 - **Button:** "Generate" ("Generating…").
 - **Checks:** typecheck, lint, the unit tests without a database (new ones for the chips); the page in the component harness at 390 and 1280, axe clean. e2e updated (`open-store`: the name, dots, Generate; `open-store-pictures`: Generating…); not run here (no local database).
+
+### 26 Nov: the Magic Store's Imagen category is `magicshop`
+- **Why themes were missing:** `open_store.theme_category` defaulted to `magicstore`, but Imagen's category for the store is "Magic Shop", slug `magicshop` (checked in Imagen's database, read only). No theme matched, so the lists showed only themes a product already uses, and new ones such as `store-the-morning-paper-copy` (active, one active scene, in Magic Shop) were left out.
+- **Done:** the default is now `magicshop` (registry, seed, fixtures, the `shop-settings` e2e and the spec). The live database has no row for this key yet, so the live site picks up the new default as soon as this is deployed.
